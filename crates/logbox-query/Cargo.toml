@@ -10,6 +10,17 @@ publish.workspace = true
 
 [dependencies]
 logbox-core.workspace = true
+regex.workspace = true
+regex-syntax.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlparser.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+clickhouse.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

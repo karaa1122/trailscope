@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+exclude = ["crates/logbox-query/fuzz"]
 
 [workspace.package]
 version = "0.1.0"
@@ -40,6 +41,7 @@ proptest = "1.12.0"
 rand = "0.10.3"
 redis = { version = "1.8.0", default-features = false, features = ["tokio-comp", "connection-manager", "aio"] }
 regex = "1.13.1"
+regex-syntax = "0.8.11"
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "http2"] }
 rust-embed = { version = "8.13.0", features = ["mime-guess"] }
 serde = { version = "1.0.229", features = ["derive"] }

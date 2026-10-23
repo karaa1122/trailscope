@@ -17,7 +17,9 @@ build/
 coverage/
 test-results/
 playwright-report/
-fuzz/target/
-fuzz/corpus/
-fuzz/artifacts/
+crates/logbox-query/fuzz/target/
+crates/logbox-query/fuzz/corpus/parse/*
+!crates/logbox-query/fuzz/corpus/parse/seed*
+
+crates/logbox-query/fuzz/artifacts/
 .DS_Store

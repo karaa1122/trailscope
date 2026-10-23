@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e391cb27f81e922d56f83826cfd0451e768b6d5e8b9f5618ff942e0c2d75a815 # shrinks to e = Compare { left: Column(Column { name: "status", ch_type: "UInt16", kind: Number, description: "HTTP status code", filterable: true, facetable: true, groupable: true, sensitive: false, free_text: false, live: true }), op: Lt, right: Literal(Int(-1)) }

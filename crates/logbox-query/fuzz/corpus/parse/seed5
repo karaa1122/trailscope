@@ -1,0 +1,1 @@
+NOT (status = 1 OR lower(method) = 'get')

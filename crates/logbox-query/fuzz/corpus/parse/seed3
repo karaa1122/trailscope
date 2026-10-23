@@ -1,0 +1,1 @@
+timestamp > now() - INTERVAL 15 MINUTE

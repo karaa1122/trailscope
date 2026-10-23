@@ -91,3 +91,45 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** The default key list includes `access_token`, but apps send `accessToken` or `access-token` too.
 - **Choice:** Key matching is case-insensitive and ignores `_` and `-`. Keys must match whole (`pinned` isn't `pin`). Dotted rules (`user.profile.dob`) match full paths, where `*` matches any key or array index. When a JSON body was truncated and no longer parses, a regex fallback still redacts `"key": value` pairs.
 - **Alternatives:** Substring matching (`pin` would also redact `shipping`, `mapping` and `spinner`).
+
+## 016. `IS NULL` means "empty"
+
+- **Context:** Logbox stores no SQL `NULL`s; missing values are empty strings, absent map keys or zeros.
+- **Choice:** `x IS NULL` compiles to `empty(x)` for strings and map values, `x = 0` for numbers and IDs, and epoch 0 for timestamps. The evaluator uses the same rule.
+- **Alternatives:** Nullable columns (slower in ClickHouse, and every SDK would need to tell "absent" from "empty").
+
+## 017. Unicode-aware string functions
+
+- **Context:** ClickHouse's `lower`, `upper`, `length` and `position` work on bytes; most people expect characters.
+- **Choice:** They compile to `lowerUTF8`, `upperUTF8`, `lengthUTF8` and `positionUTF8`. The evaluator uses Rust's Unicode-aware equivalents, and the differential test checks them on non-ASCII data.
+- **Alternatives:** Byte semantics (surprising for non-English data).
+
+## 018. Regex parity between RE2 and the live tail
+
+- **Context:** ClickHouse runs `match()` with RE2; the live tail runs Rust `regex`, which accepts more syntax and makes `\d`, `\w`, `\s` and `\b` Unicode-aware.
+- **Choice:** Patterns are parsed with `regex-syntax` and rejected when RE2 would reject them (stacked repetition, counts over 1000, nested classes and set operations, unsupported flags). For evaluation, those classes are rewritten to RE2's ASCII definitions. The differential test caught both problems.
+- **Alternatives:** Using RE2 bindings in the evaluator (C++ build dependency), or documenting the differences.
+
+## 019. A comparison needs a column
+
+- **Context:** `1 = 1` and `'a' = 'a'` are harmless but are classic injection tautologies, and they never express a real filter.
+- **Choice:** At least one side of every comparison, and the subject of every IN, BETWEEN, LIKE and IS NULL, must read a column or map value.
+- **Alternatives:** Allowing constant comparisons.
+
+## 020. The time picker always applies
+
+- **Context:** The spec says the time range comes from the picker "unless the expression narrows it further".
+- **Choice:** The server always wraps the filter as `project_id = … AND timestamp BETWEEN picker range AND (filter)`. Conditions on `timestamp` in the filter AND with the range, so they can only narrow it. This also bounds every query's scan.
+- **Alternatives:** Letting a `timestamp` condition replace the picker (filters could then scan all retained data).
+
+## 021. Bodies and headers are gated in filters too
+
+- **Context:** Members without *can view bodies* must not see bodies or headers. Filtering on them would leak their contents one guess at a time.
+- **Choice:** `req_body`, `res_body`, `req_headers` and `res_headers` are marked sensitive in the registry. Referencing them in any query mode is an error unless the member has the permission.
+- **Alternatives:** Hiding them only in results.
+
+## 022. No casts
+
+- **Context:** The spec rejects "casts to unsafe types".
+- **Choice:** All casts (`CAST`, `::`, `toString()` and friends) are rejected. Comparisons already coerce literals to the column's type (timestamps from strings, IDs from strings or numbers, booleans from 0/1), which covers the real use cases.
+- **Alternatives:** A cast whitelist (more surface area, more ways for SQL and the evaluator to disagree).

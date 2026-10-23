@@ -25,8 +25,8 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 |---|---|---|
 | M0 Scaffold | done (`7c6042c`) | workspace, binary + config, compose, CI skeleton |
 | M1 Ingest | done | 50k ev/s sustained at p99 17 ms on 4 CPUs (docs/benchmarks.md); Node core SDK; demo and load test |
-| M2 Query language | **next** | |
-| M3 API | todo | |
+| M2 Query language | done | parser, registry, compiler, evaluator, search, chips; injection, property, differential (vs ClickHouse) and fuzz tests; docs/query-language.md |
+| M3 API | **next** | |
 | M4 Web part 1 | todo | |
 | M5 Web part 2 | todo | |
 | M6 Alerts + email-on-5xx | todo | includes the follow-up email brief |
@@ -93,17 +93,20 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `scripts/dev/rust.sh` runs a command in the Rust container with the test env vars; `scripts/dev/env.sh` holds the env for running `logbox` against the dev services.
 - Not built yet: `logbox-query`, `logbox-api` and `logbox-alerts` are empty stubs, `web/` is a placeholder, and the Python SDK is a skeleton.
 
-## Plan for M2 (query language)
+## Query language (M2, done)
 
-All in `crates/logbox-query`, with no database dependency:
+`crates/logbox-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs` (AST plus `Display` back to SQL), `compile.rs` (`compile`, `where_clause`; values are always `{pN:Type}` params), `eval.rs` (`Prepared` evaluator; `Record` is implemented for `LiveRequest` and `RequestRow`), `regex.rs` (RE2 validation and ASCII class rewriting), `search.rs`, `chips.rs`, and `QueryInput` in `lib.rs` (sql/search/filters). Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `LOGBOX_DIFF_CASES=4000 LOGBOX_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`; nightly and cargo-fuzz are installed in the dev container).
 
-1. `registry.rs`: the column registry (name, ClickHouse type, logical type, description, filterable/facetable/groupable, table) for `requests` and `events`. The single source of truth, also served at `GET /api/v1/schema`.
-2. `ast.rs`: Logbox's own small typed AST, with limits of 256 nodes and depth 32.
-3. `parse.rs`: normalize (optional leading `WHERE`, trailing `;`, reject comments and trailing statements, 4,000-character cap), parse with `sqlparser` `Parser::parse_expr` using the ClickHouse dialect, then convert the allowed subset to our AST. Errors carry line, column and length.
-4. Type-check against the registry. `compile.rs` turns the AST into ClickHouse SQL with every literal as a `{pN:Type}` parameter, wrapped in `project_id = {pid} AND timestamp BETWEEN {from} AND {to} AND (...)`.
-5. `eval.rs`: an in-memory evaluator over a `Record` trait (implemented for `LiveRequest`), for the live tail and real-time 5xx rules.
-6. `search.rs` (`status:>=500 route:/checkout/* "free text"`) and `chips.rs` (AST ↔ a `{field, op, value}` list).
-7. Tests: unit tests for every operator and error, proptest round-trips, a `fuzz/` cargo-fuzz target, and the injection suite from the spec. Then `docs/query-language.md`.
+## Plan for M3 (API)
+
+`crates/logbox-api`, mounted by `logbox-server` for the `all` and `api` roles:
+1. Postgres migration `0002` if needed. Auth: argon2id passwords, session cookie (HttpOnly, SameSite=Lax, Secure from config), CSRF token header on state-changing requests, login rate limit, roles owner/admin/member/viewer plus `can_view_bodies`, and API tokens (`lbx_api_…`, with scopes) as Bearer.
+2. Setup wizard API: status, create owner, create first project (with ingest key, shown once).
+3. Admin: projects, environments (distinct values from ClickHouse), services, ingest keys, API tokens, members and invites, redaction rules (invalidate the ingest `KeyCache`), project settings, replay targets.
+4. Query endpoints: `/api/v1/query/validate`, `requests` (keyset pagination on `(timestamp, request_id)`), `histogram` (by status class), `facets`, `group`, `/api/v1/schema`, `/api/v1/values`. Always use `ch.reader` with params from `logbox_query::compile`.
+5. Inspector: `/api/v1/requests/:id` (row, spans, events, error group; bodies and headers hidden without the permission), `/curl`, `/replay` (configured targets only, auth headers stripped).
+6. Live SSE `/api/v1/live?filter=…` (`LiveBus::subscribe_requests`, evaluated with `Prepared` in a live `Ctx`, 200 events/s cap, `skipped` markers).
+7. Saved views CRUD; OpenAPI via utoipa with a docs page.
 
 ## Email-on-5xx (follow-up brief) integration points
 

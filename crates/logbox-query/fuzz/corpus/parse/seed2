@@ -1,0 +1,1 @@
+attr['tenant'] IN ('a', 'b')
