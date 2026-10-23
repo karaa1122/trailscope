@@ -22,7 +22,8 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "lint": "eslint src test",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "node bench/overhead.mjs"
   },
   "devDependencies": {
     "tsup": "9.0.0"

@@ -1,13 +1,22 @@
 //! The `logbox` binary.
 
+mod ops;
+mod serve;
+
 use std::path::PathBuf;
 
 use anyhow::Context;
-use axum::{Json, Router, routing::get};
 use clap::{Parser, Subcommand};
 use logbox_core::Config;
-use serde_json::json;
-use tokio::net::TcpListener;
+use logbox_demo::DemoArgs;
+use tokio_util::sync::CancellationToken;
+
+use crate::serve::Role;
+
+// mimalloc returns freed memory to the OS far better than glibc malloc under
+// bursty ingest, which keeps RSS close to the configured queue budget.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Debug, Parser)]
 #[command(name = "logbox", version, about = "Self-hosted API request logging")]
@@ -31,8 +40,8 @@ enum Command {
     Alerts,
     /// Apply ClickHouse and Postgres migrations, then exit.
     Migrate,
-    /// Generate demo traffic.
-    Demo,
+    /// Generate demo traffic (or load-test with --load).
+    Demo(DemoArgs),
     /// Probe the local `/healthz` endpoint (used by container healthchecks).
     #[command(hide = true)]
     Healthcheck,
@@ -42,31 +51,31 @@ enum Command {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config = Config::load(cli.config.as_deref()).context("loading configuration")?;
+    let command = cli.command.unwrap_or(Command::All);
+    if matches!(command, Command::Healthcheck) {
+        return healthcheck(&config).await;
+    }
     logbox_core::telemetry::init(&config.log.level, config.log.format);
 
-    match cli.command.unwrap_or(Command::All) {
-        Command::All | Command::Ingest | Command::Api => serve(&config).await,
-        Command::Healthcheck => healthcheck(&config).await,
-        Command::Alerts | Command::Migrate | Command::Demo => {
-            tracing::warn!("not implemented yet");
-            Ok(())
+    let shutdown = CancellationToken::new();
+    tokio::spawn({
+        let shutdown = shutdown.clone();
+        async move {
+            shutdown_signal().await;
+            tracing::info!("shutdown signal received");
+            shutdown.cancel();
         }
-    }
-}
+    });
 
-async fn serve(config: &Config) -> anyhow::Result<()> {
-    let app = Router::new().route(
-        "/healthz",
-        get(|| async { Json(json!({ "status": "ok" })) }),
-    );
-    let listener = TcpListener::bind(&config.server.listen)
-        .await
-        .with_context(|| format!("binding {}", config.server.listen))?;
-    tracing::info!(addr = %config.server.listen, "listening");
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-    Ok(())
+    match command {
+        Command::All => serve::run(config, Role::All, shutdown).await,
+        Command::Ingest => serve::run(config, Role::Ingest, shutdown).await,
+        Command::Api => serve::run(config, Role::Api, shutdown).await,
+        Command::Alerts => serve::run(config, Role::Alerts, shutdown).await,
+        Command::Migrate => serve::migrate(&config).await,
+        Command::Demo(args) => logbox_demo::run(args, &config, shutdown).await,
+        Command::Healthcheck => Ok(()),
+    }
 }
 
 async fn shutdown_signal() {

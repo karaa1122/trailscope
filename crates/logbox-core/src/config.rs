@@ -163,8 +163,14 @@ pub struct IngestConfig {
     pub max_items: usize,
     /// Rows the in-memory queue holds before ingest answers 429.
     pub queue_capacity: usize,
+    /// Approximate bytes the queue holds before ingest answers 429.
+    pub max_queue_bytes: usize,
     pub flush_interval_ms: u64,
     pub flush_rows: usize,
+    /// ClickHouse inserts allowed in flight at once.
+    pub writer_concurrency: usize,
+    /// Batches decoded and validated at once; others wait. 0 = 2 x CPUs.
+    pub max_concurrent_batches: usize,
     /// Request and response bodies longer than this are truncated server-side.
     pub max_stored_body_bytes: usize,
     /// Seconds suggested in `Retry-After` when the queue is full.
@@ -175,11 +181,14 @@ impl Default for IngestConfig {
     fn default() -> Self {
         Self {
             max_body_bytes: 5 * 1024 * 1024,
-            max_decompressed_bytes: 64 * 1024 * 1024,
+            max_decompressed_bytes: 32 * 1024 * 1024,
             max_items: 10_000,
             queue_capacity: 200_000,
+            max_queue_bytes: 256 * 1024 * 1024,
             flush_interval_ms: 1_000,
             flush_rows: 20_000,
+            writer_concurrency: 4,
+            max_concurrent_batches: 0,
             max_stored_body_bytes: 16 * 1024,
             retry_after_secs: 2,
         }

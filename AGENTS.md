@@ -24,8 +24,8 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 | Milestone | State | Notes |
 |---|---|---|
 | M0 Scaffold | done (`7c6042c`) | workspace, binary + config, compose, CI skeleton |
-| M1 Ingest | **in progress** | ClickHouse schema written (`migrations/clickhouse/0001_init.sql`); next: Postgres schema, migration runner, ingest pipeline, Node core SDK, demo |
-| M2 Query language | todo | |
+| M1 Ingest | done | 50k ev/s sustained at p99 17 ms on 4 CPUs (docs/benchmarks.md); Node core SDK; demo and load test |
+| M2 Query language | **next** | |
 | M3 API | todo | |
 | M4 Web part 1 | todo | |
 | M5 Web part 2 | todo | |
@@ -84,24 +84,31 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 
 ## Architecture as built so far
 
-- `crates/logbox-core`: `Config` (defaults → `logbox.toml` → `LOGBOX_<SECTION>_<KEY>` env), errors, tracing init. Planned additions: event schema (wire + row types), ClickHouse/Postgres helpers and migration runner, live bus (broadcast or Redis), key generation and hashing.
-- `crates/logbox-server`: the `logbox` binary (clap): `all` (default), `ingest`, `api`, `alerts`, `migrate`, `demo`, and a hidden `healthcheck` used by the distroless image.
-- `migrations/clickhouse/0001_init.sql`: `requests`, `spans`, `events`, `route_minute` (+MV), `error_groups` (+MVs from requests and events), `error_minute` (+MVs). Placeholders `{{db}}`, `{{days}}`, `{{body_days}}` are substituted by the runner.
-- `deploy/`: all-in-one and split compose files, ClickHouse low-memory config.
-- `web/`, `sdks/node/packages/node`, `sdks/python`: skeletons only.
+- `crates/logbox-core`: `config` (defaults → `logbox.toml` → `LOGBOX_<SECTION>_<KEY>` env), `wire` (ingest JSON types), `rows` (ClickHouse row structs, `LiveRequest`, `ErrorSignal`), `ch` (writer and reader clients, migration runner, reader user and settings profile, TTL sync), `pg` (pool and sqlx migrations), `live` (`LiveBus`: broadcast, or Redis pub/sub in split mode, with separate `requests` and `errors` topics), `secrets` (token generation and SHA-256), `admin` (create project, create ingest key), `project` (`ProjectSettings` JSONB), `testing` (per-test databases from `LOGBOX_TEST_*`).
+- `crates/logbox-ingest`: `/v1/ingest`, `/v1/releases`, `/v1/config`. Modules: `keys` (key cache), `decode` (gzip/zstd with a cap, array/NDJSON split), `normalize` (validation, route templating, truncation), `redact`, `fingerprint`, `pipeline` (queue bounded by rows and bytes; writer with 4 concurrent inserts; publishes live and 5xx signals after each flush).
+- `crates/logbox-demo`: a deterministic generic SaaS traffic generator (`generator.rs`), backfill, live traffic and a scripted incident (release v1.43.0 breaks `GET /projects/:id/tasks`, v1.43.1 fixes it), and `--load` with `--target-eps` for open-loop latency tests.
+- `crates/logbox-server`: the `logbox` binary. `serve.rs` wires the roles; `ops.rs` serves `/healthz`, `/readyz` and `/metrics`. Uses mimalloc. Shutdown order: stop accepting, then drain the writer.
+- `migrations/clickhouse/0001_init.sql` (embedded with `include_str!` in `ch.rs`; add new files to its `MIGRATIONS` list) and `migrations/postgres/0001_init.sql` (sqlx).
+- `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, benchmark in `bench/`).
+- `scripts/dev/rust.sh` runs a command in the Rust container with the test env vars; `scripts/dev/env.sh` holds the env for running `logbox` against the dev services.
+- Not built yet: `logbox-query`, `logbox-api` and `logbox-alerts` are empty stubs, `web/` is a placeholder, and the Python SDK is a skeleton.
 
-## Plan for the rest of M1
+## Plan for M2 (query language)
 
-1. `migrations/postgres/0001_init.sql`: users, sessions, invites, projects, environments, ingest_keys, api_tokens, redaction_rules, releases, saved_views, replay targets and results, notification channels, alert rules and events, settings.
-2. ClickHouse migration runner in core: creates the database and a `schema_migrations` table, applies embedded files in order, creates the `logbox_reader` user and a settings profile (readonly, execution and memory limits), and re-applies TTLs when the config changes.
-3. `logbox-ingest`: `POST /v1/ingest` (Bearer `lbx_ingest_…`, SHA-256 lookup with an in-memory cache), gzip/zstd with a decompressed-size cap, NDJSON or JSON array, per-item validation with a 207-style response, server-side redaction, fingerprinting, body truncation, and a row-counted bounded queue (429 + `Retry-After` when full). The writer flushes every 1 s or 20k rows with retries. After a successful flush it publishes live summaries and, on a **separate error channel**, 5xx summaries for the real-time email engine (M6). Graceful shutdown drains the queue. `POST /v1/releases`. `/metrics`.
-4. `@logbox/node` core client: bounded queue that drops the oldest, batch gzip transport with backoff, jitter and `Retry-After`, AsyncLocalStorage context, redaction, sampling, body capture policy.
-5. `logbox demo` (backfill + live + scripted incident) and `--load` (events/s and latency percentiles).
+All in `crates/logbox-query`, with no database dependency:
+
+1. `registry.rs`: the column registry (name, ClickHouse type, logical type, description, filterable/facetable/groupable, table) for `requests` and `events`. The single source of truth, also served at `GET /api/v1/schema`.
+2. `ast.rs`: Logbox's own small typed AST, with limits of 256 nodes and depth 32.
+3. `parse.rs`: normalize (optional leading `WHERE`, trailing `;`, reject comments and trailing statements, 4,000-character cap), parse with `sqlparser` `Parser::parse_expr` using the ClickHouse dialect, then convert the allowed subset to our AST. Errors carry line, column and length.
+4. Type-check against the registry. `compile.rs` turns the AST into ClickHouse SQL with every literal as a `{pN:Type}` parameter, wrapped in `project_id = {pid} AND timestamp BETWEEN {from} AND {to} AND (...)`.
+5. `eval.rs`: an in-memory evaluator over a `Record` trait (implemented for `LiveRequest`), for the live tail and real-time 5xx rules.
+6. `search.rs` (`status:>=500 route:/checkout/* "free text"`) and `chips.rs` (AST ↔ a `{field, op, value}` list).
+7. Tests: unit tests for every operator and error, proptest round-trips, a `fuzz/` cargo-fuzz target, and the injection suite from the spec. Then `docs/query-language.md`.
 
 ## Email-on-5xx (follow-up brief) integration points
 
 - **Config:** `smtp.*` exists in `Config`. Still needed: `smtp.from_name`, a top-level `secret_key` (env `LOGBOX_SECRET_KEY`) used for AES-256-GCM or XChaCha20-Poly1305 encryption of the stored SMTP password and for HMAC-signed mute links. Env values override UI values and lock those fields in the UI.
-- **Ingest → alert engine:** after each successful flush, publish 5xx summaries (no bodies, headers or IPs) on an error channel: in-process in `all` mode, a separate Redis channel in split mode.
+- **Ingest → alert engine:** done in M1. `LiveBus::subscribe_errors()` yields `ErrorSignal`s (5xx, without bodies, headers or IPs) after each successful flush; in split mode they arrive over Redis `<prefix>:errors`.
 - **Alerts crate:** throttle per `error_fingerprint` (first occurrence immediately, then at most one per 15 min with digest counts), a project cap of 30/hour with a single "paused" email, regression after 24 h quiet, signed mute links (1 h / 24 h / forever), and a Postgres-backed send queue with 5 attempts and exponential backoff. Every send is logged and shown under Alerts → History.
 - **Dev:** Mailpit in a `dev` compose profile; an integration test asserts the email arrives with the right subject and no body or header data.
 - **Docs:** `docs/alerts.md` and `docs/configuration.md`.

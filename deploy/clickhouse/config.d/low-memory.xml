@@ -21,6 +21,9 @@
         <merge_max_block_size>2048</merge_max_block_size>
         <max_bytes_to_merge_at_max_space_in_pool>2147483648</max_bytes_to_merge_at_max_space_in_pool>
         <number_of_free_entries_in_pool_to_lower_max_size_of_merge>2</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+        <!-- Must stay below background_pool_size * background_merges_mutations_concurrency_ratio (8). -->
+        <number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
     </merge_tree>
 
     <!-- The internal log tables eat disk and RAM on a small box; keep only a short query_log. -->

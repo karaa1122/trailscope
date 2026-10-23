@@ -3,7 +3,7 @@
 --   {{db}}           database name (clickhouse.database)
 --   {{days}}         raw row retention in days (retention.days)
 --   {{body_days}}    body and header retention in days (retention.body_days)
--- Statements are separated by a line containing only `;`... no: by `;` at end of line.
+-- The runner splits statements on a `;` that ends a line.
 
 CREATE TABLE IF NOT EXISTS {{db}}.requests
 (

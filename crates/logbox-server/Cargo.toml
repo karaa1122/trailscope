@@ -17,8 +17,15 @@ anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
 logbox-core.workspace = true
+logbox-demo.workspace = true
+logbox-ingest.workspace = true
+metrics-exporter-prometheus.workspace = true
+mimalloc.workspace = true
 serde_json.workspace = true
+sqlx.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
+tower-http.workspace = true
 tracing.workspace = true
 
 [lints]
