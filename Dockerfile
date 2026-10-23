@@ -39,7 +39,7 @@ FROM ${RUNTIME_IMAGE}
 LABEL org.opencontainers.image.title="logbox" \
       org.opencontainers.image.description="Self-hosted API request logging" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/karaa1122/logbox"
+      org.opencontainers.image.source="https://github.com/karaa1122/LogBox"
 COPY --from=builder /usr/local/bin/logbox /usr/local/bin/logbox
 USER nonroot:nonroot
 ENV LOGBOX_SERVER_LISTEN=0.0.0.0:8080 \

@@ -17,7 +17,7 @@
   "engines": { "node": ">=18" },
   "sideEffects": false,
   "publishConfig": { "access": "public", "provenance": true },
-  "repository": { "type": "git", "url": "https://github.com/karaa1122/logbox", "directory": "sdks/node/packages/node" },
+  "repository": { "type": "git", "url": "https://github.com/karaa1122/LogBox", "directory": "sdks/node/packages/node" },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "lint": "eslint src test",

@@ -29,7 +29,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 005. Repository URL and image name
 
 - **Context:** The project needs a canonical URL for package metadata and image labels.
-- **Choice:** `https://github.com/karaa1122/logbox`. CI publishes to `ghcr.io/${{ github.repository }}`, so forks work without edits. Compose builds `logbox:local` from source by default; `LOGBOX_IMAGE` selects a published image.
+- **Choice:** `https://github.com/karaa1122/LogBox`. CI publishes to `ghcr.io/${{ github.repository }}`, so forks work without edits. Compose builds `logbox:local` from source by default; `LOGBOX_IMAGE` selects a published image.
 - **Alternatives:** A placeholder organisation.
 
 ## 006. Distroless runtime image and built-in healthcheck
