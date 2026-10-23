@@ -12,7 +12,7 @@ use logbox_query::{Ctx, Prepared, Table, compile, parse, parse_search};
 
 fn check(expr: &logbox_query::Expr, ctx: &Ctx) {
     let sql = compile(expr);
-    for bad in ['\'', '"', '`', ';', '\'] {
+    for bad in ['\'', '"', '`', ';', '\\'] {
         assert!(!sql.text.contains(bad), "unsafe SQL: {}", sql.text);
     }
     assert!(!sql.text.contains("--") && !sql.text.contains("/*"), "unsafe SQL: {}", sql.text);
