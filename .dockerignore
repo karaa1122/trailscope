@@ -1,0 +1,13 @@
+target
+**/node_modules
+**/dist
+.git
+.github
+design
+docs
+examples
+e2e
+sdks/python
+**/__pycache__
+**/.venv
+fuzz/target

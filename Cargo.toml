@@ -1,0 +1,77 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+repository = "https://github.com/karaa1122/logbox"
+homepage = "https://github.com/karaa1122/logbox"
+publish = false
+
+[workspace.dependencies]
+logbox-core = { path = "crates/logbox-core" }
+logbox-query = { path = "crates/logbox-query" }
+logbox-ingest = { path = "crates/logbox-ingest" }
+logbox-api = { path = "crates/logbox-api" }
+logbox-alerts = { path = "crates/logbox-alerts" }
+logbox-demo = { path = "crates/logbox-demo" }
+
+anyhow = "1.0.104"
+async-stream = "0.3.6"
+axum = { version = "0.8.9", features = ["macros"] }
+axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
+base64 = "0.23.1"
+bytes = "1.12.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+clickhouse = { version = "0.15.3", features = ["lz4", "inserter", "uuid", "time"] }
+figment = { version = "0.10.19", features = ["toml", "env"] }
+flate2 = "1.1.10"
+futures = "0.3.34"
+hex = "0.4.3"
+hmac = "0.13.0"
+http-body-util = "0.1.5"
+metrics = "0.24.6"
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
+proptest = "1.12.0"
+rand = "0.10.3"
+regex = "1.13.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "gzip"] }
+rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+sqlparser = "0.63.0"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "time", "json"] }
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+tokio-util = "0.7.20"
+tower = { version = "0.5.3", features = ["util", "limit", "timeout"] }
+tower-http = { version = "0.7.1", features = ["compression-gzip", "compression-zstd", "decompression-gzip", "decompression-zstd", "cors", "request-id", "trace", "util", "set-header", "propagate-header"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+url = "2.5.8"
+uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
+xxhash-rust = { version = "0.8.19", features = ["xxh64"] }
+zstd = "0.14.3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+dbg_macro = "deny"
+todo = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev.package."*"]
+opt-level = 1

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Logbox – Order journey</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0A0C0F}
+a{color:#C8F65D}a:hover{color:#E2FF9E}
+.lb-ev:hover{background:#161A21 !important}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; background: #0A0C0F; color: #E7EAEE; font-family: 'Geist', system-ui, sans-serif; font-size: 14px; display: flex; flex-wrap: wrap; align-items: stretch">
+
+  <nav aria-label="Main" style="flex: 1 1 64px; box-sizing: border-box; padding: 16px 12px; border-right: 1px solid #1D222B; background: #0D1014; display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center; gap: 6px">
+    <a href="Main.dc.html" aria-label="Logbox home" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="7" fill="#C8F65D"></rect><path d="M7 9h12M7 13h7M7 17h10" stroke="#0A0C0F" stroke-width="2.2" stroke-linecap="round"></path></svg>
+    </a>
+    <a href="Main.dc.html" aria-label="Live tail" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #B7BDC7">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>
+    </a>
+    <a href="Inspector.dc.html" aria-label="Explore" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #B7BDC7">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+    </a>
+    <a href="#" aria-label="Errors" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #B7BDC7">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"></path><path d="M12 10v4M12 17h.01"></path></svg>
+    </a>
+    <a href="Journey.dc.html" aria-label="Journeys" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #C8F65D; background: #161A21">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h6a4 4 0 0 1 0 8H11a4 4 0 0 0 0 8h6"></path></svg>
+    </a>
+    <a href="#" aria-label="Alerts" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #B7BDC7">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10 21h4"></path></svg>
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 18px">
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+      <div style="flex: 1 1 380px; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px; box-sizing: border-box; background: #111419; border: 1px solid #2E3540; border-radius: 10px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9099A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <label for="lb-j" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Find a journey by order, user, or request ID</label>
+        <input id="lb-j" type="text" value="order:ord_48213" style="flex: 1; min-width: 0; height: 34px; background: transparent; border: 0; outline: none; color: #E7EAEE; font-family: 'Geist Mono', monospace; font-size: 13px">
+        <span style="font-size: 12px; color: #9099A8">order · user · request ID</span>
+      </div>
+      <button type="button" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #2E3540; border-radius: 10px; background: #111419; color: #E7EAEE; font-family: inherit; font-size: 13px; cursor: pointer">Share journey</button>
+      <button type="button" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid #2E3540; border-radius: 10px; background: #111419; color: #E7EAEE; font-family: inherit; font-size: 13px; cursor: pointer">Export JSON</button>
+    </div>
+
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px">
+      <h1 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em">Order <span style="font-family: 'Geist Mono', monospace; font-weight: 500">ord_48213</span></h1>
+      <span style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: #C8F65D; background: rgba(200,246,93,0.1); border: 1px solid rgba(200,246,93,0.35); border-radius: 999px; padding: 4px 12px">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #C8F65D"></span>
+        In progress · courier assigned
+      </span>
+      <span style="font-size: 13px; color: #9099A8">recovered from 2 errors, no customer impact</span>
+    </header>
+
+    <section aria-label="Summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px">
+      <sc-for list="{{summary}}" as="s" hint-placeholder-count="5">
+        <div style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 24px; font-weight: 500; letter-spacing: -0.02em; color: {{s.color}}">{{s.value}}</span>
+          <span style="font-size: 12px; color: #9099A8">{{s.label}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <section aria-label="Swimlane timeline" style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Across services</h2>
+        <span style="font-size: 12px; color: #9099A8">every log line carrying this order's ID, one lane per service</span>
+        <span style="margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: #9099A8">
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 9px; height: 9px; border-radius: 50%; background: #8AB4F8"></span>ok</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 9px; height: 9px; border-radius: 50%; background: #F5B544"></span>retry / warn</span>
+          <span style="display: flex; align-items: center; gap: 6px"><span style="width: 9px; height: 9px; border-radius: 50%; background: #FF6B5B"></span>error</span>
+        </span>
+      </div>
+      <div style="overflow-x: auto">
+        <div style="min-width: 760px; display: flex; flex-direction: column">
+          <sc-for list="{{lanes}}" as="lane" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; align-items: center; min-height: 40px; border-bottom: 1px solid #171B22">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #B7BDC7">{{lane.name}}</span>
+              <span style="position: relative; height: 40px; display: block">
+                <span style="position: absolute; left: 0; right: 0; top: 19px; height: 1px; background: #222833"></span>
+                <span style="position: absolute; top: 0; bottom: 0; left: 88.9%; right: 0; background: repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 6px, transparent 6px 12px)"></span>
+                <span style="position: absolute; top: 0; bottom: 0; left: 88.9%; width: 1px; background: #C8F65D"></span>
+                <sc-for list="{{lane.dots}}" as="d" hint-placeholder-count="2">
+                  <span title="{{d.tip}}" style="position: absolute; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; left: {{d.left}}; width: {{d.size}}; height: {{d.size}}; background: {{d.color}}; box-shadow: {{d.ring}}"></span>
+                </sc-for>
+              </span>
+            </div>
+          </sc-for>
+          <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding-top: 8px">
+            <span></span>
+            <span style="position: relative; height: 16px; display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #7D8696">
+              <span style="position: absolute; left: 0">21:26</span>
+              <span style="position: absolute; left: 33.3%; transform: translateX(-50%)">21:28</span>
+              <span style="position: absolute; left: 66.6%; transform: translateX(-50%)">21:30</span>
+              <span style="position: absolute; left: 88.9%; transform: translateX(-50%); color: #C8F65D">now 21:31:20</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+      <section aria-label="Event log" style="flex: 999 1 520px; min-width: 0; background: #111419; border: 1px solid #1D222B; border-radius: 12px; overflow: hidden">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #1D222B">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Event log</h2>
+          <span style="font-size: 12px; color: #9099A8">12 menu views and 9 location pings collapsed</span>
+        </div>
+        <div style="overflow-x: auto">
+          <div style="min-width: 640px">
+            <sc-for list="{{events}}" as="e" hint-placeholder-count="9">
+              <a class="lb-ev" href="{{e.href}}" style="display: grid; grid-template-columns: 74px 22px 126px minmax(0, 1fr) 80px; gap: 0 12px; align-items: start; padding: 12px 18px; border-bottom: 1px solid #171B22; text-decoration: none; color: #E7EAEE; background: {{e.bg}}">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9099A8; padding-top: 2px">{{e.time}}</span>
+                <span style="display: flex; justify-content: center; padding-top: 5px"><span style="width: 10px; height: 10px; border-radius: 50%; background: {{e.color}}"></span></span>
+                <span style="justify-self: start; font-family: 'Geist Mono', monospace; font-size: 11px; color: #B7BDC7; border: 1px solid #2E3540; border-radius: 5px; padding: 2px 6px">{{e.lane}}</span>
+                <span style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+                  <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: {{e.titleColor}}">{{e.title}}</span>
+                    <sc-if value="{{e.inspected}}" hint-placeholder-val="{{false}}">
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; font-weight: 600; color: #0A0C0F; background: #C8F65D; border-radius: 5px; padding: 1px 6px">YOU CAME FROM HERE</span>
+                    </sc-if>
+                  </span>
+                  <span style="font-size: 12.5px; color: #9099A8">{{e.detail}}</span>
+                </span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 12px; text-align: right; color: #B7BDC7; padding-top: 2px">{{e.dur}}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <aside aria-label="Context" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <section aria-label="Order" style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 6px 0">
+          <h2 style="margin: 0; padding: 10px 16px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #7D8696">Order</h2>
+          <sc-for list="{{orderMeta}}" as="m" hint-placeholder-count="5">
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding: 8px 16px">
+              <span style="font-size: 12px; color: #9099A8">{{m.k}}</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; text-align: right">{{m.v}}</span>
+            </div>
+          </sc-for>
+        </section>
+        <section aria-label="Customer" style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 6px 0">
+          <h2 style="margin: 0; padding: 10px 16px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #7D8696">Customer</h2>
+          <sc-for list="{{customerMeta}}" as="m" hint-placeholder-count="4">
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding: 8px 16px">
+              <span style="font-size: 12px; color: #9099A8">{{m.k}}</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; text-align: right">{{m.v}}</span>
+            </div>
+          </sc-for>
+        </section>
+        <section aria-label="Related" style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #7D8696">Related</h2>
+          <a href="Inspector.dc.html" style="display: flex; align-items: center; gap: 8px; font-size: 13px; text-decoration: none; color: #E7EAEE">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #FF6B5B"></span>
+            <span style="font-family: 'Geist Mono', monospace">PaymentTimeoutError</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9099A8">142×</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 8px; font-size: 13px; text-decoration: none; color: #E7EAEE">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #F5B544"></span>
+            <span style="font-family: 'Geist Mono', monospace">CourierNotFoundError</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9099A8">12×</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 8px; font-size: 13px; text-decoration: none; color: #E7EAEE">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: #8AB4F8"></span>
+            <span style="font-family: 'Geist Mono', monospace">trace 4bf92f35…a9e1</span>
+            <span style="margin-left: auto; font-size: 12px; color: #9099A8">7 spans</span>
+          </a>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1160}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var WINDOW = 360; // 21:26:00 → 21:32:00
+    var C = { ok: '#8AB4F8', warn: '#F5B544', err: '#FF6B5B', dim: '#3A4556' };
+
+    function dot(s, kind, tip, opts) {
+      opts = opts || {};
+      return {
+        left: (s / WINDOW * 100).toFixed(2) + '%',
+        size: opts.small ? '6px' : '12px',
+        color: C[kind],
+        tip: tip,
+        ring: opts.inspected ? '0 0 0 3px #111419, 0 0 0 5px #C8F65D' : '0 0 0 3px #111419'
+      };
+    }
+
+    var pings = [];
+    for (var i = 0; i < 9; i++) { pings.push(dot(318 + i * 0.3, 'dim', 'PATCH /couriers/c_2041/location', { small: true })); }
+    var menu = [];
+    for (var j = 0; j < 12; j++) { menu.push(dot(4 + j * 2.6, 'dim', 'GET /restaurants/r_311/menu', { small: true })); }
+
+    var lanes = [
+      { name: 'customer-app', dots: menu.concat([dot(245, 'ok', '21:30:05 push: Order confirmed')]) },
+      { name: 'orders-svc', dots: [dot(40, 'ok', '21:26:40 POST /orders 201'), dot(238, 'err', '21:29:58 POST /orders/:id/checkout 500', { inspected: true })] },
+      { name: 'payments-svc', dots: [dot(232, 'err', '21:29:58 provider /charge timeout'), dot(244, 'ok', '21:30:04 charge captured')] },
+      { name: 'jobs · bullmq', dots: [dot(239, 'warn', '21:29:59 payments.retry scheduled'), dot(282, 'warn', '21:30:42 courier.assign failed, retrying'), dot(312, 'ok', '21:31:12 courier.assign → c_2041')] },
+      { name: 'restaurant-app', dots: [dot(281, 'ok', '21:30:41 PATCH /orders/:id/accept 200')] },
+      { name: 'courier-svc', dots: [dot(313, 'ok', '21:31:13 c_2041 accepted')].concat(pings) }
+    ];
+
+    var raw = [
+      { time: '21:26:40', kind: 'ok', lane: 'orders-svc', title: 'POST /orders → 201', detail: 'Order created from cart, 3 items, 18,500 IQD', dur: '312 ms' },
+      { time: '21:29:58', kind: 'err', lane: 'orders-svc', title: 'POST /orders/:id/checkout → 500', detail: 'PaymentTimeoutError: provider did not respond within 1200ms', dur: '1,318 ms', inspected: true, href: 'Inspector.dc.html' },
+      { time: '21:29:59', kind: 'warn', lane: 'jobs · bullmq', title: 'payments.retry · attempt 1', detail: 'Scheduled with 5s backoff, idempotency key ord_48213:pay', dur: 'queued' },
+      { time: '21:30:04', kind: 'ok', lane: 'payments-svc', title: 'charge captured', detail: 'Retry succeeded, order moved to confirmed', dur: '640 ms' },
+      { time: '21:30:05', kind: 'ok', lane: 'customer-app', title: 'push delivered', detail: 'Order confirmed notification opened 4s later', dur: '—' },
+      { time: '21:30:41', kind: 'ok', lane: 'restaurant-app', title: 'PATCH /orders/:id/accept → 200', detail: 'Restaurant r_311 accepted, prep time 15 min', dur: '58 ms' },
+      { time: '21:30:42', kind: 'warn', lane: 'jobs · bullmq', title: 'courier.assign · attempt 1 failed', detail: 'CourierNotFoundError: no courier within 3 km, widening radius', dur: '210 ms' },
+      { time: '21:31:12', kind: 'ok', lane: 'jobs · bullmq', title: 'courier.assign · attempt 2', detail: 'Assigned c_2041, 4.2 km away, ETA pickup 21:46', dur: '180 ms' },
+      { time: '21:31:13', kind: 'ok', lane: 'courier-svc', title: 'courier accepted', detail: 'c_2041 heading to restaurant, live location streaming', dur: '—' }
+    ];
+    var events = raw.map(function (e) {
+      return {
+        time: e.time, lane: e.lane, title: e.title, detail: e.detail, dur: e.dur,
+        color: C[e.kind],
+        titleColor: e.kind === 'err' ? '#FF8A7D' : e.kind === 'warn' ? '#F5B544' : '#E7EAEE',
+        inspected: !!e.inspected,
+        href: e.href || '#',
+        bg: e.inspected ? 'rgba(200,246,93,0.05)' : 'transparent'
+      };
+    });
+
+    var summary = [
+      { value: '5m 33s', label: 'since order created', color: '#E7EAEE' },
+      { value: '7', label: 'API requests', color: '#E7EAEE' },
+      { value: '3', label: 'background jobs', color: '#E7EAEE' },
+      { value: '2', label: 'errors, both recovered', color: '#F5B544' },
+      { value: '4', label: 'services touched', color: '#E7EAEE' }
+    ];
+
+    var orderMeta = [
+      { k: 'Restaurant', v: 'r_311' },
+      { k: 'Items', v: '3' },
+      { k: 'Total', v: '18,500 IQD' },
+      { k: 'Payment', v: 'card · token' },
+      { k: 'Courier', v: 'c_2041' }
+    ];
+    var customerMeta = [
+      { k: 'User', v: 'u_48213' },
+      { k: 'Client', v: 'iOS 4.12 (412)' },
+      { k: 'Language', v: 'ku' },
+      { k: 'Errors today', v: '1' }
+    ];
+
+    return { lanes: lanes, events: events, summary: summary, orderMeta: orderMeta, customerMeta: customerMeta };
+  }
+}
+</script>
+</body>
+</html>

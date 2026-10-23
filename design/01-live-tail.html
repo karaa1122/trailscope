@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Logbox – Live tail</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0A0C0F}
+a{color:#C8F65D}a:hover{color:#E2FF9E}
+.lb-row:hover{background:#161A21 !important}
+.lb-nav:hover{background:#161A21}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; background: #0A0C0F; color: #E7EAEE; font-family: 'Geist', system-ui, sans-serif; font-size: 14px; display: flex; flex-wrap: wrap; align-items: stretch">
+
+  <aside style="flex: 1 1 232px; box-sizing: border-box; padding: 20px 14px; border-right: 1px solid #1D222B; background: #0D1014; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="7" fill="#C8F65D"></rect><path d="M7 9h12M7 13h7M7 17h10" stroke="#0A0C0F" stroke-width="2.2" stroke-linecap="round"></path></svg>
+      <span style="font-family: 'Geist Mono', monospace; font-weight: 600; font-size: 16px; letter-spacing: -0.02em">logbox</span>
+    </div>
+
+    <button type="button" style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; background: #111419; border: 1px solid #262C36; border-radius: 10px; color: #E7EAEE; font-family: inherit; font-size: 13px; cursor: pointer">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #C8F65D"></span>
+      <span style="font-weight: 500">production</span>
+      <span style="margin-left: auto; color: #9099A8; font-family: 'Geist Mono', monospace; font-size: 12px">6 services</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9099A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+
+    <nav aria-label="Main" style="display: flex; flex-direction: column; gap: 2px">
+      <a class="lb-nav" href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #E7EAEE; text-decoration: none; background: #161A21; font-weight: 500">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C8F65D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>
+        Live tail
+        <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #7D8696">G L</span>
+      </a>
+      <a class="lb-nav" href="#" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #B7BDC7; text-decoration: none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        Explore
+      </a>
+      <a class="lb-nav" href="#" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #B7BDC7; text-decoration: none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"></path><path d="M12 10v4M12 17h.01"></path></svg>
+        Errors
+        <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #0A0C0F; background: #FF8A7D; border-radius: 6px; padding: 1px 6px; font-weight: 600">3</span>
+      </a>
+      <a class="lb-nav" href="Journey.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #B7BDC7; text-decoration: none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="18" r="2"></circle><path d="M7 6h6a4 4 0 0 1 0 8H11a4 4 0 0 0 0 8h6"></path></svg>
+        Journeys
+      </a>
+      <a class="lb-nav" href="#" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #B7BDC7; text-decoration: none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>
+        Routes
+      </a>
+      <a class="lb-nav" href="#" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #B7BDC7; text-decoration: none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10 21h4"></path></svg>
+        Alerts
+        <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #F5B544">1 firing</span>
+      </a>
+      <a class="lb-nav" href="#" style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; color: #B7BDC7; text-decoration: none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3Z"></path></svg>
+        Saved views
+      </a>
+    </nav>
+
+    <section aria-label="Services" style="display: flex; flex-direction: column; gap: 4px">
+      <h2 style="margin: 0 0 6px; padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #7D8696">Services</h2>
+      <sc-for list="{{services}}" as="svc" hint-placeholder-count="6">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 10px; font-size: 13px">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: {{svc.dot}}"></span>
+          <span style="font-family: 'Geist Mono', monospace; color: #D2D6DC">{{svc.name}}</span>
+          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: {{svc.noteColor}}">{{svc.note}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <div style="margin-top: auto; padding: 14px; border: 1px dashed #262C36; border-radius: 10px; color: #9099A8; font-size: 12px; line-height: 1.7">
+      <span style="font-family: 'Geist Mono', monospace; color: #E7EAEE; background: #1B2029; border-radius: 4px; padding: 1px 6px">/</span> search ·
+      <span style="font-family: 'Geist Mono', monospace; color: #E7EAEE; background: #1B2029; border-radius: 4px; padding: 1px 6px">J</span>
+      <span style="font-family: 'Geist Mono', monospace; color: #E7EAEE; background: #1B2029; border-radius: 4px; padding: 1px 6px">K</span> move ·
+      <span style="font-family: 'Geist Mono', monospace; color: #E7EAEE; background: #1B2029; border-radius: 4px; padding: 1px 6px">↵</span> inspect ·
+      <span style="font-family: 'Geist Mono', monospace; color: #E7EAEE; background: #1B2029; border-radius: 4px; padding: 1px 6px">Space</span> pause
+    </div>
+  </aside>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 20px 28px 40px; display: flex; flex-direction: column; gap: 18px">
+
+    <header style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+      <h1 style="margin: 0 6px 0 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Live tail</h1>
+      <div role="group" aria-label="Query mode" style="display: flex; background: #0D1014; border: 1px solid #262C36; border-radius: 10px; padding: 3px; gap: 2px">
+        <sc-for list="{{modes}}" as="md" hint-placeholder-count="3">
+          <button type="button" aria-pressed="{{md.pressed}}" onClick="{{md.pick}}" style="min-height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: {{md.bg}}; color: {{md.color}}; font-family: 'Geist Mono', monospace; font-size: 12.5px; cursor: pointer">{{md.label}}</button>
+        </sc-for>
+      </div>
+      <span style="flex: 1 1 auto"></span>
+      <button type="button" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; background: #111419; border: 1px solid #2E3540; border-radius: 10px; color: #E7EAEE; font-family: inherit; font-size: 13px; cursor: pointer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9099A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        Last 30 min
+      </button>
+      <sc-if value="{{live}}" hint-placeholder-val="{{true}}">
+        <button type="button" onClick="{{togglePause}}" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; background: rgba(200,246,93,0.1); border: 1px solid rgba(200,246,93,0.45); border-radius: 10px; color: #C8F65D; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #C8F65D; box-shadow: 0 0 0 4px rgba(200,246,93,0.18)"></span>
+          Live
+        </button>
+      </sc-if>
+      <sc-if value="{{paused}}" hint-placeholder-val="{{false}}">
+        <button type="button" onClick="{{togglePause}}" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; background: #1B2029; border: 1px solid #2E3540; border-radius: 10px; color: #E7EAEE; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#E7EAEE" aria-hidden="true"><path d="M7 4v16l13-8L7 4Z"></path></svg>
+          Paused · 23 new
+        </button>
+      </sc-if>
+    </header>
+
+    <section aria-label="Query" style="position: relative; z-index: 2; background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+
+      <sc-if value="{{isSql}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch">
+          <div style="flex: 1 1 480px; min-width: 0; position: relative; background: #0D1014; border: 1px solid #4B5A70; border-radius: 10px; padding: 12px 14px; display: flex; gap: 14px">
+            <span aria-hidden="true" style="font-family: 'Geist Mono', monospace; font-size: 13px; line-height: 1.85; color: #4B5A70; text-align: right">1<br>2</span>
+            <pre style="margin: 0; flex: 1; min-width: 0; white-space: pre-wrap; font-family: 'Geist Mono', monospace; font-size: 13.5px; line-height: 1.85; color: #E7EAEE"><span style="color: #C8F65D; font-weight: 600">WHERE</span> status <span style="color: #9099A8">&gt;=</span> <span style="color: #F5B544">500</span> <span style="color: #C8F65D">AND</span> route <span style="color: #C8F65D">LIKE</span> <span style="color: #8AB4F8">'/orders/%'</span> <span style="color: #C8F65D">AND</span> duration_ms <span style="color: #9099A8">&gt;</span> <span style="color: #F5B544">800</span>
+  <span style="color: #C8F65D">AND</span> attr[<span style="color: #8AB4F8">'tenant'</span>] <span style="color: #C8F65D">IN</span> (<span style="color: #8AB4F8">'acme'</span>, <span style="color: #8AB4F8">'globex'</span>) <span style="color: #C8F65D">AND</span> us<span style="display: inline-block; width: 2px; height: 16px; vertical-align: -3px; background: #C8F65D"></span></pre>
+
+            <div style="position: absolute; left: 330px; top: 74px; width: 300px; background: #161A21; border: 1px solid #2E3540; border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,0.5); overflow: hidden">
+              <sc-for list="{{suggestions}}" as="sg" hint-placeholder-count="5">
+                <div style="display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 12px; background: {{sg.bg}}">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #9099A8; width: 18px">{{sg.icon}}</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #E7EAEE">{{sg.name}}</span>
+                  <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #9099A8">{{sg.type}}</span>
+                </div>
+              </sc-for>
+              <div style="padding: 8px 12px; border-top: 1px solid #262C36; font-size: 11px; color: #9099A8">↑↓ pick · Tab insert · top values from last hour</div>
+            </div>
+          </div>
+          <div style="flex: 0 1 160px; display: flex; flex-direction: column; gap: 8px">
+            <button type="button" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; background: #C8F65D; color: #0A0C0F; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Run <span style="font-family: 'Geist Mono', monospace; font-size: 11px; opacity: 0.7">⌘↵</span></button>
+            <button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid #2E3540; border-radius: 10px; background: transparent; color: #E7EAEE; font-family: inherit; font-size: 13px; cursor: pointer">Save as view</button>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: 12px; color: #9099A8">
+          <span style="color: #C8F65D; font-family: 'Geist Mono', monospace">✓ valid</span>
+          <span>5 conditions · ~1.2M rows scanned · 38 ms</span>
+          <span>read-only · whitelisted columns · scoped to this project</span>
+          <a href="#" style="margin-left: auto; font-size: 12px; text-decoration: none">History</a>
+          <a href="#" style="font-size: 12px; text-decoration: none">Syntax help</a>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isFilters}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+          <sc-for list="{{chips}}" as="ch" hint-placeholder-count="4">
+            <span style="display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px 0 10px; background: #1B2029; border: 1px solid #2E3540; border-radius: 8px; font-family: 'Geist Mono', monospace; font-size: 12.5px">
+              <span style="color: #9099A8">{{ch.field}}</span>
+              <span style="color: #C8F65D">{{ch.op}}</span>
+              <span style="color: #E7EAEE">{{ch.value}}</span>
+              <button type="button" aria-label="Remove filter" style="width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #9099A8; cursor: pointer; font-size: 14px">×</button>
+            </span>
+          </sc-for>
+          <button type="button" style="min-height: 36px; padding: 0 12px; border: 1px dashed #4B5A70; border-radius: 8px; background: transparent; color: #C8F65D; font-family: inherit; font-size: 12.5px; cursor: pointer">+ Add filter</button>
+          <span style="margin-left: auto; font-size: 12px; color: #9099A8">AND · switch to SQL to edit as text</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isSearch}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px; box-sizing: border-box; background: #0D1014; border: 1px solid #2E3540; border-radius: 10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9099A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <label for="lb-q" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search logs</label>
+          <input id="lb-q" type="text" value="status:&gt;=500 route:/orders/* duration:&gt;800" style="flex: 1 1 200px; min-width: 120px; height: 34px; background: transparent; border: 0; outline: none; color: #E7EAEE; font-family: 'Geist Mono', monospace; font-size: 13px">
+          <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9099A8; border: 1px solid #2E3540; border-radius: 6px; padding: 2px 7px">⌘K</span>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #7D8696; margin-right: 4px">Quick filters</span>
+        <sc-for list="{{facets}}" as="fc" hint-placeholder-count="8">
+          <button type="button" style="display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid #262C36; border-radius: 8px; background: #0D1014; color: #D2D6DC; font-family: inherit; font-size: 12.5px; cursor: pointer">
+            {{fc.label}}
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9099A8">{{fc.hint}}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9099A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+        </sc-for>
+        <button type="button" style="min-height: 32px; padding: 0 10px; border: 1px dashed #4B5A70; border-radius: 8px; background: transparent; color: #C8F65D; font-family: inherit; font-size: 12.5px; cursor: pointer">+ attribute</button>
+      </div>
+    </section>
+
+    <section aria-label="Overview" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+      <sc-for list="{{tiles}}" as="tile" hint-placeholder-count="4">
+        <div style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+            <span style="font-size: 12px; color: #9099A8">{{tile.label}}</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: {{tile.deltaColor}}">{{tile.delta}}</span>
+          </div>
+          <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px">
+            <div style="display: flex; align-items: baseline; gap: 6px">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 30px; font-weight: 500; letter-spacing: -0.03em">{{tile.value}}</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9099A8">{{tile.unit}}</span>
+            </div>
+            <svg width="110" height="34" viewBox="0 0 110 34" aria-hidden="true"><polyline points="{{tile.points}}" fill="none" stroke="{{tile.color}}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></polyline></svg>
+          </div>
+        </div>
+      </sc-for>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch">
+      <section aria-label="Route heatmap" style="flex: 999 1 620px; min-width: 0; background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Route heatmap</h2>
+          <span style="font-size: 12px; color: #9099A8">p95 latency · 1 cell = 1 min · click a cell to filter</span>
+          <div role="group" aria-label="Heatmap metric" style="margin-left: auto; display: flex; background: #0D1014; border: 1px solid #262C36; border-radius: 8px; padding: 3px; gap: 2px">
+            <button type="button" aria-pressed="true" style="min-height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: #222833; color: #E7EAEE; font-family: 'Geist Mono', monospace; font-size: 12px; cursor: pointer">p95</button>
+            <button type="button" aria-pressed="false" style="min-height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #9099A8; font-family: 'Geist Mono', monospace; font-size: 12px; cursor: pointer">errors</button>
+            <button type="button" aria-pressed="false" style="min-height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #9099A8; font-family: 'Geist Mono', monospace; font-size: 12px; cursor: pointer">volume</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto">
+          <div style="min-width: 640px; display: flex; flex-direction: column; gap: 5px">
+            <div style="display: grid; grid-template-columns: 190px minmax(0, 1fr) 70px; gap: 12px">
+              <span></span>
+              <div style="position: relative; height: 20px">
+                <span style="position: absolute; left: 46.6%; top: 0; transform: translateX(-4px); display: flex; align-items: center; gap: 6px; white-space: nowrap; font-family: 'Geist Mono', monospace; font-size: 11px; color: #C8F65D">
+                  <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 10 0 0h10L5 10Z" fill="#C8F65D"></path></svg>
+                  v2.3.1 deployed · 21:14
+                </span>
+              </div>
+              <span></span>
+            </div>
+            <sc-for list="{{heat}}" as="route" hint-placeholder-count="8">
+              <div style="display: grid; grid-template-columns: 190px minmax(0, 1fr) 70px; gap: 12px; align-items: center">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #D2D6DC; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{route.name}}</span>
+                <div style="display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 3px">
+                  <sc-for list="{{route.cells}}" as="cell" hint-placeholder-count="30">
+                    <span title="{{cell.tip}}" style="height: 18px; border-radius: 3px; background: {{cell.bg}}"></span>
+                  </sc-for>
+                </div>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 12px; text-align: right; color: {{route.p95Color}}">{{route.p95}}</span>
+              </div>
+            </sc-for>
+            <div style="display: grid; grid-template-columns: 190px minmax(0, 1fr) 70px; gap: 12px; margin-top: 4px">
+              <span style="font-size: 11px; color: #7D8696">route</span>
+              <div style="display: flex; justify-content: space-between; font-family: 'Geist Mono', monospace; font-size: 11px; color: #7D8696">
+                <span>21:00</span><span>21:10</span><span>21:20</span><span>now</span>
+              </div>
+              <span style="font-size: 11px; color: #7D8696; text-align: right">p95 now</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #9099A8">
+          <span>fast</span>
+          <span style="width: 18px; height: 10px; border-radius: 2px; background: rgba(245,181,68,0.12)"></span>
+          <span style="width: 18px; height: 10px; border-radius: 2px; background: rgba(245,181,68,0.35)"></span>
+          <span style="width: 18px; height: 10px; border-radius: 2px; background: rgba(245,181,68,0.6)"></span>
+          <span style="width: 18px; height: 10px; border-radius: 2px; background: rgba(245,181,68,0.85)"></span>
+          <span style="width: 18px; height: 10px; border-radius: 2px; background: #FF6B5B"></span>
+          <span>over SLO</span>
+        </div>
+      </section>
+
+      <section aria-label="New and spiking errors" style="flex: 1 1 320px; min-width: 0; background: #111419; border: 1px solid #1D222B; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">New &amp; spiking errors</h2>
+          <a href="#" style="margin-left: auto; font-size: 12px; text-decoration: none">All errors →</a>
+        </div>
+
+        <a href="Inspector.dc.html" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: rgba(255,107,91,0.07); border: 1px solid rgba(255,107,91,0.3); text-decoration: none; color: #E7EAEE">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">PaymentTimeoutError</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; font-weight: 600; color: #0A0C0F; background: #FF8A7D; border-radius: 5px; padding: 2px 6px">SPIKE</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #9099A8">
+            <span style="font-family: 'Geist Mono', monospace">payments-svc</span>
+            <span>142× · 37 users</span>
+            <svg style="margin-left: auto" width="80" height="22" viewBox="0 0 80 22" aria-hidden="true"><polyline points="0,20 10,20 20,19 30,20 40,18 48,8 56,4 64,2 72,5 80,3" fill="none" stroke="#FF6B5B" stroke-width="1.6" stroke-linejoin="round"></polyline></svg>
+          </div>
+          <span style="font-size: 12px; color: #B7BDC7">Started 21:14, right after v2.3.1</span>
+        </a>
+
+        <a href="#" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: #0D1014; border: 1px solid #222833; text-decoration: none; color: #E7EAEE">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">CourierNotFoundError</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; font-weight: 600; color: #0A0C0F; background: #C8F65D; border-radius: 5px; padding: 2px 6px">NEW</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #9099A8">
+            <span style="font-family: 'Geist Mono', monospace">courier-svc · job</span>
+            <span>12× · retried</span>
+            <svg style="margin-left: auto" width="80" height="22" viewBox="0 0 80 22" aria-hidden="true"><polyline points="0,20 16,20 32,20 48,20 56,14 64,17 72,11 80,15" fill="none" stroke="#F5B544" stroke-width="1.6" stroke-linejoin="round"></polyline></svg>
+          </div>
+        </a>
+
+        <a href="#" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: #0D1014; border: 1px solid #222833; text-decoration: none; color: #E7EAEE">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">422 CouponExpired</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #9099A8; border: 1px solid #2E3540; border-radius: 5px; padding: 1px 6px">steady</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #9099A8">
+            <span style="font-family: 'Geist Mono', monospace">orders-svc</span>
+            <span>58× · 51 users</span>
+            <svg style="margin-left: auto" width="80" height="22" viewBox="0 0 80 22" aria-hidden="true"><polyline points="0,12 10,10 20,13 30,11 40,12 50,10 60,13 70,11 80,12" fill="none" stroke="#9099A8" stroke-width="1.6" stroke-linejoin="round"></polyline></svg>
+          </div>
+        </a>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; font-size: 12px; color: #9099A8">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F5B544" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10 21h4"></path></svg>
+          Alert sent to Telegram · backend on-call · 21:16
+        </div>
+      </section>
+    </div>
+
+    <section aria-label="Live stream" style="background: #111419; border: 1px solid #1D222B; border-radius: 12px; overflow: hidden">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #1D222B">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Stream</h2>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: {{streamColor}}">{{streamLabel}}</span>
+        <div role="group" aria-label="Filter requests" style="display: flex; flex-wrap: wrap; gap: 6px; margin-left: 8px">
+          <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+            <button type="button" onClick="{{f.pick}}" aria-pressed="{{f.pressed}}" style="min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid {{f.border}}; background: {{f.bg}}; color: {{f.color}}; font-family: 'Geist Mono', monospace; font-size: 12px; cursor: pointer">{{f.label}} <span style="opacity: 0.75">{{f.count}}</span></button>
+          </sc-for>
+        </div>
+        <div style="margin-left: auto; display: flex; gap: 6px">
+          <button type="button" style="min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid #2E3540; background: transparent; color: #B7BDC7; font-family: inherit; font-size: 12px; cursor: pointer">Columns</button>
+          <button type="button" style="min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid #2E3540; background: transparent; color: #B7BDC7; font-family: inherit; font-size: 12px; cursor: pointer">Save view</button>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto">
+        <div style="min-width: 1000px">
+          <div style="display: grid; grid-template-columns: 118px 66px 62px minmax(220px, 1fr) 210px 92px 110px 112px; gap: 0 12px; padding: 10px 18px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #7D8696; border-bottom: 1px solid #1D222B">
+            <span>Time</span><span>Method</span><span>Status</span><span>Route</span><span>Duration</span><span>User</span><span>Client</span><span>Service</span>
+          </div>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="13">
+            <a class="lb-row" href="Inspector.dc.html" style="display: grid; grid-template-columns: 118px 66px 62px minmax(220px, 1fr) 210px 92px 110px 112px; gap: 0 12px; align-items: center; min-height: 40px; padding: 0 18px; border-bottom: 1px solid #171B22; text-decoration: none; color: #E7EAEE; background: {{r.rowBg}}">
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9099A8">{{r.time}}</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; font-weight: 600; color: #B7BDC7">{{r.method}}</span>
+              <span style="justify-self: start; font-family: 'Geist Mono', monospace; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 6px; color: {{r.sColor}}; background: {{r.sBg}}">{{r.status}}</span>
+              <span style="display: flex; align-items: center; gap: 8px; min-width: 0">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.route}}</span>
+                <sc-if value="{{r.slow}}" hint-placeholder-val="{{false}}">
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10px; font-weight: 600; color: #F5B544; border: 1px solid rgba(245,181,68,0.5); border-radius: 4px; padding: 0 5px">SLOW</span>
+                </sc-if>
+              </span>
+              <span style="display: flex; align-items: center; gap: 10px">
+                <span style="flex: 1; height: 6px; border-radius: 3px; background: #1B2029; overflow: hidden">
+                  <span style="display: block; height: 100%; border-radius: 3px; width: {{r.barW}}; background: {{r.barColor}}"></span>
+                </span>
+                <span style="width: 72px; text-align: right; font-family: 'Geist Mono', monospace; font-size: 12px; color: #D2D6DC">{{r.ms}}</span>
+              </span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #B7BDC7">{{r.user}}</span>
+              <span style="font-size: 12px; color: #9099A8">{{r.client}}</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9099A8">{{r.service}}</span>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 18px; font-size: 12px; color: #9099A8">
+        <span>Sampling: 20% of healthy GETs · 100% of errors and slow requests</span>
+        <span style="margin-left: auto; font-family: 'Geist Mono', monospace">bodies redacted at the SDK</span>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1480}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var st = this.state || {};
+    var filter = st.filter || 'all';
+    var paused = !!st.paused;
+    var mode = st.mode || 'sql';
+    var self = this;
+
+    function fmt(n) { return n.toLocaleString('en-US'); }
+    function rnd(i) { var x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function pts(vals) {
+      var max = Math.max.apply(null, vals), min = Math.min.apply(null, vals);
+      var span = (max - min) || 1;
+      return vals.map(function (v, i) {
+        return (i * (110 / (vals.length - 1))).toFixed(1) + ',' + (31 - (v - min) / span * 28).toFixed(1);
+      }).join(' ');
+    }
+
+    var raw = [
+      { t: '21:29:58.412', m: 'POST', s: 500, r: '/orders/:id/checkout', ms: 1318, u: 'u_48213', p: 'iOS 4.12', svc: 'orders-svc' },
+      { t: '21:29:58.390', m: 'GET', s: 200, r: '/restaurants/nearby', ms: 84, u: 'u_10922', p: 'Android 4.12', svc: 'catalog-svc' },
+      { t: '21:29:58.351', m: 'GET', s: 200, r: '/restaurants/:id/menu', ms: 132, u: 'u_77310', p: 'iOS 4.11', svc: 'catalog-svc' },
+      { t: '21:29:58.302', m: 'POST', s: 422, r: '/cart/coupon', ms: 41, u: 'u_31007', p: 'Android 4.12', svc: 'orders-svc' },
+      { t: '21:29:58.287', m: 'GET', s: 200, r: '/orders/:id/track', ms: 38, u: 'u_20554', p: 'iOS 4.12', svc: 'courier-svc' },
+      { t: '21:29:58.240', m: 'POST', s: 201, r: '/orders', ms: 312, u: 'u_55012', p: 'Web', svc: 'orders-svc' },
+      { t: '21:29:58.198', m: 'PATCH', s: 200, r: '/couriers/:id/location', ms: 19, u: 'c_2041', p: 'Courier 2.3', svc: 'courier-svc' },
+      { t: '21:29:58.150', m: 'POST', s: 504, r: '/payments/charge', ms: 4812, u: 'u_90144', p: 'Android 4.10', svc: 'payments-svc' },
+      { t: '21:29:58.101', m: 'GET', s: 200, r: '/restaurants/nearby', ms: 912, u: 'u_66203', p: 'Android 4.12', svc: 'catalog-svc' },
+      { t: '21:29:58.066', m: 'POST', s: 401, r: '/auth/refresh', ms: 22, u: 'anon', p: 'iOS 4.9', svc: 'auth-svc' },
+      { t: '21:29:58.020', m: 'GET', s: 200, r: '/me/addresses', ms: 27, u: 'u_41880', p: 'iOS 4.12', svc: 'customer-api' },
+      { t: '21:29:57.981', m: 'DELETE', s: 204, r: '/cart/items/:id', ms: 33, u: 'u_31007', p: 'Android 4.12', svc: 'orders-svc' },
+      { t: '21:29:57.940', m: 'GET', s: 200, r: '/promotions/active', ms: 61, u: 'u_12045', p: 'Web', svc: 'catalog-svc' }
+    ];
+
+    function keep(r, f) {
+      if (f === 'errors') return r.s >= 400;
+      if (f === '5xx') return r.s >= 500;
+      if (f === 'slow') return r.ms >= 800;
+      return true;
+    }
+
+    var rows = raw.filter(function (r) { return keep(r, filter); }).map(function (r) {
+      var c = r.s >= 500 ? 5 : r.s >= 400 ? 4 : 2;
+      return {
+        time: r.t, method: r.m, status: String(r.s), route: r.r,
+        ms: fmt(r.ms) + ' ms', user: r.u, client: r.p, service: r.svc,
+        sColor: c === 5 ? '#FF8A7D' : c === 4 ? '#F5B544' : '#8AB4F8',
+        sBg: c === 5 ? 'rgba(255,107,91,0.14)' : c === 4 ? 'rgba(245,181,68,0.13)' : 'rgba(138,180,248,0.12)',
+        barColor: r.ms >= 1000 ? '#FF6B5B' : r.ms >= 800 ? '#F5B544' : '#4B5A70',
+        barW: Math.max(3, Math.min(100, Math.round(r.ms / 1500 * 100))) + '%',
+        slow: r.ms >= 800,
+        rowBg: c === 5 ? 'rgba(255,107,91,0.05)' : 'transparent'
+      };
+    });
+
+    var filters = [
+      { id: 'all', label: 'All' },
+      { id: 'errors', label: 'Errors ≥400' },
+      { id: '5xx', label: '5xx' },
+      { id: 'slow', label: 'Slow >800ms' }
+    ].map(function (f) {
+      var on = f.id === filter;
+      return {
+        label: f.label,
+        count: String(raw.filter(function (r) { return keep(r, f.id); }).length),
+        pressed: on ? 'true' : 'false',
+        bg: on ? '#C8F65D' : 'transparent',
+        color: on ? '#0A0C0F' : '#B7BDC7',
+        border: on ? '#C8F65D' : '#2E3540',
+        pick: function () { self.setState({ filter: f.id }); }
+      };
+    });
+
+    var tiles = [
+      { label: 'Requests / min', value: '4,812', unit: '', delta: '+6% vs 1h ago', deltaColor: '#9099A8', color: '#8AB4F8', vals: [40, 42, 41, 44, 43, 46, 45, 47, 46, 48, 47, 48] },
+      { label: 'Error rate', value: '2.7', unit: '%', delta: '↑ from 0.4%', deltaColor: '#FF8A7D', color: '#FF6B5B', vals: [0.4, 0.3, 0.5, 0.4, 0.4, 0.6, 0.5, 1.8, 2.4, 2.9, 2.6, 2.7] },
+      { label: 'p95 latency', value: '418', unit: 'ms', delta: '↑ 31%', deltaColor: '#F5B544', color: '#F5B544', vals: [300, 310, 305, 320, 315, 318, 330, 390, 420, 430, 410, 418] },
+      { label: 'Slow requests', value: '96', unit: '> 800 ms', delta: 'last 15 min', deltaColor: '#9099A8', color: '#C8F65D', vals: [3, 4, 2, 5, 3, 4, 4, 9, 12, 14, 11, 10] }
+    ].map(function (t) {
+      return { label: t.label, value: t.value, unit: t.unit, delta: t.delta, deltaColor: t.deltaColor, color: t.color, points: pts(t.vals) };
+    });
+
+    var routes = [
+      { name: '/orders/:id/checkout', base: 0.28, spike: 0.5, p95: '1,240 ms', hot: true },
+      { name: '/payments/charge', base: 0.34, spike: 0.52, p95: '4,600 ms', hot: true },
+      { name: '/restaurants/nearby', base: 0.42, spike: 0.08, p95: '910 ms', hot: false },
+      { name: '/restaurants/:id/menu', base: 0.2, spike: 0, p95: '140 ms', hot: false },
+      { name: '/orders', base: 0.24, spike: 0.1, p95: '330 ms', hot: false },
+      { name: '/cart/coupon', base: 0.1, spike: 0, p95: '45 ms', hot: false },
+      { name: '/orders/:id/track', base: 0.08, spike: 0, p95: '40 ms', hot: false },
+      { name: '/auth/refresh', base: 0.06, spike: 0, p95: '24 ms', hot: false }
+    ];
+    var heat = routes.map(function (rt, k) {
+      var cells = [];
+      for (var i = 0; i < 30; i++) {
+        var v = rt.base + (rnd(k * 31 + i) - 0.5) * 0.18 + (i >= 14 ? rt.spike * (0.7 + rnd(k * 7 + i) * 0.5) : 0);
+        v = Math.max(0, Math.min(1, v));
+        cells.push({
+          bg: v > 0.82 ? '#FF6B5B' : 'rgba(245,181,68,' + (0.08 + v * 0.8).toFixed(2) + ')',
+          tip: rt.name + ' · 21:' + pad(i) + ' · p95 ' + fmt(Math.round(30 + v * 1400)) + ' ms'
+        });
+      }
+      return { name: rt.name, cells: cells, p95: rt.p95, p95Color: rt.hot ? '#FF8A7D' : '#B7BDC7' };
+    });
+
+    var services = [
+      { name: 'customer-api', note: '1.9k/m', dot: '#C8F65D', noteColor: '#7D8696' },
+      { name: 'orders-svc', note: '5xx 4.1%', dot: '#FF6B5B', noteColor: '#FF8A7D' },
+      { name: 'payments-svc', note: 'p95 4.6s', dot: '#F5B544', noteColor: '#F5B544' },
+      { name: 'catalog-svc', note: '2.2k/m', dot: '#C8F65D', noteColor: '#7D8696' },
+      { name: 'courier-svc', note: '640/m', dot: '#C8F65D', noteColor: '#7D8696' },
+      { name: 'auth-svc', note: '310/m', dot: '#C8F65D', noteColor: '#7D8696' }
+    ];
+
+    var modes = [
+      { id: 'search', label: 'Search' },
+      { id: 'filters', label: 'Filters' },
+      { id: 'sql', label: 'SQL WHERE' }
+    ].map(function (m) {
+      var on = m.id === mode;
+      return {
+        label: m.label,
+        pressed: on ? 'true' : 'false',
+        bg: on ? '#222833' : 'transparent',
+        color: on ? '#C8F65D' : '#9099A8',
+        pick: function () { self.setState({ mode: m.id }); }
+      };
+    });
+
+    var suggestions = [
+      { icon: 'col', name: 'user_id', type: 'String', sel: true },
+      { icon: 'col', name: 'user_agent', type: 'String' },
+      { icon: 'attr', name: "attr['user_tier']", type: 'attr' },
+      { icon: 'fn', name: 'upper()', type: 'function' },
+      { icon: 'kw', name: 'USING', type: 'keyword' }
+    ].map(function (s) {
+      return { icon: s.icon, name: s.name, type: s.type, bg: s.sel ? '#222833' : 'transparent' };
+    });
+
+    var chips = [
+      { field: 'status', op: '>=', value: '500' },
+      { field: 'route', op: 'LIKE', value: '/orders/%' },
+      { field: 'duration_ms', op: '>', value: '800' },
+      { field: "attr['tenant']", op: 'IN', value: 'acme, globex' }
+    ];
+
+    var facets = [
+      { label: 'Service', hint: '6' },
+      { label: 'Status', hint: '2xx 4xx 5xx' },
+      { label: 'Method', hint: '5' },
+      { label: 'Route', hint: '48' },
+      { label: 'User', hint: 'any' },
+      { label: 'Client', hint: '7' },
+      { label: 'Duration', hint: '> 800 ms' },
+      { label: 'Release', hint: 'v2.3.1' }
+    ];
+
+    return {
+      modes: modes,
+      isSql: mode === 'sql',
+      isFilters: mode === 'filters',
+      isSearch: mode === 'search',
+      suggestions: suggestions,
+      chips: chips,
+      facets: facets,
+      rows: rows,
+      filters: filters,
+      tiles: tiles,
+      heat: heat,
+      services: services,
+      live: !paused,
+      paused: paused,
+      streamLabel: paused ? 'paused · 23 new since 21:29:58' : '● streaming · 81 req/s',
+      streamColor: paused ? '#F5B544' : '#C8F65D',
+      togglePause: function () { self.setState({ paused: !paused }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

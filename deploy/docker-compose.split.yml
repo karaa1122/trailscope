@@ -1,0 +1,83 @@
+# Split mode: separate ingest, api and alerts processes, live tail over Redis.
+#   docker compose -f docker-compose.split.yml up -d
+# UI and API: http://localhost:8080   Ingest (point SDKs here): http://localhost:8081
+name: logbox-split
+
+x-logbox-env: &logbox-env
+  LOGBOX_SERVER_PUBLIC_URL: ${LOGBOX_PUBLIC_URL:-http://localhost:8080}
+  LOGBOX_CLICKHOUSE_URL: http://clickhouse:8123
+  LOGBOX_CLICKHOUSE_USER: logbox
+  LOGBOX_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-logbox}
+  LOGBOX_CLICKHOUSE_READER_PASSWORD: ${CLICKHOUSE_READER_PASSWORD:-logbox_reader}
+  LOGBOX_POSTGRES_URL: postgres://logbox:${POSTGRES_PASSWORD:-logbox}@postgres:5432/logbox
+  LOGBOX_REDIS_URL: redis://redis:6379
+  LOGBOX_LOG_FORMAT: json
+
+x-logbox: &logbox
+  image: ${LOGBOX_IMAGE:-logbox:local}
+  restart: unless-stopped
+  environment: *logbox-env
+  healthcheck:
+    test: ["CMD", "/usr/local/bin/logbox", "healthcheck"]
+    interval: 10s
+    timeout: 3s
+    retries: 6
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+
+services:
+  migrate:
+    image: ${LOGBOX_IMAGE:-logbox:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["migrate"]
+    environment: *logbox-env
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  ingest:
+    <<: *logbox
+    command: ["ingest"]
+    ports:
+      - "${LOGBOX_INGEST_PORT:-8081}:8080"
+
+  api:
+    <<: *logbox
+    command: ["api"]
+    ports:
+      - "${LOGBOX_PORT:-8080}:8080"
+
+  alerts:
+    <<: *logbox
+    command: ["alerts"]
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    extends:
+      file: docker-compose.yml
+      service: clickhouse
+
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+
+volumes:
+  clickhouse-data:
+  postgres-data:

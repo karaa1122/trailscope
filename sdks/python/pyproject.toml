@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[project]
+name = "logbox"
+version = "0.1.0"
+description = "Logbox SDK for Python: non-blocking API request logging for Django, FastAPI/Starlette and Celery"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Logbox contributors" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Django",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: System :: Logging",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+django = ["django>=4.2"]
+starlette = ["starlette>=0.37"]
+fastapi = ["fastapi>=0.110"]
+celery = ["celery>=5.3"]
+dev = [
+  "pytest>=9.1",
+  "pytest-asyncio>=1.4",
+  "ruff>=0.17",
+  "mypy>=2.4",
+  "django>=6.1",
+  "starlette>=1.9",
+  "fastapi>=0.162",
+  "httpx>=0.28",
+  "celery>=5.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/karaa1122/logbox"
+Documentation = "https://github.com/karaa1122/logbox/blob/main/docs/sdk-python.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/logbox"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+mypy_path = "src"
+packages = ["logbox"]
+
+[[tool.mypy.overrides]]
+module = ["django.*", "celery.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

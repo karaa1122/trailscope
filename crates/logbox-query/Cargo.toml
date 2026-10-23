@@ -1,0 +1,15 @@
+[package]
+name = "logbox-query"
+description = "Logbox query language: parser, validator, ClickHouse compiler and evaluator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+logbox-core.workspace = true
+
+[lints]
+workspace = true
