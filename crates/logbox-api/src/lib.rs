@@ -1,5 +1,6 @@
 //! The Logbox HTTP API (`/api/v1/...`), used by the web UI and by API tokens.
 
+pub mod alerts;
 pub mod auth;
 pub mod error;
 pub mod errors;
@@ -41,6 +42,10 @@ pub struct Inner {
     pub http: reqwest::Client,
     /// Cancelled when the server shuts down, so long-lived streams end.
     pub shutdown: tokio_util::sync::CancellationToken,
+    /// Encrypts stored secrets and signs mute links.
+    pub secrets: logbox_alerts::Keys,
+    /// Queues notifications (the alerts worker delivers them).
+    pub outbox: logbox_alerts::Outbox,
 }
 
 #[derive(Clone)]
@@ -60,6 +65,7 @@ impl AppState {
         pool: PgPool,
         bus: LiveBus,
         keys: Option<Arc<KeyCache>>,
+        secrets: logbox_alerts::Keys,
         shutdown: tokio_util::sync::CancellationToken,
     ) -> anyhow::Result<Self> {
         let http = reqwest::Client::builder()
@@ -68,6 +74,7 @@ impl AppState {
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("logbox-replay/0.1")
             .build()?;
+        let outbox = logbox_alerts::Outbox::new(pool.clone());
         Ok(Self(Arc::new(Inner {
             config,
             ch,
@@ -77,6 +84,8 @@ impl AppState {
             limiter: LoginLimiter::default(),
             http,
             shutdown,
+            secrets,
+            outbox,
         })))
     }
 

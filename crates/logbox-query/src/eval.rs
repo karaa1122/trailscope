@@ -9,7 +9,7 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use logbox_core::rows::{LiveRequest, RequestRow};
+use logbox_core::rows::{ErrorSignal, LiveRequest, RequestRow};
 use regex::Regex;
 
 use crate::ast::{CmpOp, Expr, Literal, Operand, Sign};
@@ -294,6 +294,38 @@ impl Record for LiveRequest {
             "error_message" => s(&self.error_message),
             "error_fingerprint" => Some(Val::U64(self.error_fingerprint.parse().unwrap_or(0))),
             "sample_rate" => Some(Val::Num(f64::from(self.sample_rate))),
+            _ => None,
+        }
+    }
+
+    fn map_get(&self, map: &str, key: &str) -> Option<&str> {
+        match map {
+            "attributes" => map_lookup(&self.attributes, key),
+            "correlation" => map_lookup(&self.correlation, key),
+            _ => None,
+        }
+    }
+}
+
+/// 5xx signals handed to the alert engine (no bodies, headers or IPs).
+impl Record for ErrorSignal {
+    fn value(&self, column: &str) -> Option<Val<'_>> {
+        let s = |v: &str| Some(Val::Str(Cow::Owned(v.to_string())));
+        match column {
+            "timestamp" => Some(Val::Time(self.timestamp)),
+            "environment" => s(&self.environment),
+            "service" => s(&self.service),
+            "release" => s(&self.release),
+            "request_id" => s(&self.request_id),
+            "trace_id" => s(&self.trace_id),
+            "method" => s(&self.method),
+            "route" => s(&self.route),
+            "status" => Some(Val::Num(f64::from(self.status))),
+            "duration_ms" => Some(Val::Num(f64::from(self.duration_ms))),
+            "user_id" => s(&self.user_id),
+            "error_type" => s(&self.error_type),
+            "error_message" => s(&self.error_message),
+            "error_fingerprint" => Some(Val::U64(self.error_fingerprint.parse().unwrap_or(0))),
             _ => None,
         }
     }

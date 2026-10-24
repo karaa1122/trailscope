@@ -46,6 +46,11 @@ pub struct Config {
     pub smtp: SmtpConfig,
     pub oidc: OidcConfig,
     pub log: LogConfig,
+    /// Encrypts stored secrets (SMTP password, channel tokens) and signs mute
+    /// links (`LOGBOX_SECRET_KEY`). When empty, a random key is generated and
+    /// kept in Postgres, which protects less: set it in production.
+    #[serde(deserialize_with = "lenient_string")]
+    pub secret_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -264,6 +269,14 @@ pub struct AlertsConfig {
     pub interval_secs: u64,
     /// Default cooldown between notifications for the same rule, in seconds.
     pub default_cooldown_secs: u64,
+    /// Email on 5xx: at most one email per error group per this many minutes.
+    pub email_throttle_minutes: u32,
+    /// Email on 5xx: at most this many emails per project per hour.
+    pub email_hourly_cap: u32,
+    /// Email on 5xx: a group quiet for this many hours that comes back is a regression.
+    pub regression_hours: u32,
+    /// Days a mute link in an email stays valid.
+    pub mute_link_days: u32,
 }
 
 impl Default for AlertsConfig {
@@ -271,6 +284,10 @@ impl Default for AlertsConfig {
         Self {
             interval_secs: 60,
             default_cooldown_secs: 600,
+            email_throttle_minutes: 15,
+            email_hourly_cap: 30,
+            regression_hours: 24,
+            mute_link_days: 7,
         }
     }
 }
@@ -284,7 +301,10 @@ pub struct SmtpConfig {
     pub username: String,
     #[serde(deserialize_with = "lenient_string")]
     pub password: String,
+    /// Sender address, e.g. `logbox@example.com`.
     pub from: String,
+    /// Sender display name.
+    pub from_name: String,
     /// `starttls` (default), `tls` or `none`.
     pub security: String,
 }
@@ -296,7 +316,8 @@ impl Default for SmtpConfig {
             port: 587,
             username: String::new(),
             password: String::new(),
-            from: "Logbox <logbox@localhost>".into(),
+            from: String::new(),
+            from_name: String::new(),
             security: "starttls".into(),
         }
     }

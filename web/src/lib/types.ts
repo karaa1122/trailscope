@@ -393,3 +393,91 @@ export interface ApiToken {
   lastUsedAt: string | null;
   expiresAt: string | null;
 }
+
+export type RuleKind = 'count' | 'error_rate' | 'p95' | 'new_error' | 'spiking_error';
+
+export interface AlertRule {
+  id: string;
+  project: string;
+  name: string;
+  kind: RuleKind;
+  query: { table: TableName; input: QueryInput | null };
+  environment: string;
+  threshold: number;
+  windowMinutes: number;
+  cooldownMinutes: number;
+  channelIds: string[];
+  enabled: boolean;
+  state: 'ok' | 'firing';
+  lastValue: number | null;
+  lastError: string | null;
+  lastEvaluatedAt: string | null;
+  stateChangedAt: string | null;
+  lastNotifiedAt: string | null;
+}
+
+export type ChannelKind = 'webhook' | 'slack' | 'telegram' | 'email';
+
+export interface AlertChannel {
+  id: string;
+  name: string;
+  kind: ChannelKind;
+  config: { chatId: string; memberIds: string[]; emails: string[]; urlHost: string };
+}
+
+export interface SendResult {
+  ok: boolean;
+  response: string | null;
+  error: string | null;
+  recipients: string[];
+}
+
+export interface EmailRule {
+  enabled: boolean;
+  filter: string;
+  memberIds: string[];
+  emails: string[];
+  recipients: { email: string; name: string; memberId: string | null }[];
+  smtpConfigured: boolean;
+  active: boolean;
+  throttleMinutes: number;
+  hourlyCap: number;
+  regressionHours: number;
+}
+
+export interface SmtpSettings {
+  host: string;
+  port: number;
+  security: 'starttls' | 'tls' | 'none';
+  username: string;
+  from: string;
+  fromName: string;
+  passwordSet: boolean;
+  locked: string[];
+  configured: boolean;
+  secretKeyConfigured: boolean;
+}
+
+export interface NotificationRow {
+  id: string;
+  createdAt: string;
+  sentAt: string | null;
+  source: string;
+  ruleName: string;
+  channelKind: ChannelKind;
+  target: string;
+  reason: string;
+  fingerprint: string;
+  subject: string;
+  status: 'pending' | 'sent' | 'failed';
+  attempts: number;
+  lastError: string | null;
+  response: string | null;
+}
+
+export interface Mute {
+  fingerprint: string;
+  mutedUntil: string | null;
+  forever: boolean;
+  lastSeenAt: string;
+}

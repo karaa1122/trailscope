@@ -1,4 +1,6 @@
 # Logbox all-in-one: `docker compose up -d`, then open http://localhost:8080
+# Local email testing: `docker compose --profile dev up -d` adds Mailpit at http://localhost:8025
+# (in Settings → Notifications → Email use host `mailpit`, port 1025, security none).
 name: logbox
 
 services:
@@ -21,6 +23,8 @@ services:
       LOGBOX_RETENTION_DAYS: ${LOGBOX_RETENTION_DAYS:-30}
       LOGBOX_RETENTION_BODY_DAYS: ${LOGBOX_RETENTION_BODY_DAYS:-7}
       LOGBOX_LOG_FORMAT: json
+      # Encrypts stored secrets and signs mute links. Set a long random value in production.
+      LOGBOX_SECRET_KEY: ${LOGBOX_SECRET_KEY:-}
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -69,6 +73,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    profiles: ["dev"]
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
 
 volumes:
   clickhouse-data:

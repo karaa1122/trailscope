@@ -1,7 +1,10 @@
 import type {
+  AlertChannel,
+  AlertRule,
   ApiToken,
   Chip,
   ErrorDetail,
+  EmailRule,
   ErrorGroup,
   Facet,
   GroupRow,
@@ -11,6 +14,8 @@ import type {
   Invite,
   Journey,
   Member,
+  Mute,
+  NotificationRow,
   Me,
   Overview,
   Project,
@@ -24,6 +29,8 @@ import type {
   RouteSeries,
   RowsResponse,
   SavedView,
+  SendResult,
+  SmtpSettings,
   Schema,
   ServiceHealth,
   TableName,
@@ -211,9 +218,61 @@ export const api = {
   createToken: (body: { name: string; scopes: string[]; projectId?: string | null; expiresInDays?: number | null }) =>
     post<{ id: string; token: string; prefix: string }>('/api/v1/tokens', body),
   revokeToken: (id: string) => del(`/api/v1/tokens/${id}`),
+
+  rules: (project: string) => get<AlertRule[]>(`/api/v1/alerts/rules${qs({ project })}`),
+  createRule: (rule: RuleInput) => post<AlertRule>('/api/v1/alerts/rules', rule),
+  updateRule: (id: string, rule: RuleInput) => put<AlertRule>(`/api/v1/alerts/rules/${id}`, rule),
+  deleteRule: (project: string, id: string) => del(`/api/v1/alerts/rules/${id}${qs({ project })}`),
+  previewRule: (rule: RuleInput) => post<{ value: number; firing: boolean }>('/api/v1/alerts/rules/preview', rule),
+  channels: (project: string) => get<AlertChannel[]>(`/api/v1/alerts/channels${qs({ project })}`),
+  createChannel: (body: {
+    project: string;
+    name: string;
+    kind: AlertChannel['kind'];
+    url?: string;
+    botToken?: string;
+    chatId?: string;
+    memberIds?: string[];
+    emails?: string[];
+  }) => post<{ channel: AlertChannel; signingSecret: string | null }>('/api/v1/alerts/channels', body),
+  deleteChannel: (project: string, id: string) => del(`/api/v1/alerts/channels/${id}${qs({ project })}`),
+  testChannel: (project: string, id: string) => post<SendResult>(`/api/v1/alerts/channels/${id}/test${qs({ project })}`, {}),
+  emailRule: (project: string) => get<EmailRule>(`/api/v1/alerts/email-rule${qs({ project })}`),
+  saveEmailRule: (body: { project: string; enabled: boolean; filter: string; memberIds: string[]; emails: string[] }) =>
+    put<EmailRule>('/api/v1/alerts/email-rule', body),
+  testEmailRule: (project: string) => post<SendResult>(`/api/v1/alerts/email-rule/test${qs({ project })}`, {}),
+  smtp: () => get<SmtpSettings>('/api/v1/settings/smtp'),
+  saveSmtp: (body: {
+    host: string;
+    port: number;
+    security: SmtpSettings['security'];
+    username: string;
+    from: string;
+    fromName: string;
+    password?: string | null;
+  }) => put<SmtpSettings>('/api/v1/settings/smtp', body),
+  testSmtp: (to: string) => post<SendResult>('/api/v1/settings/smtp/test', { to }),
+  history: (project: string, status?: string, limit = 100) =>
+    get<NotificationRow[]>(`/api/v1/alerts/history${qs({ project, status, limit })}`),
+  mutes: (project: string) => get<Mute[]>(`/api/v1/alerts/mutes${qs({ project })}`),
+  unmute: (project: string, fingerprint: string) =>
+    del(`/api/v1/alerts/mutes/${encodeURIComponent(fingerprint)}${qs({ project })}`),
   changePassword: (currentPassword: string, newPassword: string) =>
     post<undefined>('/api/v1/auth/password', { currentPassword, newPassword }),
 };
+
+export interface RuleInput {
+  project: string;
+  name: string;
+  kind: AlertRule['kind'];
+  query: AlertRule['query'];
+  environment: string;
+  threshold: number;
+  windowMinutes: number;
+  cooldownMinutes: number;
+  channelIds: string[];
+  enabled: boolean;
+}
 
 /** Server-Sent Events URL for the live tail. */
 export function liveUrl(project: string, filter: string, mode: 'sql' | 'search', environment: string | null): string {

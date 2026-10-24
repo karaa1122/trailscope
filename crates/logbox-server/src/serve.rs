@@ -32,6 +32,10 @@ impl Role {
     fn api(self) -> bool {
         matches!(self, Role::All | Role::Api)
     }
+
+    fn alerts(self) -> bool {
+        matches!(self, Role::All | Role::Alerts)
+    }
 }
 
 pub async fn migrate(config: &Config) -> anyhow::Result<()> {
@@ -67,6 +71,26 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
         LiveBus::local(&config.live)
     };
 
+    let secrets = logbox_alerts::Keys::load(&config, &pool)
+        .await
+        .context("loading the secret key")?;
+    if !secrets.from_config && (role.api() || role.alerts()) {
+        tracing::warn!(
+            "LOGBOX_SECRET_KEY is not set: stored secrets are encrypted with a key kept in Postgres; set it in production"
+        );
+    }
+    let mut alerts = None;
+    if role.alerts() {
+        alerts = Some(logbox_alerts::start(
+            config.clone(),
+            ch.clone(),
+            pool.clone(),
+            bus.clone(),
+            secrets.clone(),
+            shutdown.clone(),
+        ));
+    }
+
     let writer_stop = CancellationToken::new();
     let mut writer = None;
     let mut keys = None;
@@ -85,6 +109,7 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
             pool.clone(),
             bus.clone(),
             keys.clone(),
+            secrets.clone(),
             shutdown.clone(),
         )?;
         let mut api = logbox_api::router(state).layer(CompressionLayer::new());
@@ -119,6 +144,13 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
         if tokio::time::timeout(grace, w).await.is_err() {
             tracing::error!("ingest writer did not finish in time");
         }
+    }
+    if let Some(mut set) = alerts {
+        // The tasks watch the shutdown token; give them a moment to save state.
+        let _ = tokio::time::timeout(Duration::from_secs(5), async {
+            while set.join_next().await.is_some() {}
+        })
+        .await;
     }
     Ok(())
 }

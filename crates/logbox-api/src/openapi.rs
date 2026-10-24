@@ -9,7 +9,8 @@ use utoipa_axum::routes;
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    AppState, errors, inspector, journeys, live, overview, projects, query, setup, users, views,
+    AppState, alerts, errors, inspector, journeys, live, overview, projects, query, setup, users,
+    views,
 };
 
 #[derive(OpenApi)]
@@ -24,7 +25,7 @@ use crate::{
     tags(
         (name = "setup"), (name = "auth"), (name = "members"), (name = "tokens"),
         (name = "projects"), (name = "query"), (name = "inspector"), (name = "live"), (name = "views"),
-        (name = "overview"), (name = "errors"), (name = "journeys")
+        (name = "overview"), (name = "errors"), (name = "journeys"), (name = "alerts")
     )
 )]
 struct ApiDoc;
@@ -98,6 +99,20 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(errors::list))
         .routes(routes!(errors::detail))
         .routes(routes!(journeys::journey))
+        .routes(routes!(alerts::list_rules, alerts::create_rule))
+        .routes(routes!(alerts::update_rule, alerts::delete_rule))
+        .routes(routes!(alerts::preview_rule))
+        .routes(routes!(alerts::list_channels, alerts::create_channel))
+        .routes(routes!(alerts::delete_channel))
+        .routes(routes!(alerts::test_channel))
+        .routes(routes!(alerts::get_email_rule, alerts::put_email_rule))
+        .routes(routes!(alerts::test_email_rule))
+        .routes(routes!(alerts::get_smtp, alerts::put_smtp))
+        .routes(routes!(alerts::test_smtp))
+        .routes(routes!(alerts::history))
+        .routes(routes!(alerts::list_mutes))
+        .routes(routes!(alerts::delete_mute))
+        .routes(routes!(alerts::mute_page, alerts::mute_apply))
 }
 
 /// `/api/openapi.json` and the `/api/docs` reference page.

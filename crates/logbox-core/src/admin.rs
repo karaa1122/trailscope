@@ -58,7 +58,7 @@ pub async fn create_project(pool: &PgPool, name: &str) -> Result<Project, sqlx::
         }
         slug = format!("{base}-{n}");
     }
-    sqlx::query_as(
+    let project: Project = sqlx::query_as(
         "INSERT INTO projects (id, slug, name, settings) VALUES ($1, $2, $3, $4) \
          RETURNING id, slug, name, settings, created_at",
     )
@@ -67,7 +67,14 @@ pub async fn create_project(pool: &PgPool, name: &str) -> Result<Project, sqlx::
     .bind(name.trim())
     .bind(Json(ProjectSettings::default()))
     .fetch_one(pool)
-    .await
+    .await?;
+    // Every project gets the built-in "Email on 5xx" rule. It sends nothing
+    // until SMTP is configured and recipients are listed.
+    sqlx::query("INSERT INTO email_rules (project_id) VALUES ($1) ON CONFLICT DO NOTHING")
+        .bind(project.id)
+        .execute(pool)
+        .await?;
+    Ok(project)
 }
 
 pub async fn project_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Project>, sqlx::Error> {

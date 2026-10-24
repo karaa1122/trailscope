@@ -94,6 +94,7 @@ async fn app() -> Option<App> {
         pool,
         bus.clone(),
         None,
+        logbox_alerts::Keys::from_secret("test", true),
         CancellationToken::new(),
     )
     .unwrap();

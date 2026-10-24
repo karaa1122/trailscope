@@ -16,6 +16,7 @@ path = "src/main.rs"
 anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
+logbox-alerts.workspace = true
 logbox-core.workspace = true
 logbox-demo.workspace = true
 logbox-ingest.workspace = true

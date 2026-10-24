@@ -27,6 +27,7 @@ axum = { version = "0.8.9", features = ["macros"] }
 axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
 base64 = "0.23.1"
 bytes = "1.12.1"
+chacha20poly1305 = "0.11.0"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 clickhouse = { version = "0.15.3", features = ["lz4", "inserter", "uuid", "time"] }
 figment = { version = "0.10.19", features = ["toml", "env"] }
@@ -35,6 +36,7 @@ futures = "0.3.34"
 hex = "0.4.3"
 hmac = "0.13.0"
 http-body-util = "0.1.5"
+lettre = { version = "0.11.23", default-features = false, features = ["builder", "hostname", "pool", "smtp-transport", "tokio1-rustls", "aws-lc-rs", "webpki-roots"] }
 metrics = "0.24.6"
 mimalloc = { version = "0.1.52", default-features = false }
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
