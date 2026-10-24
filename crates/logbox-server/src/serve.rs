@@ -91,7 +91,7 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
         if !config.server.cors_origins.is_empty() {
             api = api.layer(cors(&config.server.cors_origins)?);
         }
-        app = app.merge(api);
+        app = app.merge(api).merge(crate::ui::router());
     }
 
     let app = app

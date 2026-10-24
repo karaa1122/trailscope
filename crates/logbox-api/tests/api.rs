@@ -555,6 +555,47 @@ async fn full_api_flow() {
     assert_eq!(s, StatusCode::OK);
     assert!(v["paths"]["/api/v1/query/requests"].is_object());
 
+    // ---- overview, heatmap and errors (from the rollups) ----
+    let (s, v) = app
+        .get(
+            &owner,
+            &format!("/api/v1/overview?project={project}&minutes=30"),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["times"].as_array().unwrap().len(), 30);
+    assert!(v["requestsPerMin"]["value"].as_f64().unwrap() > 0.0, "{v}");
+    assert!(v["errorRate"]["value"].as_f64().unwrap() > 0.0, "{v}");
+    let (s, v) = app
+        .get(
+            &owner,
+            &format!("/api/v1/routes/heatmap?project={project}&minutes=30"),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["routes"][0]["route"], "/projects/:id/tasks");
+    assert_eq!(v["routes"][0]["cells"].as_array().unwrap().len(), 30);
+    let (s, v) = app
+        .get(&owner, &format!("/api/v1/errors?project={project}"))
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let groups = v["groups"].as_array().unwrap();
+    assert!(
+        groups.iter().any(|g| g["fingerprint"] == "42"
+            && g["errorType"] == "TimeoutError"
+            && g["isNew"] == true),
+        "{v}"
+    );
+    let (s, v) = app
+        .get(
+            &owner,
+            &format!("/api/v1/errors/42?project={project}&environment=production"),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["samples"].as_array().unwrap().len(), 6);
+    assert_eq!(v["group"]["last24h"], 6);
+
     // ---- login and rate limiting ----
     let (s, _) = app
         .post(

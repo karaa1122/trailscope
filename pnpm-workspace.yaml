@@ -1,3 +1,4 @@
 packages:
   - web
   - sdks/node/packages/*
+  - e2e

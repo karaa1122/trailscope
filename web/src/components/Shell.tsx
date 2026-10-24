@@ -1,0 +1,232 @@
+import * as Dropdown from '@radix-ui/react-dropdown-menu';
+import { useQuery } from '@tanstack/react-query';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { useState, type ComponentType, type ReactNode } from 'react';
+
+import { api } from '../lib/api';
+import { fmtCompact, fmtPct } from '../lib/format';
+import { useHotkeys } from '../lib/hotkeys';
+import { useSession } from '../lib/session';
+import { CommandPalette } from './CommandPalette';
+import {
+  IconAlert,
+  IconBell,
+  IconBookmark,
+  IconChevron,
+  IconGrid,
+  IconJourney,
+  IconLive,
+  IconSearch,
+  IconSettings,
+  Logo,
+} from './icons';
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: ComponentType<{ size?: number }>;
+  hint?: string;
+}
+
+const NAV: NavItem[] = [
+  { to: '/live', label: 'Live tail', icon: IconLive, hint: 'G L' },
+  { to: '/explore', label: 'Explore', icon: IconSearch, hint: 'G E' },
+  { to: '/errors', label: 'Errors', icon: IconAlert, hint: 'G X' },
+  { to: '/journeys', label: 'Journeys', icon: IconJourney, hint: 'G J' },
+  { to: '/routes', label: 'Routes', icon: IconGrid, hint: 'G R' },
+  { to: '/alerts', label: 'Alerts', icon: IconBell, hint: 'G A' },
+  { to: '/views', label: 'Saved views', icon: IconBookmark },
+  { to: '/settings', label: 'Settings', icon: IconSettings, hint: 'G S' },
+];
+
+/** Pages that use the collapsed icon rail instead of the full sidebar. */
+const RAIL_PREFIXES = ['/requests/', '/journeys', '/errors/'];
+
+export function Shell() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const [palette, setPalette] = useState(false);
+  const rail = RAIL_PREFIXES.some((p) => pathname.startsWith(p));
+
+  useHotkeys({
+    'mod+k': () => setPalette((o) => !o),
+    '/': () => window.dispatchEvent(new Event('logbox:focus-query')),
+    'g l': () => void navigate({ to: '/live' }),
+    'g e': () => void navigate({ to: '/explore' }),
+    'g j': () => void navigate({ to: '/journeys' }),
+    'g x': () => void navigate({ to: '/errors' }),
+    'g r': () => void navigate({ to: '/routes' }),
+    'g a': () => void navigate({ to: '/alerts' }),
+    'g s': () => void navigate({ to: '/settings' }),
+  });
+
+  return (
+    <div className="app">
+      {rail ? <Rail pathname={pathname} /> : <Sidebar pathname={pathname} />}
+      <Outlet />
+      <CommandPalette open={palette} onOpenChange={setPalette} />
+    </div>
+  );
+}
+
+function isActive(pathname: string, to: string): boolean {
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function Rail({ pathname }: { pathname: string }) {
+  return (
+    <nav aria-label="Main" className="rail">
+      <Link to="/live" aria-label="Logbox home" style={{ marginBottom: 10 }}>
+        <Logo />
+      </Link>
+      {NAV.slice(0, 6).map((n) => (
+        <Link
+          key={n.to}
+          to={n.to}
+          aria-label={n.label}
+          title={n.label}
+          className={isActive(pathname, n.to) || (n.to === '/explore' && pathname.startsWith('/requests/')) ? 'active' : undefined}
+        >
+          <n.icon size={18} />
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function Sidebar({ pathname }: { pathname: string }) {
+  const { project, environment } = useSession();
+  const services = useQuery({
+    queryKey: ['services', project?.id, environment],
+    queryFn: () => api.services(project?.id ?? '', environment),
+    enabled: !!project,
+    refetchInterval: 30_000,
+  });
+  const errors = useQuery({
+    queryKey: ['errors', 'badge', project?.id, environment],
+    queryFn: () => api.errors(project?.id ?? '', environment, 'new_or_spiking', 50),
+    enabled: !!project,
+    refetchInterval: 60_000,
+  });
+  const badge = errors.data?.groups.length ?? 0;
+
+  return (
+    <aside className="sidebar">
+      <Link to="/live" className="logo">
+        <Logo />
+        <span className="logo-word">logbox</span>
+      </Link>
+
+      <ProjectSwitcher serviceCount={services.data?.length ?? 0} />
+
+      <nav aria-label="Main" className="nav">
+        {NAV.map((n) => (
+          <Link key={n.to} to={n.to} className={isActive(pathname, n.to) ? 'active' : undefined}>
+            <n.icon />
+            {n.label}
+            {n.to === '/errors' && badge > 0 ? (
+              <span className="nav-badge" aria-label={`${badge} new or spiking`}>
+                {badge}
+              </span>
+            ) : n.hint ? (
+              <span className="nav-hint">{n.hint}</span>
+            ) : null}
+          </Link>
+        ))}
+      </nav>
+
+      <section aria-label="Services" className="services">
+        <h2 className="section-title">Services</h2>
+        {services.data?.length === 0 && <span className="dim" style={{ padding: '0 10px', fontSize: 12 }}>No traffic yet</span>}
+        {services.data?.map((s) => {
+          const color =
+            s.health === 'failing' ? 'var(--err)' : s.health === 'degraded' ? 'var(--warn)' : s.health === 'idle' ? 'var(--faint)' : 'var(--accent)';
+          const note =
+            s.health === 'failing' || s.health === 'degraded'
+              ? `5xx ${fmtPct(s.errorRate)}`
+              : s.health === 'idle'
+                ? 'idle'
+                : `${fmtCompact(s.requests / 15)}/m`;
+          return (
+            <Link key={s.service} to="/explore" search={{ q: `service:${s.service}`, mode: 'search' }} className="service">
+              <span className="dot" style={{ width: 7, height: 7, background: color }} aria-hidden="true" />
+              <span className="mono">{s.service}</span>
+              <span
+                className="service-note"
+                style={{ color: s.health === 'failing' ? 'var(--err-text)' : s.health === 'degraded' ? 'var(--warn)' : undefined }}
+              >
+                {note}
+              </span>
+            </Link>
+          );
+        })}
+      </section>
+
+      <div className="hints">
+        <kbd>/</kbd> search · <kbd>J</kbd> <kbd>K</kbd> move · <kbd>↵</kbd> inspect · <kbd>Space</kbd> pause ·{' '}
+        <kbd>⌘K</kbd> commands
+      </div>
+    </aside>
+  );
+}
+
+function ProjectSwitcher({ serviceCount }: { serviceCount: number }) {
+  const { projects, project, environment, setProject, setEnvironment } = useSession();
+  const envs = useQuery({
+    queryKey: ['environments', project?.id],
+    queryFn: () => api.environments(project?.id ?? ''),
+    enabled: !!project,
+    staleTime: 60_000,
+  });
+  return (
+    <Dropdown.Root>
+      <Dropdown.Trigger asChild>
+        <button
+          type="button"
+          className="btn"
+          style={{ justifyContent: 'flex-start', gap: 10, padding: '0 12px', borderColor: 'var(--line-mid)', width: '100%' }}
+        >
+          <span className="dot" style={{ background: 'var(--accent)' }} aria-hidden="true" />
+          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.25, minWidth: 0, flex: 1 }}>
+            <span style={{ fontWeight: 500 }} className="ellipsis">
+              {environment ?? 'all environments'}
+            </span>
+            <span className="dim ellipsis" style={{ fontSize: 11 }}>
+              {project?.name ?? 'No project'}
+            </span>
+          </span>
+          <span style={{ marginLeft: 'auto', display: 'flex' }} title={`${serviceCount} services`}>
+            <IconChevron />
+          </span>
+        </button>
+      </Dropdown.Trigger>
+      <Dropdown.Portal>
+        <Dropdown.Content className="popover" sideOffset={6} align="start">
+          <MenuLabel>Environment</MenuLabel>
+          <Dropdown.Item className="menu-item" onSelect={() => setEnvironment(null)}>
+            all environments {environment === null && <span className="nav-hint">✓</span>}
+          </Dropdown.Item>
+          {envs.data?.map((e) => (
+            <Dropdown.Item key={e} className="menu-item" onSelect={() => setEnvironment(e)}>
+              {e} {environment === e && <span className="nav-hint">✓</span>}
+            </Dropdown.Item>
+          ))}
+          <MenuLabel>Project</MenuLabel>
+          {projects.map((p) => (
+            <Dropdown.Item key={p.id} className="menu-item" onSelect={() => setProject(p.id)}>
+              {p.name} {project?.id === p.id && <span className="nav-hint">✓</span>}
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Content>
+      </Dropdown.Portal>
+    </Dropdown.Root>
+  );
+}
+
+function MenuLabel({ children }: { children: ReactNode }) {
+  return (
+    <Dropdown.Label className="section-title" style={{ padding: '10px 12px 4px', margin: 0 }}>
+      {children}
+    </Dropdown.Label>
+  );
+}

@@ -2,6 +2,7 @@
 
 mod ops;
 mod serve;
+mod ui;
 
 use std::path::PathBuf;
 

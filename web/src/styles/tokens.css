@@ -1,0 +1,101 @@
+/* Design tokens. Dark is the default; light mirrors every token. */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../assets/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('../assets/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0c0f;
+  --sidebar: #0d1014;
+  --sunken: #0c0f13;
+  --panel: #111419;
+  --raised: #161a21;
+  --raised-2: #1b2029;
+  --selected: #222833;
+  --line: #1d222b;
+  --line-soft: #171b22;
+  --line-mid: #262c36;
+  --line-strong: #2e3540;
+  --line-focus: #4b5a70;
+  --text: #e7eaee;
+  --text-2: #b7bdc7;
+  --text-3: #d2d6dc;
+  --muted: #9099a8;
+  --dim: #7d8696;
+  --faint: #4b5a70;
+  --accent: #c8f65d;
+  --accent-hover: #e2ff9e;
+  --accent-ink: #0a0c0f;
+  --accent-soft: rgba(200, 246, 93, 0.1);
+  --accent-line: rgba(200, 246, 93, 0.4);
+  --ok: #8ab4f8;
+  --ok-soft: rgba(138, 180, 248, 0.12);
+  --warn: #f5b544;
+  --warn-soft: rgba(245, 181, 68, 0.13);
+  --warn-line: rgba(245, 181, 68, 0.5);
+  --err: #ff6b5b;
+  --err-text: #ff8a7d;
+  --err-soft: rgba(255, 107, 91, 0.14);
+  --err-faint: rgba(255, 107, 91, 0.06);
+  --err-line: rgba(255, 107, 91, 0.35);
+  --span: #3a4556;
+  --heat-rgb: 245, 181, 68;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --font: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 12px;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --sidebar: #eef0f3;
+  --sunken: #f1f3f6;
+  --panel: #ffffff;
+  --raised: #f0f2f5;
+  --raised-2: #e8ebf0;
+  --selected: #e3e7ee;
+  --line: #e1e4ea;
+  --line-soft: #eceef2;
+  --line-mid: #d5d9e1;
+  --line-strong: #c4cad4;
+  --line-focus: #8a95a8;
+  --text: #11151b;
+  --text-2: #3a4250;
+  --text-3: #2a313c;
+  --muted: #5b6575;
+  --dim: #667080;
+  --faint: #9aa3b2;
+  --accent: #4f7a00;
+  --accent-hover: #3d5f00;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(79, 122, 0, 0.1);
+  --accent-line: rgba(79, 122, 0, 0.4);
+  --ok: #2557c4;
+  --ok-soft: rgba(37, 87, 196, 0.1);
+  --warn: #9a5b00;
+  --warn-soft: rgba(176, 106, 0, 0.12);
+  --warn-line: rgba(176, 106, 0, 0.45);
+  --err: #d23b2a;
+  --err-text: #b42d1e;
+  --err-soft: rgba(210, 59, 42, 0.1);
+  --err-faint: rgba(210, 59, 42, 0.05);
+  --err-line: rgba(210, 59, 42, 0.35);
+  --span: #b8c0cc;
+  --heat-rgb: 214, 132, 0;
+  --shadow: 0 16px 40px rgba(20, 30, 50, 0.16);
+}

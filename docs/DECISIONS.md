@@ -163,3 +163,27 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** Replay sends stored requests to other systems.
 - **Choice:** Only admin-configured targets (http/https, no credentials, no query) are allowed. Redirects aren't followed, with a 30-second timeout. Auth headers (`authorization`, `cookie`, `x-api-key`, `proxy-authorization`) and redacted values are never replayed, and requests whose stored body was truncated are refused. Replaying requires the member role and *can view bodies*; every replay is recorded.
 - **Alternatives:** Arbitrary URLs (an SSRF vector), or replaying stored auth headers (they're redacted anyway).
+
+## 028. No new tests after M3
+
+- **Context:** During M4 the user asked to skip tests to move faster.
+- **Choice:** From M4 on, no new test suites are written or run as part of the milestones. Builds, clippy and the TypeScript typecheck/lint stay green, and the existing tests stay in CI.
+- **Alternatives:** Keep the original "every milestone passes its tests" bar (the user explicitly chose speed).
+
+## 029. Hand-rolled SVG charts
+
+- **Context:** The spec allows uPlot or hand-rolled SVG/canvas, with an initial JS budget of 300 KB gzipped.
+- **Choice:** Sparklines, the stacked histogram (with release markers and drag-to-zoom), the route heatmap and the span waterfall are small React SVG components styled with the design tokens, so both themes come for free. The initial bundle is about 177 KB gzipped. CodeMirror (about 124 KB) is code-split and loads only with SQL mode.
+- **Alternatives:** uPlot (canvas, faster for very large series, but would need its own theming and accessibility work).
+
+## 030. Query state lives in the URL
+
+- **Context:** "The whole query is encoded in the URL, so every view is shareable."
+- **Choice:** `mode`, `q` (SQL or search text), `chips` (JSON) and the time range (`range`, or absolute `from`/`to` after a zoom) are route search params. The inspector keeps the originating filter in its URL, so "nearby requests" and the back link preserve context.
+- **Alternatives:** In-memory state with a "copy link" button.
+
+## 031. Live tail with chip filters
+
+- **Context:** The live SSE endpoint accepts SQL or search text; the Filters mode holds chips.
+- **Choice:** Chips are rendered to SQL client-side (`addCondition`) for the live stream; Explore sends chips as-is. The server parses either into the same AST.
+- **Alternatives:** A chips parameter on the SSE endpoint (more URL encoding for the same result).

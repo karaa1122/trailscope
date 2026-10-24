@@ -2,9 +2,11 @@
 
 pub mod auth;
 pub mod error;
+pub mod errors;
 pub mod inspector;
 pub mod live;
 pub mod openapi;
+pub mod overview;
 pub mod projects;
 pub mod query;
 pub mod setup;
