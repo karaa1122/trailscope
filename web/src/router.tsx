@@ -7,10 +7,15 @@ import { api } from './lib/api';
 import { parseQuerySearch } from './lib/query';
 import { useSession } from './lib/session';
 import { InviteAccept, Login, Setup } from './pages/Auth';
+import { ErrorGroupPage, Errors, type ErrorsSearch } from './pages/Errors';
 import { Explore, type ExploreSearch } from './pages/Explore';
 import { Inspector, type InspectorSearch } from './pages/Inspector';
+import { Journeys, type JourneySearch } from './pages/Journeys';
 import { LiveTail, type LiveSearch } from './pages/LiveTail';
 import { Placeholder } from './pages/Placeholder';
+import { Routes, type RoutesSearch } from './pages/Routes';
+import { Settings, type SettingsTab } from './pages/Settings';
+import { Views } from './pages/Views';
 
 const numParam = (v: unknown): number | undefined => {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
@@ -93,35 +98,49 @@ const requestRoute = createRoute({
   },
 });
 
-export interface JourneySearch {
-  q?: string;
-  /// The request the user came from (highlighted as "you came from here").
-  came?: string;
-}
-
 const journeysRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/journeys',
-  validateSearch: (raw: Record<string, unknown>): JourneySearch => ({ q: strParam(raw.q), came: strParam(raw.came) }),
-  component: () => <Placeholder title="Journeys" note="Journeys arrive in the next milestone." />,
+  validateSearch: (raw: Record<string, unknown>): JourneySearch => ({ q: strParam(raw.q), came: strParam(raw.came), range: strParam(raw.range) }),
+  component: function JourneysPage() {
+    return <Journeys search={journeysRoute.useSearch()} />;
+  },
 });
 
 const errorsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/errors',
-  component: () => <Placeholder title="Errors" note="The error groups screen arrives in the next milestone." />,
+  validateSearch: (raw: Record<string, unknown>): ErrorsSearch => ({
+    status: raw.status === 'new' || raw.status === 'spiking' ? raw.status : undefined,
+    sort: raw.sort === 'count' || raw.sort === 'new' ? raw.sort : undefined,
+    range: strParam(raw.range),
+    q: strParam(raw.q),
+  }),
+  component: function ErrorsPage() {
+    return <Errors search={errorsRoute.useSearch()} />;
+  },
 });
 
 const errorRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/errors/$fingerprint',
-  component: () => <Placeholder title="Error group" note="Error group details arrive in the next milestone." />,
+  component: function ErrorPage() {
+    const { fingerprint } = errorRoute.useParams();
+    return <ErrorGroupPage key={fingerprint} fingerprint={fingerprint} />;
+  },
 });
 
 const routesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/routes',
-  component: () => <Placeholder title="Routes" note="The full-page route heatmap arrives in the next milestone." />,
+  validateSearch: (raw: Record<string, unknown>): RoutesSearch => ({
+    route: strParam(raw.route),
+    minutes: numParam(raw.minutes),
+    metric: raw.metric === 'errors' || raw.metric === 'volume' || raw.metric === 'p95' ? raw.metric : undefined,
+  }),
+  component: function RoutesPage() {
+    return <Routes search={routesRoute.useSearch()} />;
+  },
 });
 
 const alertsRoute = createRoute({
@@ -133,13 +152,16 @@ const alertsRoute = createRoute({
 const viewsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/views',
-  component: () => <Placeholder title="Saved views" note="Saved views get their own screen in the next milestone." />,
+  component: Views,
 });
 
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings',
-  component: () => <Placeholder title="Settings" note="Settings arrive in the next milestone." />,
+  validateSearch: (raw: Record<string, unknown>): { tab?: SettingsTab } => ({ tab: strParam(raw.tab) as SettingsTab | undefined }),
+  component: function SettingsPage() {
+    return <Settings tab={settingsRoute.useSearch().tab} />;
+  },
 });
 
 const routeTree = rootRoute.addChildren([

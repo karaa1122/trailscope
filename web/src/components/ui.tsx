@@ -102,3 +102,24 @@ export function Segmented<T extends string>({
     </div>
   );
 }
+
+/** A one-time secret, shown once with a copy button. */
+export function SecretOnce({ label, value, onDone }: { label: string; value: string; onDone: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="panel panel-pad" role="status" style={{ display: 'flex', flexDirection: 'column', gap: 10, borderColor: 'var(--accent-line)' }}>
+      <span style={{ fontSize: 13 }}>{label} It is shown only once.</span>
+      <code className="mono" style={{ fontSize: 12.5, padding: '10px 12px', background: 'var(--sidebar)', borderRadius: 8, overflowWrap: 'anywhere' }}>
+        {value}
+      </code>
+      <span className="row">
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => void copyText(value).then(setCopied)}>
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button type="button" className="btn btn-sm" onClick={onDone}>
+          Done
+        </button>
+      </span>
+    </div>
+  );
+}

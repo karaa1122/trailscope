@@ -32,6 +32,7 @@ pub struct View {
     pub columns: Vec<String>,
     pub shared: bool,
     #[schema(value_type = String)]
+    #[serde(with = "time::serde::rfc3339")]
     pub updated_at: time::OffsetDateTime,
 }
 

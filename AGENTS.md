@@ -29,8 +29,8 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 | M2 Query language | done | parser, registry, compiler, evaluator, search, chips; injection, property, differential (vs ClickHouse) and fuzz tests; docs/query-language.md |
 | M3 API | done | auth (sessions+CSRF, tokens, roles, invites, rate limit), setup, projects/keys/rules/targets, query endpoints, inspector/cURL/replay, live SSE, views, OpenAPI at /api/docs; docs/api.md |
 | M4 Web part 1 | done | shell, palette, setup/login/invite, query bar (3 modes, quick filters, CodeMirror), Live tail, Explore, Inspector; UI embedded via rust-embed; overview/heatmap/errors endpoints |
-| M5 Web part 2 | **next** | |
-| M6 Alerts + email-on-5xx | todo | includes the follow-up email brief |
+| M5 Web part 2 | done | Journeys (`/api/v1/journeys` + swimlane UI), Errors list/detail, Routes (full heatmap + `/api/v1/routes/series`), release markers on every chart, Saved views page, Settings; RFC 3339 timestamps in API responses |
+| M6 Alerts + email-on-5xx | **next** | includes the follow-up email brief |
 | M7 SDKs | todo | |
 | M8 Harden and ship | todo | |
 
@@ -95,8 +95,8 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, benchmark in `bench/`).
 - `scripts/dev/rust.sh` runs a command in the Rust container with the test env vars; `scripts/dev/env.sh` holds the env for running `logbox` against the dev services.
 - `crates/logbox-api`: `AppState` (config, ClickHouse, Postgres, LiveBus, optional ingest KeyCache, login limiter, replay HTTP client, shutdown token). Modules: `auth` (Auth extractor: session cookie + CSRF or Bearer API token; `require(Role, Scope)`, `can_view_bodies`), `setup`, `users` (login/logout/me/password, members, invites, tokens, `ClientIp`), `projects`, `query` (`prepare` → `Prepared`, `fetch_json` runs as the reader and strips the `_c_` alias prefix), `inspector`, `live`, `views`, `openapi` (utoipa-axum route table). The integration test is `tests/api.rs`.
-- `web/src`: `main.tsx`, `router.tsx` (code-based TanStack routes, typed search params, `Guard`), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx` (me, projects, current project/env, theme), `query.ts` (QueryValue ↔ URL, addCondition, history), `live.ts` (SSE hook with pause buffer), `hotkeys.ts`, `format.ts`), `components/` (`Shell` sidebar/rail, `CommandPalette`, `QueryBar`, `SqlEditor` (lazy CodeMirror), `charts.tsx` (Heatmap, Histogram, Waterfall, JsonView), `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Auth` (login, invite, setup wizard), `Placeholder` for M5 screens). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
-- `crates/logbox-server/src/ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). `crates/logbox-api/src/overview.rs` (tiles, heatmap from route_minute) and `errors.rs` (groups list/detail with new/spiking).
+- `web/src`: `main.tsx`, `router.tsx` (code-based TanStack routes, typed search params, `Guard`), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx` (me, projects, current project/env, theme), `query.ts` (QueryValue ↔ URL, addCondition, history), `live.ts` (SSE hook with pause buffer), `hotkeys.ts`, `format.ts`), `components/` (`Shell` sidebar/rail, `CommandPalette`, `QueryBar`, `SqlEditor` (lazy CodeMirror), `charts.tsx` (Heatmap, Histogram, TimeChart, Waterfall, JsonView), `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Journeys`, `Errors` (list + group), `Routes`, `Views`, `Settings` (`?tab=`), `Auth` (login, invite, setup wizard), `Placeholder` (still used for Alerts)). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
+- `crates/logbox-server/src/ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). `crates/logbox-api/src/overview.rs` (tiles, heatmap and per-route series from route_minute), `errors.rs` (groups list/detail with new/spiking) and `journeys.rs` (requests + events + spans for one key, collapsed into lanes).
 - `e2e/screenshots.mjs`: Playwright screenshots of a running instance (`BASE_URL=… OUT=… node screenshots.mjs`); Chromium is installed on the host.
 - Not built yet: `logbox-alerts` is an empty stub; the Python SDK is a skeleton.
 
@@ -104,14 +104,17 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 
 `crates/logbox-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs` (AST plus `Display` back to SQL), `compile.rs` (`compile`, `where_clause`; values are always `{pN:Type}` params), `eval.rs` (`Prepared` evaluator; `Record` is implemented for `LiveRequest` and `RequestRow`), `regex.rs` (RE2 validation and ASCII class rewriting), `search.rs`, `chips.rs`, and `QueryInput` in `lib.rs` (sql/search/filters). Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `LOGBOX_DIFF_CASES=4000 LOGBOX_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`; nightly and cargo-fuzz are installed in the dev container).
 
-## Plan for M5 (web part 2 and backend)
+## Plan for M6 (alerts and email on 5xx)
 
-1. Journeys: `GET /api/v1/journeys?project&key&value` (any correlation key, or user_id/request_id/trace_id) merging requests, events and spans into one timeline grouped by service lane, collapsing runs of >5 same route+status into "N similar"; UI per `design/03-journey.html` (search box, summary tiles, swimlanes with "now" line and inspected ring, event log with "YOU CAME FROM HERE" via `?came=<request_id>`, context cards, related errors and traces).
-2. Errors list (`/errors`, uses `/api/v1/errors`) and detail (`/errors/$fingerprint`, uses `/api/v1/errors/{fp}`): sparkline, new/spiking flags, samples, stack, hourly chart.
-3. Routes page: full-page heatmap (longer windows, metric toggle) plus per-route latency charts (add an endpoint for per-route minute series from route_minute).
-4. Release markers everywhere (already on Live tail heatmap and Explore histogram; add to Routes and error charts).
-5. Settings: projects, ingest keys, members/invites, API tokens, redaction rules, replay targets, sampling defaults (project settings), retention (read-only), theme. Saved views page.
-6. The dev UI instance: container `logbox-ui` publishes 8090 (owner@example.com / "correct horse battery"); restart it after rebuilding, and restart the demo inside it.
+Spec: "A rule is a query, a condition and a window: `count > N`, `error_rate > X%`, `p95(duration_ms) > X ms` on a filter, or `new error group` / `spiking error group`. Rules are evaluated every 60 s. States ok/firing/resolved with dedupe and a cooldown, so each state change sends one notification. Channels: webhook (HMAC-SHA256), Slack incoming webhook, Telegram bot, email over SMTP. Messages link back to the UI with the query pre-filled." Plus the whole follow-up brief (next section and docs/agents/spec-email-notifications.md).
+
+1. Postgres migration `0002_alerts.sql`: `alert_rules` (project, name, table, query JSON, kind, threshold, window, cooldown, channels, enabled, state, last_eval), `alert_channels` (kind webhook/slack/telegram/email, config JSON with secrets encrypted), `alert_events` (history), `smtp_settings` (one row; password encrypted), `email_rules` (built-in "Email on 5xx" per project: filter, recipients), `email_outbox` (queue: attempts, next_attempt_at, status, error), `error_mutes` (fingerprint, until).
+2. Config: `secret_key` (`LOGBOX_SECRET_KEY`), `smtp.from_name`; crypto with XChaCha20-Poly1305 (check the current `chacha20poly1305` version) and HMAC-SHA256 mute links.
+3. `crates/logbox-alerts`: evaluator task (60 s tick, compiles rule queries with `logbox_query::compile`, runs as the reader), state machine with cooldown, channel senders (reqwest; lettre with tokio + rustls for SMTP), the 5xx email pipeline subscribed to `LiveBus::subscribe_errors()` with throttling/digest/cap/regression, and the outbox worker. Started by `serve.rs` for the `all` and `alerts` roles.
+4. API: rules/channels CRUD, test-send, SMTP settings (env-locked fields, password never returned), history, mute link endpoint (no login).
+5. UI: `/alerts` page (rules list, editor using `QueryBar`, channels, Email on 5xx card, SMTP settings, history).
+6. Mailpit in a `dev` compose profile; docs/alerts.md and docs/configuration.md.
+7. The dev UI instance: container `logbox-ui` publishes 8090 (owner@example.com / "correct horse battery"); restart it after rebuilding the binary. Demo traffic runs separately in `logbox-rust` (`/target/debug/logbox demo --url http://logbox-ui:8080 --key <ingest key> --backfill-hours 0`); start it again after container restarts. Without `--key` the demo creates a new project.
 
 ## Email-on-5xx (follow-up brief) integration points
 

@@ -415,3 +415,149 @@ function render(v: unknown, depth: number): ReactNode {
 export function countRedacted(text: string): number {
   return text.split(REDACTED).length - 1;
 }
+
+export interface ChartSeries {
+  name: string;
+  values: number[];
+  color: string;
+  /** Bars are drawn under lines. */
+  kind?: 'line' | 'bar';
+  dashed?: boolean;
+}
+
+/** Time series as lines and bars, with an optional threshold and release markers. */
+export function TimeChart({
+  times,
+  step,
+  series,
+  releases = [],
+  height = 150,
+  threshold,
+  format = fmtInt,
+  label,
+}: {
+  times: number[];
+  step: number;
+  series: ChartSeries[];
+  releases?: Release[];
+  height?: number;
+  threshold?: { value: number; label: string };
+  format?: (v: number) => string;
+  label: string;
+}) {
+  const width = 1000;
+  const [hover, setHover] = useState<number | null>(null);
+  const from = times[0] ?? 0;
+  const to = (times[times.length - 1] ?? 0) + step;
+  const span = Math.max(1, to - from);
+  const x = (t: number) => ((t - from) / span) * width;
+  const max = Math.max(1, threshold?.value ?? 0, ...series.flatMap((s) => s.values.filter(Number.isFinite))) * 1.08;
+  const y = (v: number) => height - (v / max) * (height - 6);
+  const bw = Math.max(1, (step / span) * width - 1.5);
+  const markers = releases.filter((r) => r.at >= from && r.at <= to).sort((a, b) => a.at - b.at);
+  // Labels closer than ~8% of the width would overlap; their lines still show.
+  const labelled = markers.filter((r, i, all) => i === 0 || (r.at - all[i - 1]!.at) / span > 0.08);
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={label}
+        style={{ display: 'block' }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const t = from + ((e.clientX - rect.left) / rect.width) * span;
+          const i = Math.floor((t - from) / step);
+          setHover(i >= 0 && i < times.length ? i : null);
+        }}
+        onMouseLeave={() => setHover(null)}
+      >
+        {series
+          .filter((s) => s.kind === 'bar')
+          .map((s) =>
+            s.values.map((v, i) =>
+              v > 0 ? <rect key={`${s.name}-${i}`} x={x(times[i]!)} y={y(v)} width={bw} height={height - y(v)} fill={s.color} opacity={hover === null || hover === i ? 0.8 : 0.45} /> : null,
+            ),
+          )}
+        {threshold && (
+          <line x1={0} x2={width} y1={y(threshold.value)} y2={y(threshold.value)} stroke="var(--err)" strokeDasharray="4 4" strokeWidth={1} vectorEffect="non-scaling-stroke" opacity={0.7} />
+        )}
+        {series
+          .filter((s) => s.kind !== 'bar')
+          .flatMap((s) =>
+            segments(s.values).map(([a, b]) => (
+              <polyline
+                key={`${s.name}-${a}`}
+                points={s.values
+                  .slice(a, b)
+                  .map((v, i) => `${(x(times[a + i]!) + bw / 2).toFixed(1)},${y(v).toFixed(1)}`)
+                  .join(' ')}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={1.6}
+                strokeDasharray={s.dashed ? '4 3' : undefined}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            )),
+          )}
+        {markers.map((r) => (
+          <line key={r.id} x1={x(r.at)} x2={x(r.at)} y1={0} y2={height} stroke="var(--accent)" strokeDasharray="3 3" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        ))}
+        {hover !== null && <line x1={x(times[hover]!) + bw / 2} x2={x(times[hover]!) + bw / 2} y1={0} y2={height} stroke="var(--line-focus)" vectorEffect="non-scaling-stroke" />}
+        <line x1={0} x2={width} y1={height - 0.5} y2={height - 0.5} stroke="var(--line-strong)" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {labelled.map((r) => (
+        <span
+          key={r.id}
+          className="mono"
+          title={`${r.service} ${r.version}`}
+          style={{ position: 'absolute', top: 0, left: `${(((r.at - from) / span) * 100).toFixed(1)}%`, transform: 'translateX(4px)', fontSize: 10.5, color: 'var(--accent)', whiteSpace: 'nowrap', pointerEvents: 'none' }}
+        >
+          {r.version}
+        </span>
+      ))}
+      {threshold && (
+        <span className="mono" style={{ position: 'absolute', right: 4, top: Math.max(0, y(threshold.value) - 16), fontSize: 10.5, color: 'var(--err-text)', pointerEvents: 'none' }}>
+          {threshold.label}
+        </span>
+      )}
+      <div className="mono dim" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 4 }}>
+        {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+          <span key={f}>{fmtTick(from + span * f, span)}</span>
+        ))}
+      </div>
+      {hover !== null && (
+        <div className="tooltip" style={{ position: 'absolute', top: 6, left: 6, pointerEvents: 'none' }}>
+          {fmtTick(times[hover]!, span)} · {series.map((s) => `${s.name} ${Number.isFinite(s.values[hover]) ? format(s.values[hover] ?? 0) : '–'}`).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Index ranges of consecutive finite values; NaN marks a gap. */
+function segments(values: number[]): [number, number][] {
+  const out: [number, number][] = [];
+  let start = -1;
+  values.forEach((v, i) => {
+    if (Number.isFinite(v)) {
+      if (start < 0) start = i;
+    } else if (start >= 0) {
+      out.push([start, i]);
+      start = -1;
+    }
+  });
+  if (start >= 0) out.push([start, values.length]);
+  return out;
+}
+
+function fmtTick(t: number, span: number): string {
+  if (span <= 36 * 3_600_000) return fmtHm(t);
+  const d = new Date(t);
+  return `${d.getMonth() + 1}/${d.getDate()} ${fmtHm(t)}`;
+}

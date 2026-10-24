@@ -73,6 +73,10 @@ A token bound to a project can only see that project. A token can never act beyo
 | Inspector | `GET /api/v1/requests/{id}`, `GET /api/v1/requests/{id}/curl`, `POST /api/v1/requests/{id}/replay` |
 | Live | `GET /api/v1/live` (Server-Sent Events) |
 | Views | `GET`/`POST /api/v1/views`, `PUT`/`DELETE /api/v1/views/{id}` |
+| Overview | `GET /api/v1/overview`, `GET /api/v1/routes/heatmap`, `GET /api/v1/routes/series` |
+| Errors | `GET /api/v1/errors`, `GET /api/v1/errors/{fingerprint}` |
+| Journeys | `GET /api/v1/journeys` |
+| Settings | `GET /api/v1/settings/retention` |
 
 ### Query endpoints
 
@@ -95,6 +99,16 @@ All query endpoints take the same scope:
 - `/query/histogram` returns buckets (sized automatically for about 60 points), split by status class, with counts scaled by `1 / sample_rate`.
 - `/query/facets` takes `fields: [{column, key?}]` and returns the top values with counts under the current filter.
 - `/query/group` takes `by: {column, key?}` and returns count, error rate and p50/p95/p99 per group.
+
+### Journeys
+
+`GET /api/v1/journeys?project=…&key=…&value=…` returns every request and event carrying one value, merged into a single timeline. `key` is a correlation key (`account_id`, `session_id`, …) or one of `user_id`, `request_id`, `trace_id`. Events triggered by a matching request are included even when they don't carry the key themselves. The window defaults to the last 7 days (`from`/`to` in ms); `environment` narrows it.
+
+The response has `summary` (counts, services, `inProgress` when there was activity in the last 5 minutes), `lanes` (one per service, background jobs as `jobs · <service>`), `items` (runs of more than 5 identical items in a lane are collapsed into one with `similar` and `until`), `context` (the most common correlation values, attributes, user and client), related `errors` and `traces`. At most 2,000 requests and 2,000 events are read; `truncated` says when that limit was hit.
+
+### Routes
+
+`GET /api/v1/routes/series?project=…&route=…&minutes=60` returns p50/p95/p99, requests, 4xx and 5xx per bucket for one route, from the per-minute rollup. Buckets are 1, 5, 15 or 60 minutes depending on the window (up to 7 days).
 
 ### Live tail
 

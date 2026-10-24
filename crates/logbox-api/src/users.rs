@@ -264,8 +264,10 @@ pub struct Member {
     pub can_view_bodies: bool,
     pub disabled: bool,
     #[schema(value_type = String)]
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
     #[schema(value_type = Option<String>)]
+    #[serde(with = "time::serde::rfc3339::option")]
     pub last_login_at: Option<time::OffsetDateTime>,
 }
 
@@ -442,6 +444,7 @@ pub struct Invite {
     pub role: String,
     pub can_view_bodies: bool,
     #[schema(value_type = String)]
+    #[serde(with = "time::serde::rfc3339")]
     pub expires_at: time::OffsetDateTime,
 }
 
@@ -567,10 +570,13 @@ pub struct ApiToken {
     pub scopes: Vec<String>,
     pub project_id: Option<Uuid>,
     #[schema(value_type = String)]
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
     #[schema(value_type = Option<String>)]
+    #[serde(with = "time::serde::rfc3339::option")]
     pub last_used_at: Option<time::OffsetDateTime>,
     #[schema(value_type = Option<String>)]
+    #[serde(with = "time::serde::rfc3339::option")]
     pub expires_at: Option<time::OffsetDateTime>,
 }
 

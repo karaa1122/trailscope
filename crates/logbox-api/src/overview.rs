@@ -368,3 +368,122 @@ pub async fn heatmap(
         slo_ms,
     }))
 }
+
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+pub struct RouteSeriesQuery {
+    pub project: Uuid,
+    pub route: String,
+    pub environment: Option<String>,
+    pub service: Option<String>,
+    /// Window in minutes (default 60, max 10080).
+    pub minutes: Option<u32>,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteSeries {
+    pub route: String,
+    pub bucket_minutes: i64,
+    pub times: Vec<i64>,
+    pub requests: Vec<f64>,
+    pub errors_5xx: Vec<f64>,
+    pub errors_4xx: Vec<f64>,
+    pub p50: Vec<f64>,
+    pub p95: Vec<f64>,
+    pub p99: Vec<f64>,
+    /// Requests per method over the window.
+    pub methods: BTreeMap<String, f64>,
+    pub slo_ms: u32,
+}
+
+/// Latency percentiles, volume and errors over time for one route.
+#[utoipa::path(get, path = "/api/v1/routes/series", tag = "overview", params(RouteSeriesQuery),
+    responses((status = 200, body = RouteSeries)))]
+pub async fn route_series(
+    State(state): State<AppState>,
+    auth: Auth,
+    Query(q): Query<RouteSeriesQuery>,
+) -> ApiResult<Json<RouteSeries>> {
+    auth.require(Role::Viewer, Scope::Read)?;
+    auth.check_project(q.project)?;
+    let key = state.project_key(q.project).await?;
+    let minutes = q.minutes.unwrap_or(60).clamp(5, 10_080);
+    let slo_ms = project_slow_ms(&state, q.project).await;
+    let bucket: i64 = match minutes {
+        0..=120 => 1,
+        121..=720 => 5,
+        721..=2880 => 15,
+        _ => 60,
+    };
+    let mut sql = Sql::default();
+    let scope = rollup_scope(
+        &mut sql,
+        &key,
+        q.environment.as_deref(),
+        q.service.as_deref(),
+        minutes,
+    );
+    let r = param(
+        &mut sql,
+        "route",
+        "String",
+        ParamValue::Str(q.route.clone()),
+    );
+    let b = param(&mut sql, "bucket", "Int64", ParamValue::Int(bucket));
+    let text = format!(
+        "SELECT toUnixTimestamp(toStartOfInterval(minute, toIntervalMinute({b}))) * 1000 AS t, method, \
+           sumMerge(weighted) AS req, countIfMerge(errors_5xx) AS e5, countIfMerge(errors_4xx) AS e4, \
+           quantilesTDigestMerge(0.5, 0.95, 0.99)(latency) AS q \
+         FROM route_minute WHERE {scope} AND route = {r} GROUP BY t, method"
+    );
+    let rows = fetch_json(&state, &text, &sql.params).await?;
+
+    let step = bucket * 60_000;
+    let now_b = (crate::now_ms() / step) * step;
+    let count = (i64::from(minutes) / bucket).max(1);
+    let times: Vec<i64> = (0..count).map(|i| now_b - (count - 1 - i) * step).collect();
+    let index: BTreeMap<i64, usize> = times.iter().enumerate().map(|(i, t)| (*t, i)).collect();
+    let n = times.len();
+    let mut out = RouteSeries {
+        route: q.route,
+        bucket_minutes: bucket,
+        times,
+        requests: vec![0.0; n],
+        errors_5xx: vec![0.0; n],
+        errors_4xx: vec![0.0; n],
+        p50: vec![0.0; n],
+        p95: vec![0.0; n],
+        p99: vec![0.0; n],
+        methods: BTreeMap::new(),
+        slo_ms,
+    };
+    for row in &rows.rows {
+        let req = num(row, "req");
+        let method = row
+            .get("method")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        *out.methods.entry(method).or_insert(0.0) += req.round();
+        let Some(&i) = index.get(&(num(row, "t") as i64)) else {
+            continue;
+        };
+        let qs: Vec<f64> = row
+            .get("q")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(Value::as_f64).collect())
+            .unwrap_or_default();
+        // Methods share a bucket: keep the worst latency, sum the counts.
+        let round = |v: f64| (v * 10.0).round() / 10.0;
+        for (slot, v) in [&mut out.p50, &mut out.p95, &mut out.p99]
+            .into_iter()
+            .zip(qs)
+        {
+            slot[i] = slot[i].max(round(v));
+        }
+        out.requests[i] += req.round();
+        out.errors_5xx[i] += num(row, "e5");
+        out.errors_4xx[i] += num(row, "e4");
+    }
+    Ok(Json(out))
+}

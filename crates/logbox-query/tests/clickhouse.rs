@@ -187,6 +187,7 @@ async fn run(
             ParamValue::Int(i) => q.param(&p.name, i),
             ParamValue::UInt(u) => q.param(&p.name, u),
             ParamValue::Float(f) => q.param(&p.name, f),
+            ParamValue::Strs(v) => q.param(&p.name, v),
         };
     }
     let got: Vec<String> = q

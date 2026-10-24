@@ -18,6 +18,8 @@ pub enum ParamValue {
     Int(i64),
     UInt(u64),
     Float(f64),
+    /// `Array(String)`, for server-built `IN` lists (never from user input).
+    Strs(Vec<String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

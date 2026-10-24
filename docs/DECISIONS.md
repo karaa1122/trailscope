@@ -187,3 +187,27 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** The live SSE endpoint accepts SQL or search text; the Filters mode holds chips.
 - **Choice:** Chips are rendered to SQL client-side (`addCondition`) for the live stream; Explore sends chips as-is. The server parses either into the same AST.
 - **Alternatives:** A chips parameter on the SSE endpoint (more URL encoding for the same result).
+
+## 032. Journeys: key guessing, related events and collapsing
+
+- **Context:** A journey is "everything that happened for this value", and the search box should accept a bare ID.
+- **Choice:** `key:value` searches a correlation key (or `user_id`, `request_id`, `trace_id`). A bare value is a trace ID when it is 32 hex characters, a request ID when it starts with `req_`, and a user ID otherwise. Events are included when they carry the key or were triggered by one of the matched requests (`request_id`), so jobs show up even if the SDK didn't copy the correlation keys. Runs of more than 5 items with the same lane, title and status collapse into one "N similar" row, and the server caps reads at 2,000 requests and 2,000 events. The UI defaults to a 24-hour window and refreshes every 10 s while the journey is in progress.
+- **Alternatives:** A dedicated journeys table maintained at ingest (faster for very long journeys, but another write path and more storage); requiring `key:value` always (less forgiving).
+
+## 033. Timestamps in API responses are RFC 3339
+
+- **Context:** `time::OffsetDateTime` fields were serialized with the crate's default tuple format (`[2026, 297, 18, …]`), which the UI couldn't parse.
+- **Choice:** Every `OffsetDateTime` in a response uses `time::serde::rfc3339` (strings like `2026-10-24T18:27:19.277Z`). Query results keep epoch milliseconds, as before.
+- **Alternatives:** Epoch milliseconds everywhere (consistent with query rows, but less readable in admin responses).
+
+## 034. Release markers everywhere, filtered where it matters
+
+- **Context:** "Release markers everywhere": histograms, heatmaps, route charts, error charts and journeys.
+- **Choice:** One `TimeChart` SVG component draws lines and bars with release markers and an optional threshold (the project's `slowMs` as the SLO). Labels closer than 8% of the width are dropped (the lines stay). The error group chart only shows releases of the group's service; other charts show all releases in the environment. Latency lines break where a bucket had no traffic instead of dropping to zero.
+- **Alternatives:** One marker style per chart, or showing all releases on the error chart (noisy with many services).
+
+## 035. Settings on one page
+
+- **Context:** M5 adds settings for projects, keys, members, tokens, redaction, replay targets, sampling and retention.
+- **Choice:** A single `/settings` page with a section list (`?tab=`), showing only the sections the signed-in role can use. Secrets (ingest keys, API tokens, invite links) are shown once with a copy button. Sampling and ignored routes are project settings delivered to SDKs through `/v1/config`; retention is read-only in the UI because it is applied to ClickHouse TTLs at startup.
+- **Alternatives:** Separate pages per area (more navigation for rarely used screens).

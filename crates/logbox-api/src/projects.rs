@@ -28,6 +28,7 @@ pub struct ProjectOut {
     #[schema(value_type = Object)]
     pub settings: ProjectSettings,
     #[schema(value_type = String)]
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
 }
 
@@ -206,10 +207,13 @@ pub struct IngestKey {
     pub name: String,
     pub prefix: String,
     #[schema(value_type = String)]
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
     #[schema(value_type = Option<String>)]
+    #[serde(with = "time::serde::rfc3339::option")]
     pub last_used_at: Option<time::OffsetDateTime>,
     #[schema(value_type = Option<String>)]
+    #[serde(with = "time::serde::rfc3339::option")]
     pub revoked_at: Option<time::OffsetDateTime>,
 }
 

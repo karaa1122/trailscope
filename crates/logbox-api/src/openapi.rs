@@ -8,7 +8,9 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use utoipa_scalar::{Scalar, Servable};
 
-use crate::{AppState, errors, inspector, live, overview, projects, query, setup, users, views};
+use crate::{
+    AppState, errors, inspector, journeys, live, overview, projects, query, setup, users, views,
+};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -22,7 +24,7 @@ use crate::{AppState, errors, inspector, live, overview, projects, query, setup,
     tags(
         (name = "setup"), (name = "auth"), (name = "members"), (name = "tokens"),
         (name = "projects"), (name = "query"), (name = "inspector"), (name = "live"), (name = "views"),
-        (name = "overview"), (name = "errors")
+        (name = "overview"), (name = "errors"), (name = "journeys")
     )
 )]
 struct ApiDoc;
@@ -92,8 +94,10 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(views::update, views::delete))
         .routes(routes!(overview::overview))
         .routes(routes!(overview::heatmap))
+        .routes(routes!(overview::route_series))
         .routes(routes!(errors::list))
         .routes(routes!(errors::detail))
+        .routes(routes!(journeys::journey))
 }
 
 /// `/api/openapi.json` and the `/api/docs` reference page.

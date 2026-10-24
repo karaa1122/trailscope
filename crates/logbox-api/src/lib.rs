@@ -4,6 +4,7 @@ pub mod auth;
 pub mod error;
 pub mod errors;
 pub mod inspector;
+pub mod journeys;
 pub mod live;
 pub mod openapi;
 pub mod overview;

@@ -1,18 +1,27 @@
 import type {
+  ApiToken,
   Chip,
+  ErrorDetail,
   ErrorGroup,
   Facet,
   GroupRow,
   Heatmap,
   HistogramResponse,
+  IngestKey,
+  Invite,
+  Journey,
+  Member,
   Me,
   Overview,
   Project,
   QueryInput,
+  RedactionRule,
   Release,
   ReplayResult,
   ReplayTarget,
   RequestDetail,
+  Role,
+  RouteSeries,
   RowsResponse,
   SavedView,
   Schema,
@@ -66,6 +75,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 const get = <T>(path: string) => request<T>('GET', path);
 const post = <T>(path: string, body: unknown) => request<T>('POST', path, body);
+const patch = <T>(path: string, body: unknown) => request<T>('PATCH', path, body);
+const put = <T>(path: string, body: unknown) => request<T>('PUT', path, body);
+const del = (path: string) => request<undefined>('DELETE', path);
 
 function qs(params: Record<string, string | number | undefined | null>): string {
   const p = new URLSearchParams();
@@ -134,8 +146,19 @@ export const api = {
     get<Overview>(`/api/v1/overview${qs({ project, environment, minutes })}`),
   heatmap: (project: string, environment: string | null, minutes: number, limit = 12) =>
     get<Heatmap>(`/api/v1/routes/heatmap${qs({ project, environment, minutes, limit })}`),
-  errors: (project: string, environment: string | null, status?: string, limit = 50) =>
-    get<{ groups: ErrorGroup[] }>(`/api/v1/errors${qs({ project, environment, status, limit })}`),
+  errors: (
+    project: string,
+    environment: string | null,
+    status?: string,
+    limit = 50,
+    opts: { from?: number; sort?: string; q?: string } = {},
+  ) => get<{ groups: ErrorGroup[] }>(`/api/v1/errors${qs({ project, environment, status, limit, ...opts })}`),
+  errorDetail: (project: string, fingerprint: string, environment: string | null) =>
+    get<ErrorDetail>(`/api/v1/errors/${encodeURIComponent(fingerprint)}${qs({ project, environment })}`),
+  routeSeries: (project: string, route: string, environment: string | null, minutes: number, service?: string) =>
+    get<RouteSeries>(`/api/v1/routes/series${qs({ project, route, environment, minutes, service })}`),
+  journey: (project: string, key: string, value: string, environment: string | null, from?: number, to?: number) =>
+    get<Journey>(`/api/v1/journeys${qs({ project, key, value, environment, from, to })}`),
 
   request: (project: string, id: string) =>
     get<RequestDetail>(`/api/v1/requests/${encodeURIComponent(id)}${qs({ project })}`),
@@ -156,6 +179,40 @@ export const api = {
     columns: string[];
     shared: boolean;
   }) => post<SavedView>('/api/v1/views', view),
+  updateView: (id: string, view: Omit<SavedView, 'id' | 'ownerId' | 'updatedAt'>) => put<SavedView>(`/api/v1/views/${id}`, view),
+  deleteView: (id: string) => del(`/api/v1/views/${id}`),
+
+  createProject: (name: string) => post<{ project: Project; ingestKey: string }>('/api/v1/projects', { name }),
+  updateProject: (id: string, body: { name?: string; settings?: Project['settings'] }) =>
+    patch<Project>(`/api/v1/projects/${id}`, body),
+  deleteProject: (id: string) => del(`/api/v1/projects/${id}`),
+  keys: (project: string) => get<IngestKey[]>(`/api/v1/projects/${project}/keys`),
+  createKey: (project: string, name: string) =>
+    post<{ id: string; token: string; prefix: string }>(`/api/v1/projects/${project}/keys`, { name }),
+  revokeKey: (project: string, id: string) => del(`/api/v1/projects/${project}/keys/${id}`),
+  rules: (project: string) => get<RedactionRule[]>(`/api/v1/projects/${project}/redaction-rules`),
+  createRule: (project: string, kind: RedactionRule['kind'], pattern: string) =>
+    post<RedactionRule>(`/api/v1/projects/${project}/redaction-rules`, { kind, pattern }),
+  deleteRule: (project: string, id: string) => del(`/api/v1/projects/${project}/redaction-rules/${id}`),
+  createTarget: (project: string, name: string, baseUrl: string) =>
+    post<ReplayTarget>(`/api/v1/projects/${project}/replay-targets`, { name, baseUrl }),
+  deleteTarget: (project: string, id: string) => del(`/api/v1/projects/${project}/replay-targets/${id}`),
+  retention: () => get<{ days: number; bodyDays: number }>('/api/v1/settings/retention'),
+
+  members: () => get<Member[]>('/api/v1/members'),
+  updateMember: (id: string, body: Partial<Pick<Member, 'role' | 'canViewBodies' | 'disabled' | 'name'>>) =>
+    patch<Member>(`/api/v1/members/${id}`, body),
+  deleteMember: (id: string) => del(`/api/v1/members/${id}`),
+  invites: () => get<Invite[]>('/api/v1/invites'),
+  createInvite: (email: string, role: Role, canViewBodies: boolean) =>
+    post<{ id: string; url: string; token: string }>('/api/v1/invites', { email, role, canViewBodies }),
+  deleteInvite: (id: string) => del(`/api/v1/invites/${id}`),
+  tokens: () => get<ApiToken[]>('/api/v1/tokens'),
+  createToken: (body: { name: string; scopes: string[]; projectId?: string | null; expiresInDays?: number | null }) =>
+    post<{ id: string; token: string; prefix: string }>('/api/v1/tokens', body),
+  revokeToken: (id: string) => del(`/api/v1/tokens/${id}`),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    post<undefined>('/api/v1/auth/password', { currentPassword, newPassword }),
 };
 
 /** Server-Sent Events URL for the live tail. */

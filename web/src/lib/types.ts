@@ -288,3 +288,108 @@ export interface SavedView {
   shared: boolean;
   updatedAt: string;
 }
+
+export type JourneyStatus = 'ok' | 'warn' | 'error';
+
+export interface JourneyItem {
+  t: number;
+  kind: 'request' | 'job' | 'log' | 'custom' | string;
+  lane: string;
+  status: JourneyStatus | string;
+  title: string;
+  detail: string;
+  durationMs: number;
+  requestId: string;
+  traceId: string;
+  fingerprint: string;
+  similar: number;
+  until: number;
+}
+
+export interface Journey {
+  key: string;
+  value: string;
+  summary: {
+    first: number;
+    last: number;
+    requests: number;
+    jobs: number;
+    errors: number;
+    warnings: number;
+    services: string[];
+    inProgress: boolean;
+    collapsed: number;
+  };
+  lanes: string[];
+  items: JourneyItem[];
+  context: Record<string, Record<string, string>>;
+  errors: { fingerprint: string; errorType: string; count: number; status: string }[];
+  traces: { traceId: string; spans: number; services: string[] }[];
+  truncated: boolean;
+}
+
+export interface RouteSeries {
+  route: string;
+  bucketMinutes: number;
+  times: number[];
+  requests: number[];
+  errors5xx: number[];
+  errors4xx: number[];
+  p50: number[];
+  p95: number[];
+  p99: number[];
+  methods: Record<string, number>;
+  sloMs: number;
+}
+
+export interface ErrorDetail {
+  group: ErrorGroup;
+  samples: Row[];
+  hourly: [number, number][];
+  stack: string;
+}
+
+export interface IngestKey {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface RedactionRule {
+  id: string;
+  kind: 'header' | 'body_key' | 'regex';
+  pattern: string;
+}
+
+export interface Member {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  canViewBodies: boolean;
+  disabled: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: Role;
+  canViewBodies: boolean;
+  expiresAt: string;
+}
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  projectId: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+}
