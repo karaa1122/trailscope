@@ -9,6 +9,8 @@ use logbox_core::live::LiveBus;
 use logbox_core::{Config, pg};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
+use tower_http::compression::CompressionLayer;
+use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 
@@ -25,6 +27,10 @@ pub enum Role {
 impl Role {
     fn ingest(self) -> bool {
         matches!(self, Role::All | Role::Ingest)
+    }
+
+    fn api(self) -> bool {
+        matches!(self, Role::All | Role::Api)
     }
 }
 
@@ -63,12 +69,29 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
 
     let writer_stop = CancellationToken::new();
     let mut writer = None;
+    let mut keys = None;
     let mut app = Router::new();
     if role.ingest() {
         let started =
             logbox_ingest::start(&config, &ch, pool.clone(), bus.clone(), writer_stop.clone());
         app = app.merge(started.router);
         writer = Some(started.writer);
+        keys = Some(started.keys);
+    }
+    if role.api() {
+        let state = logbox_api::AppState::new(
+            config.clone(),
+            ch.clone(),
+            pool.clone(),
+            bus.clone(),
+            keys.clone(),
+            shutdown.clone(),
+        )?;
+        let mut api = logbox_api::router(state).layer(CompressionLayer::new());
+        if !config.server.cors_origins.is_empty() {
+            api = api.layer(cors(&config.server.cors_origins)?);
+        }
+        app = app.merge(api);
     }
 
     let app = app
@@ -81,9 +104,12 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
         .await
         .with_context(|| format!("binding {}", config.server.listen))?;
     tracing::info!(addr = %config.server.listen, ?role, "logbox listening");
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown.clone().cancelled_owned())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown.clone().cancelled_owned())
+    .await?;
 
     // HTTP has stopped accepting and in-flight requests are done: drain.
     tracing::info!("shutting down; draining ingest queue");
@@ -95,4 +121,20 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
         }
     }
     Ok(())
+}
+
+/// CORS for API clients on other origins (the embedded UI needs none).
+fn cors(origins: &[String]) -> anyhow::Result<CorsLayer> {
+    let list = origins
+        .iter()
+        .map(|o| {
+            o.parse()
+                .with_context(|| format!("invalid CORS origin {o}"))
+        })
+        .collect::<anyhow::Result<Vec<axum::http::HeaderValue>>>()?;
+    Ok(CorsLayer::new()
+        .allow_origin(AllowOrigin::list(list))
+        .allow_methods(AllowMethods::mirror_request())
+        .allow_headers(AllowHeaders::mirror_request())
+        .allow_credentials(true))
 }

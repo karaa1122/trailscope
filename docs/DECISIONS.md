@@ -133,3 +133,33 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** The spec rejects "casts to unsafe types".
 - **Choice:** All casts (`CAST`, `::`, `toString()` and friends) are rejected. Comparisons already coerce literals to the column's type (timestamps from strings, IDs from strings or numbers, booleans from 0/1), which covers the real use cases.
 - **Alternatives:** A cast whitelist (more surface area, more ways for SQL and the evaluator to disagree).
+
+## 023. Install-wide roles
+
+- **Context:** The spec defines owner, admin, member and viewer roles without saying whether they're per project.
+- **Choice:** Roles and *can view bodies* are install-wide; every member sees every project. A small team running one Logbox rarely needs per-project ACLs. API tokens can be bound to one project for narrower access.
+- **Alternatives:** Per-project membership tables (more UI and more checks for a rare need; can be added later without breaking the API).
+
+## 024. Sessions, CSRF and login throttling
+
+- **Context:** The spec asks for HttpOnly/Secure/SameSite=Lax cookies, CSRF tokens and login rate limiting.
+- **Choice:** A random session token in the cookie, with only its SHA-256 stored. A per-session CSRF token returned at login and by `/auth/me`, required in `X-CSRF-Token` on state-changing requests and compared in constant time. Failed sign-ins are limited in memory per email (8) and per IP (30) over 15 minutes; unknown emails still run a dummy password check, so response timing doesn't reveal which accounts exist. Changing a password signs out the user's other sessions.
+- **Alternatives:** Double-submit cookies (no server state, but weaker if a subdomain is compromised), or a persistent limiter in Postgres (unnecessary for one process; split-mode API replicas each limit independently).
+
+## 025. Invites are links
+
+- **Context:** Members need a way to join before email is configured.
+- **Choice:** Admins create an invite and get a single-use link valid for 7 days to share. Email delivery of invites can use the SMTP settings once alerts land.
+- **Alternatives:** Admins setting initial passwords (they would know them).
+
+## 026. Aliases never shadow columns
+
+- **Context:** In ClickHouse, a SELECT alias is visible in WHERE. `toUnixTimestamp64Milli(timestamp) AS timestamp` made `WHERE timestamp >= …` compare the integer alias, so queries silently returned nothing. The integration test caught it.
+- **Choice:** Transformed output columns are aliased with a `_c_` prefix, which `fetch_json` strips.
+- **Alternatives:** The `prefer_column_name_to_alias` setting (easy to forget on one query).
+
+## 027. Replay safety
+
+- **Context:** Replay sends stored requests to other systems.
+- **Choice:** Only admin-configured targets (http/https, no credentials, no query) are allowed. Redirects aren't followed, with a 30-second timeout. Auth headers (`authorization`, `cookie`, `x-api-key`, `proxy-authorization`) and redacted values are never replayed, and requests whose stored body was truncated are refused. Replaying requires the member role and *can view bodies*; every replay is recorded.
+- **Alternatives:** Arbitrary URLs (an SSRF vector), or replaying stored auth headers (they're redacted anyway).

@@ -26,8 +26,8 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 | M0 Scaffold | done (`7c6042c`) | workspace, binary + config, compose, CI skeleton |
 | M1 Ingest | done | 50k ev/s sustained at p99 17 ms on 4 CPUs (docs/benchmarks.md); Node core SDK; demo and load test |
 | M2 Query language | done | parser, registry, compiler, evaluator, search, chips; injection, property, differential (vs ClickHouse) and fuzz tests; docs/query-language.md |
-| M3 API | **next** | |
-| M4 Web part 1 | todo | |
+| M3 API | done | auth (sessions+CSRF, tokens, roles, invites, rate limit), setup, projects/keys/rules/targets, query endpoints, inspector/cURL/replay, live SSE, views, OpenAPI at /api/docs; docs/api.md |
+| M4 Web part 1 | **next** | |
 | M5 Web part 2 | todo | |
 | M6 Alerts + email-on-5xx | todo | includes the follow-up email brief |
 | M7 SDKs | todo | |
@@ -74,6 +74,8 @@ docker exec logbox-py sh -c 'ruff check . && ruff format --check . && mypy && py
 
 Machine notes:
 
+- If Docker Desktop has stopped (it did once, possibly when the machine slept), start `C:\Users\KARAA\AppData\Local\Programs\DockerDesktop\Docker Desktop.exe`, wait for `docker version`, then `docker start logbox-dev-ch logbox-dev-pg logbox-rust logbox-py`.
+
 - Port 8080 was held by a SigNoz stack from another project; the user asked for it to be stopped (`docker compose -p signoz stop`, containers and volumes kept). Another local stack (`eventy`: ports 8000, 15432, 6380, 27017) is running and must be left alone.
 - Bash heredocs containing an apostrophe inside `<<'EOF'` blocks have broken the tool's quoting before; use the Write tool for files with prose.
 - Several crates have new majors whose APIs differ from older docs: clickhouse 0.15 (`client.insert::<T>(t).await?`, params via `.param()`), sqlx 0.9, reqwest 0.13, rand 0.10, sha2 0.11, utoipa 6, tower-http 0.7, sqlparser 0.63. Read the source under `/usr/local/cargo/registry/src/*/<crate>-<ver>/` when unsure.
@@ -91,22 +93,22 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `migrations/clickhouse/0001_init.sql` (embedded with `include_str!` in `ch.rs`; add new files to its `MIGRATIONS` list) and `migrations/postgres/0001_init.sql` (sqlx).
 - `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, benchmark in `bench/`).
 - `scripts/dev/rust.sh` runs a command in the Rust container with the test env vars; `scripts/dev/env.sh` holds the env for running `logbox` against the dev services.
-- Not built yet: `logbox-query`, `logbox-api` and `logbox-alerts` are empty stubs, `web/` is a placeholder, and the Python SDK is a skeleton.
+- `crates/logbox-api`: `AppState` (config, ClickHouse, Postgres, LiveBus, optional ingest KeyCache, login limiter, replay HTTP client, shutdown token). Modules: `auth` (Auth extractor: session cookie + CSRF or Bearer API token; `require(Role, Scope)`, `can_view_bodies`), `setup`, `users` (login/logout/me/password, members, invites, tokens, `ClientIp`), `projects`, `query` (`prepare` → `Prepared`, `fetch_json` runs as the reader and strips the `_c_` alias prefix), `inspector`, `live`, `views`, `openapi` (utoipa-axum route table). The integration test is `tests/api.rs`.
+- Not built yet: `logbox-alerts` is an empty stub, `web/` is a placeholder, and the Python SDK is a skeleton.
 
 ## Query language (M2, done)
 
 `crates/logbox-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs` (AST plus `Display` back to SQL), `compile.rs` (`compile`, `where_clause`; values are always `{pN:Type}` params), `eval.rs` (`Prepared` evaluator; `Record` is implemented for `LiveRequest` and `RequestRow`), `regex.rs` (RE2 validation and ASCII class rewriting), `search.rs`, `chips.rs`, and `QueryInput` in `lib.rs` (sql/search/filters). Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `LOGBOX_DIFF_CASES=4000 LOGBOX_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`; nightly and cargo-fuzz are installed in the dev container).
 
-## Plan for M3 (API)
+## Plan for M4 (web part 1)
 
-`crates/logbox-api`, mounted by `logbox-server` for the `all` and `api` roles:
-1. Postgres migration `0002` if needed. Auth: argon2id passwords, session cookie (HttpOnly, SameSite=Lax, Secure from config), CSRF token header on state-changing requests, login rate limit, roles owner/admin/member/viewer plus `can_view_bodies`, and API tokens (`lbx_api_…`, with scopes) as Bearer.
-2. Setup wizard API: status, create owner, create first project (with ingest key, shown once).
-3. Admin: projects, environments (distinct values from ClickHouse), services, ingest keys, API tokens, members and invites, redaction rules (invalidate the ingest `KeyCache`), project settings, replay targets.
-4. Query endpoints: `/api/v1/query/validate`, `requests` (keyset pagination on `(timestamp, request_id)`), `histogram` (by status class), `facets`, `group`, `/api/v1/schema`, `/api/v1/values`. Always use `ch.reader` with params from `logbox_query::compile`.
-5. Inspector: `/api/v1/requests/:id` (row, spans, events, error group; bodies and headers hidden without the permission), `/curl`, `/replay` (configured targets only, auth headers stripped).
-6. Live SSE `/api/v1/live?filter=…` (`LiveBus::subscribe_requests`, evaluated with `Prepared` in a live `Ctx`, 200 events/s cap, `skipped` markers).
-7. Saved views CRUD; OpenAPI via utoipa with a docs page.
+`web/`: Vite + React 19 + TypeScript (strict), TanStack Router (code-based routes), TanStack Query, TanStack Virtual, CodeMirror 6, Radix primitives, uPlot or hand-rolled SVG. No UI kit; components use the design tokens as CSS variables (dark default plus a light theme). Geist and Geist Mono are self-hosted from the `geist` npm package (OFL). **Match the mockups in `design/` closely** (read all three HTML files first).
+1. Shell: sidebar (logo, environment switcher, nav, services with health dots from `/projects/{id}/services`, keyboard hints) that collapses to an icon rail; command palette (⌘K); `/` focuses the query; G L / G E / G J; login, invite accept and setup wizard (owner → project → ingest key → SDK snippets → "first event received" via live SSE).
+2. Query bar: Search | Filters | SQL WHERE; CodeMirror with highlighting, autocomplete from `/schema`, `/values` and `/keys`, squiggles from `/query/validate` (250 ms debounce), status line; quick filters from `/query/facets`; the query is encoded in the URL.
+3. Live tail: tiles, route heatmap and new/spiking errors (add backend overview endpoints over `route_minute`/`error_groups`/`error_minute` as needed), stream table from SSE, filter pills, Live/Paused (Space).
+4. Explore: histogram with release markers, facet sidebar, virtualized results table with a column chooser, group-by mode.
+5. Request inspector: nearby list (J/K), header, chips, actions (cURL, replay, journey, share), error card, body tabs with a JSON viewer, details, span waterfall with an insight line.
+6. Embed `web/dist` into the binary with rust-embed (SPA fallback to index.html) in `logbox-server`; dev server proxies `/api` and `/v1`.
 
 ## Email-on-5xx (follow-up brief) integration points
 

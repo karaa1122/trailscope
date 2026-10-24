@@ -31,7 +31,9 @@ use crate::error::{ApiError, ApiResult};
 pub const SESSION_COOKIE: &str = "logbox_session";
 pub const CSRF_HEADER: &str = "x-csrf-token";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     Viewer,
@@ -89,8 +91,14 @@ pub struct User {
 
 #[derive(Debug, Clone)]
 pub enum Method_ {
-    Session { id: String, csrf: String },
-    Token { scopes: Vec<String>, project: Option<Uuid> },
+    Session {
+        id: String,
+        csrf: String,
+    },
+    Token {
+        scopes: Vec<String>,
+        project: Option<Uuid>,
+    },
 }
 
 /// An authenticated caller.
@@ -110,9 +118,14 @@ impl Auth {
             )));
         }
         if let Method_::Token { scopes, .. } = &self.via {
-            let ok = scopes.iter().any(|s| s == scope.name() || s == "admin" || (s == "write" && scope == Scope::Read));
+            let ok = scopes.iter().any(|s| {
+                s == scope.name() || s == "admin" || (s == "write" && scope == Scope::Read)
+            });
             if !ok {
-                return Err(ApiError::forbidden(format!("this API token lacks the `{}` scope", scope.name())));
+                return Err(ApiError::forbidden(format!(
+                    "this API token lacks the `{}` scope",
+                    scope.name()
+                )));
             }
         }
         Ok(())
@@ -124,10 +137,14 @@ impl Auth {
 
     /// API tokens bound to a project can only see that project.
     pub fn check_project(&self, project: Uuid) -> ApiResult<()> {
-        if let Method_::Token { project: Some(p), .. } = &self.via
+        if let Method_::Token {
+            project: Some(p), ..
+        } = &self.via
             && *p != project
         {
-            return Err(ApiError::forbidden("this API token is limited to another project"));
+            return Err(ApiError::forbidden(
+                "this API token is limited to another project",
+            ));
         }
         Ok(())
     }
@@ -186,7 +203,10 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
 impl FromRequestParts<AppState> for Auth {
     type Rejection = ApiError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         if let Some(token) = parts
             .headers
             .get(header::AUTHORIZATION)
@@ -216,12 +236,19 @@ impl FromRequestParts<AppState> for Auth {
             return Err(ApiError::unauthorized());
         };
         if !matches!(parts.method, Method::GET | Method::HEAD | Method::OPTIONS) {
-            let sent = parts.headers.get(CSRF_HEADER).and_then(|v| v.to_str().ok()).unwrap_or("");
+            let sent = parts
+                .headers
+                .get(CSRF_HEADER)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
             if !constant_time_eq(sent.as_bytes(), csrf.as_bytes()) {
                 return Err(ApiError::forbidden("missing or invalid CSRF token"));
             }
         }
-        Ok(Auth { user, via: Method_::Session { id: sid, csrf } })
+        Ok(Auth {
+            user,
+            via: Method_::Session { id: sid, csrf },
+        })
     }
 }
 
@@ -237,12 +264,20 @@ async fn token_auth(state: &AppState, token: &str) -> ApiResult<Auth> {
     .bind(hash_token(token))
     .fetch_optional(&state.pool)
     .await?;
-    let Some((token_id, scopes, project, id, email, name, role, can_view_bodies, disabled)) = row else {
+    let Some((token_id, scopes, project, id, email, name, role, can_view_bodies, disabled)) = row
+    else {
         return Err(ApiError::unauthorized());
     };
-    let user = UserRow { id, email, name, role, can_view_bodies, disabled }
-        .into_user()
-        .ok_or_else(ApiError::unauthorized)?;
+    let user = UserRow {
+        id,
+        email,
+        name,
+        role,
+        can_view_bodies,
+        disabled,
+    }
+    .into_user()
+    .ok_or_else(ApiError::unauthorized)?;
     let pool = state.pool.clone();
     tokio::spawn(async move {
         let _ = sqlx::query("UPDATE api_tokens SET last_used_at = now() WHERE id = $1")
@@ -250,7 +285,10 @@ async fn token_auth(state: &AppState, token: &str) -> ApiResult<Auth> {
             .execute(&pool)
             .await;
     });
-    Ok(Auth { user, via: Method_::Token { scopes, project } })
+    Ok(Auth {
+        user,
+        via: Method_::Token { scopes, project },
+    })
 }
 
 // ---- passwords ----------------------------------------------------------------
@@ -266,7 +304,11 @@ pub fn hash_password(password: &str) -> ApiResult<String> {
 
 pub fn verify_password(password: &str, phc: &str) -> bool {
     PasswordHash::new(phc)
-        .map(|h| Argon2::default().verify_password(password.as_bytes(), &h).is_ok())
+        .map(|h| {
+            Argon2::default()
+                .verify_password(password.as_bytes(), &h)
+                .is_ok()
+        })
         .unwrap_or(false)
 }
 
@@ -297,7 +339,12 @@ pub struct NewSession {
     pub csrf: String,
 }
 
-pub async fn create_session(state: &AppState, user_id: Uuid, user_agent: &str, ip: &str) -> ApiResult<NewSession> {
+pub async fn create_session(
+    state: &AppState,
+    user_id: Uuid,
+    user_agent: &str,
+    ip: &str,
+) -> ApiResult<NewSession> {
     let token = generate_token("");
     let csrf = generate_token("");
     let ttl = state.config.server.session_ttl_hours;
@@ -333,7 +380,9 @@ pub fn session_cookie(state: &AppState, value: String, max_age: Duration) -> Coo
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(state.config.server.cookies_secure())
-        .max_age(time::Duration::seconds(i64::try_from(max_age.as_secs()).unwrap_or(i64::MAX)))
+        .max_age(time::Duration::seconds(
+            i64::try_from(max_age.as_secs()).unwrap_or(i64::MAX),
+        ))
         .build()
 }
 
@@ -368,13 +417,18 @@ impl LoginLimiter {
     fn keys(email: &str, ip: Option<IpAddr>) -> [(String, usize); 2] {
         [
             (format!("e:{}", email.to_lowercase()), PER_EMAIL),
-            (format!("i:{}", ip.map(|i| i.to_string()).unwrap_or_default()), PER_IP),
+            (
+                format!("i:{}", ip.map(|i| i.to_string()).unwrap_or_default()),
+                PER_IP,
+            ),
         ]
     }
 
     /// Seconds until another attempt is allowed, if currently blocked.
     pub fn blocked(&self, email: &str, ip: Option<IpAddr>) -> Option<u64> {
-        let Ok(mut map) = self.failures.lock() else { return None };
+        let Ok(mut map) = self.failures.lock() else {
+            return None;
+        };
         let now = Instant::now();
         let mut wait = None;
         for (key, limit) in Self::keys(email, ip) {
@@ -431,14 +485,22 @@ mod tests {
             l.record_failure("A@example.com", ip);
         }
         assert!(l.blocked("a@example.com", ip).is_some());
-        assert!(l.blocked("b@example.com", "203.0.113.2".parse().ok()).is_none());
+        assert!(
+            l.blocked("b@example.com", "203.0.113.2".parse().ok())
+                .is_none()
+        );
         l.reset("a@example.com");
-        assert!(l.blocked("a@example.com", "198.51.100.1".parse().ok()).is_none());
+        assert!(
+            l.blocked("a@example.com", "198.51.100.1".parse().ok())
+                .is_none()
+        );
     }
 
     #[test]
     fn roles_are_ordered() {
-        assert!(Role::Owner > Role::Admin && Role::Admin > Role::Member && Role::Member > Role::Viewer);
+        assert!(
+            Role::Owner > Role::Admin && Role::Admin > Role::Member && Role::Member > Role::Viewer
+        );
         assert_eq!(Role::parse("admin"), Some(Role::Admin));
     }
 

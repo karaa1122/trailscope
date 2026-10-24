@@ -63,6 +63,8 @@ pub struct ServerConfig {
     pub shutdown_timeout_secs: u64,
     /// Session lifetime in hours.
     pub session_ttl_hours: u64,
+    /// Trust `X-Forwarded-For` for the client IP (only behind a reverse proxy you control).
+    pub trust_proxy: bool,
 }
 
 impl Default for ServerConfig {
@@ -74,6 +76,7 @@ impl Default for ServerConfig {
             cors_origins: Vec::new(),
             shutdown_timeout_secs: 20,
             session_ttl_hours: 24 * 14,
+            trust_proxy: false,
         }
     }
 }

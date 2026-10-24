@@ -39,7 +39,11 @@ impl ApiError {
     }
 
     pub fn unauthorized() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "unauthorized", "sign in to continue")
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "unauthorized",
+            "sign in to continue",
+        )
     }
 
     pub fn forbidden(message: impl Into<String>) -> Self {
@@ -47,7 +51,11 @@ impl ApiError {
     }
 
     pub fn not_found(what: &str) -> Self {
-        Self::new(StatusCode::NOT_FOUND, "not_found", format!("{what} not found"))
+        Self::new(
+            StatusCode::NOT_FOUND,
+            "not_found",
+            format!("{what} not found"),
+        )
     }
 
     pub fn conflict(message: impl Into<String>) -> Self {
@@ -59,13 +67,22 @@ impl ApiError {
     }
 
     pub fn invalid_query(err: logbox_query::QueryError) -> Self {
-        Self::new(StatusCode::UNPROCESSABLE_ENTITY, "invalid_query", err.message.clone()).with_details(err)
+        Self::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_query",
+            err.message.clone(),
+        )
+        .with_details(err)
     }
 
     /// Logs the real error and returns a generic 500.
     pub fn internal(err: impl std::fmt::Display) -> Self {
         tracing::error!(error = %err, "internal error");
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal", "something went wrong; see the server log")
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal",
+            "something went wrong; see the server log",
+        )
     }
 }
 

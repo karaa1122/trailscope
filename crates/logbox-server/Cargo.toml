@@ -19,6 +19,7 @@ clap.workspace = true
 logbox-core.workspace = true
 logbox-demo.workspace = true
 logbox-ingest.workspace = true
+logbox-api.workspace = true
 metrics-exporter-prometheus.workspace = true
 mimalloc.workspace = true
 serde_json.workspace = true

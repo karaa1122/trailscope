@@ -21,6 +21,7 @@ logbox-alerts = { path = "crates/logbox-alerts" }
 logbox-demo = { path = "crates/logbox-demo" }
 
 anyhow = "1.0.104"
+argon2 = "0.6.0"
 async-stream = "0.3.6"
 axum = { version = "0.8.9", features = ["macros"] }
 axum-extra = { version = "0.12.6", features = ["cookie", "typed-header"] }
@@ -59,6 +60,9 @@ tower-http = { version = "0.7.1", features = ["compression-gzip", "compression-z
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 url = "2.5.8"
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "time"] }
+utoipa-axum = "0.3.0"
+utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 uuid = { version = "1.29.0", features = ["v4", "v7", "serde"] }
 xxhash-rust = { version = "0.8.19", features = ["xxh64"] }
 zstd = "0.14.3"
