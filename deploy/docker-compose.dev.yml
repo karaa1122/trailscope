@@ -1,12 +1,16 @@
-# Services for developing Logbox on your machine (Logbox itself runs from source):
+# Services for developing Logbox on your machine:
 #   docker compose -f deploy/docker-compose.dev.yml up -d
-#   source scripts/dev/local.env && cargo run -- all
+#   source scripts/dev/local.env && cargo run -- all          (Logbox from source on :8090)
+# Or run Logbox itself as a container too (image built from this repo, UI on :8090):
+#   docker compose -f deploy/docker-compose.dev.yml --profile app up -d --build
 # Ports are offset so they don't clash with other local databases.
 name: logbox-dev
 
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:26.8
+    container_name: logbox-dev-ch
+    restart: unless-stopped
     environment:
       CLICKHOUSE_USER: logbox
       CLICKHOUSE_PASSWORD: logbox
@@ -15,26 +19,69 @@ services:
     volumes: [clickhouse:/var/lib/clickhouse]
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   postgres:
     image: postgres:18-alpine
+    container_name: logbox-dev-pg
+    restart: unless-stopped
     environment:
       POSTGRES_USER: logbox
       POSTGRES_PASSWORD: logbox
       POSTGRES_DB: logbox
     ports: ["25432:5432"]
     volumes: [postgres:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logbox -d logbox"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
-  # Catches every email: SMTP on 1025, web UI on http://localhost:8025
+  # Catches every email: SMTP on 1025 (host `mailpit` from the app container), web UI on http://localhost:8025
   mailpit:
     image: axllent/mailpit:v1.32.0
+    container_name: logbox-dev-mailpit
+    restart: unless-stopped
     ports: ["1025:1025", "8025:8025"]
 
   # Split mode and the BullMQ/Celery examples
   redis:
     image: redis:8-alpine
+    container_name: logbox-dev-redis
+    restart: unless-stopped
     ports: ["26379:6379"]
 
+  # Logbox itself (profile "app"). Apps in other containers reach it at
+  # http://host.docker.internal:8090 (add `extra_hosts: ["host.docker.internal:host-gateway"]`).
+  logbox:
+    profiles: ["app"]
+    image: logbox:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: logbox-dev-app
+    command: ["all"]
+    restart: unless-stopped
+    ports: ["8090:8080"]
+    environment:
+      LOGBOX_SERVER_PUBLIC_URL: http://localhost:8090
+      LOGBOX_CLICKHOUSE_URL: http://clickhouse:8123
+      LOGBOX_CLICKHOUSE_USER: logbox
+      LOGBOX_CLICKHOUSE_PASSWORD: logbox
+      LOGBOX_POSTGRES_URL: postgres://logbox:logbox@postgres:5432/logbox
+      LOGBOX_SECRET_KEY: dev-secret-key-for-local-testing-only
+      LOGBOX_LOG_FORMAT: pretty
+    depends_on:
+      clickhouse: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
 volumes:
+  # Same names as the `docker run` setup in AGENTS.md, so existing data is kept.
   clickhouse:
+    name: logbox-dev-ch
   postgres:
+    name: logbox-dev-pg

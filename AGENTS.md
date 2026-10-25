@@ -36,28 +36,20 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 
 ## Dev environment (Linux, current since M6)
 
-The repo is at `/home/kk/Documents/LogBox` on Ubuntu 24.04. Rust 1.99.1 (rustup, picked up from `rust-toolchain.toml`), Node 24 (fnm), pnpm 9 and Docker are on the host, so cargo and pnpm run natively. Only the databases run in containers (same names and ports as on Windows):
+The repo is at `/home/kk/Documents/LogBox` on Ubuntu 24.04. Rust 1.99.1 (rustup, picked up from `rust-toolchain.toml`), Node 24 (fnm), pnpm 9 and Docker are on the host, so cargo and pnpm run natively. Services run as the compose project `logbox-dev` (`deploy/docker-compose.dev.yml`; containers `logbox-dev-ch`, `-pg`, `-redis`, `-mailpit`, and with `--profile app` the server itself as `logbox-dev-app` on :8090). Data lives in the named volumes `logbox-dev-ch` and `logbox-dev-pg`:
 
 ```bash
-docker network create logbox-dev
-docker run -d --name logbox-dev-ch --network logbox-dev -p 18123:8123 -p 19000:9000 \
-  -e CLICKHOUSE_USER=logbox -e CLICKHOUSE_PASSWORD=logbox -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
-  --ulimit nofile=262144:262144 -v logbox-dev-ch:/var/lib/clickhouse clickhouse/clickhouse-server:26.8
-docker run -d --name logbox-dev-pg --network logbox-dev -p 25432:5432 \
-  -e POSTGRES_USER=logbox -e POSTGRES_PASSWORD=logbox -e POSTGRES_DB=logbox \
-  -v logbox-dev-pg:/var/lib/postgresql postgres:18-alpine
-docker run -d --name logbox-dev-mailpit --network logbox-dev -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.32.0
-docker run -d --name logbox-dev-redis --network logbox-dev -p 26379:6379 redis:8-alpine   # BullMQ/Celery examples
-# later: docker start logbox-dev-ch logbox-dev-pg logbox-dev-mailpit logbox-dev-redis
-# Optional mock OIDC provider (issuer http://127.0.0.1:18080/default; see decision 054):
-#   docker run -d --name logbox-dev-oidc -p 18080:8080 -e JSON_CONFIG='{...}' ghcr.io/navikt/mock-oauth2-server:latest
+docker compose -f deploy/docker-compose.dev.yml --profile app up -d          # everything, Logbox from the logbox:local image
+docker compose -f deploy/docker-compose.dev.yml --profile app up -d --build  # after changing server code
+docker compose -f deploy/docker-compose.dev.yml up -d                        # only the services; run Logbox from source:
+source scripts/dev/local.env && cargo run -- all                            #   (stop logbox-dev-app first: same port)
 ```
 
-Contributors can instead run `docker compose -f deploy/docker-compose.dev.yml up -d` and `source scripts/dev/local.env` (same ports); the commands above are what this machine uses.
+The local eventy project (`/home/kk/PycharmProjects/eventy-api`) sends to this Logbox through its git-excluded `docker-compose.override.yaml` (project "Eventy"); its opt-in blocks in `eventy/settings.py` and `eventy/celery.py` are uncommitted there. In the dev database, SMTP points at host `mailpit` (correct for `logbox-dev-app`; use `127.0.0.1` when running Logbox from source).
 
 Python: a venv at `sdks/python/.venv` (Python 3.12) with `pip install -e ".[dev]"` plus `uvicorn` and `redis` for the examples. Checks: `cd sdks/python && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy`.
 
-Run the server natively (UI at http://localhost:8090, owner@example.com / "correct horse battery" on the existing dev database; SMTP there points at Mailpit, host 127.0.0.1 port 1025):
+Run the server natively instead of `logbox-dev-app` (UI at http://localhost:8090, owner@example.com / "correct horse battery" on the existing dev database):
 
 ```bash
 pnpm build && cargo build -p logbox-server
