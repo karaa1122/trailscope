@@ -7,7 +7,7 @@ import { Empty, Segmented, Skeleton, Toast, copyText, useToast } from '../compon
 import { ApiError, api } from '../lib/api';
 import { fmtClock, fmtDuration, fmtHm, fmtInt, fmtMs, rangeMs } from '../lib/format';
 import { useSession } from '../lib/session';
-import type { Journey, JourneyItem } from '../lib/types';
+import type { Journey, JourneyItem, Release } from '../lib/types';
 
 export interface JourneySearch {
   q?: string;
@@ -144,14 +144,167 @@ export function Journeys({ search }: { search: JourneySearch }) {
   );
 }
 
+/** The time span the timeline draws, with a little padding. */
+function timeWindow(s: Journey['summary'], now: number) {
+  const end = s.inProgress ? Math.max(now, s.last) : s.last;
+  const pad = Math.round(Math.max(1000, (end - s.first) * 0.04));
+  const from = s.first - pad;
+  const to = end + (s.inProgress ? pad * 2 : pad);
+  const span = Math.max(1, to - from);
+  return { from, to, span, pos: (t: number) => `${(((t - from) / span) * 100).toFixed(2)}%` };
+}
+
+interface Problem {
+  start: number;
+  end: number;
+  count: number;
+  total: number;
+  /** Most common failing step, e.g. "GET /projects/:id/tasks → 500". */
+  title: string;
+  errorType: string;
+  /** The service where it failed (its lane). */
+  lane: string;
+  /** The first failing request, to open in the inspector. */
+  firstRequestId?: string;
+  before?: Release;
+  after?: Release;
+}
+
+/**
+ * The biggest burst of one kind of failure (same step, gaps under 15 minutes),
+ * and the releases around it. Grouping by step keeps unrelated errors in other
+ * services from blurring the story.
+ */
+function findProblem(items: JourneyItem[], releases: Release[]): Problem | null {
+  const errs = items.filter((i) => i.status === 'error');
+  if (!errs.length) return null;
+  const weight = (r: JourneyItem[]) => r.reduce((n, i) => n + Math.max(1, i.similar), 0);
+  const byStep = new Map<string, JourneyItem[]>();
+  for (const e of errs) byStep.set(`${e.lane}|${e.title}`, [...(byStep.get(`${e.lane}|${e.title}`) ?? []), e]);
+  const runs: JourneyItem[][] = [];
+  for (const list of byStep.values()) {
+    let run: JourneyItem[] = [];
+    for (const e of list) {
+      if (run.length && e.t - run[run.length - 1]!.until > 15 * 60_000) {
+        runs.push(run);
+        run = [];
+      }
+      run.push(e);
+    }
+    runs.push(run);
+  }
+  const best = runs.reduce((a, b) => (weight(b) > weight(a) ? b : a));
+  const top = (key: (i: JourneyItem) => string) => {
+    const counts = new Map<string, number>();
+    for (const i of best) counts.set(key(i), (counts.get(key(i)) ?? 0) + Math.max(1, i.similar));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  };
+  const start = best[0]!.t;
+  const end = Math.max(...best.map((i) => i.until));
+  const sorted = [...releases].sort((a, b) => a.at - b.at);
+  const before = sorted.filter((r) => r.at <= start + 60_000 && r.at >= start - 30 * 60_000).pop();
+  // The fix is a later, different version deployed around the time the errors stopped.
+  const after = sorted.find(
+    (r) => r.at > (before?.at ?? start) && r.version !== before?.version && r.at >= end - 5 * 60_000 && r.at <= end + 15 * 60_000,
+  );
+  return {
+    start,
+    end,
+    count: weight(best),
+    total: weight(errs),
+    title: top((i) => i.title),
+    errorType: top((i) => i.detail.split(':')[0] ?? ''),
+    lane: top((i) => i.lane),
+    firstRequestId: best.find((i) => i.kind === 'request' && i.requestId)?.requestId,
+    before,
+    after,
+  };
+}
+
+function Story({ data, problem, came }: { data: Journey; problem: Problem | null; came?: JourneyItem }) {
+  const s = data.summary;
+  const who = `${title(data.key)} ${data.value}`;
+  const activity = `${fmtInt(s.requests)}${data.truncated ? '+' : ''} requests and ${fmtInt(s.jobs)} background jobs across ${s.services.length} service${s.services.length === 1 ? '' : 's'}`;
+  return (
+    <section aria-label="What happened" className="panel panel-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8, borderColor: problem ? 'var(--err-line)' : undefined }}>
+      <h2 className="section-title" style={{ padding: 0, margin: 0 }}>
+        What happened
+      </h2>
+      <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6 }}>
+        {who} made {activity} between {fmtHm(s.first)} and {fmtHm(s.last)}.{' '}
+        {!problem ? (
+          <span className="ok-text">Nothing failed for them in this window.</span>
+        ) : (
+          <>
+            <span style={{ color: 'var(--err-text)', fontWeight: 600 }}>
+              {problem.count === problem.total ? `${fmtInt(problem.total)} errors` : `${fmtInt(problem.count)} of the ${fmtInt(problem.total)} errors`}
+            </span>{' '}
+            happened between {fmtHm(problem.start)} and {fmtHm(problem.end)}
+            {problem.before && (
+              <>
+                , right after release <b className="mono">{problem.before.version}</b> was deployed
+              </>
+            )}
+            .
+            {problem.after && (
+              <>
+                {' '}
+                They stopped after <b className="mono">{problem.after.version}</b> at {fmtHm(problem.after.at)}.
+              </>
+            )}
+          </>
+        )}
+      </p>
+      {problem && (
+        <div className="row wrap" style={{ gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--err-faint)', fontSize: 13.5 }}>
+          <span style={{ fontWeight: 600 }}>Where it failed:</span>
+          <span className="chip">service {problem.lane}</span>
+          <span className="chip" style={{ color: 'var(--err-text)' }}>
+            {problem.title}
+          </span>
+          {problem.errorType && (
+            <span className="chip" style={{ color: 'var(--err-text)' }}>
+              {problem.errorType}
+            </span>
+          )}
+          {problem.firstRequestId && (
+            <Link to="/requests/$requestId" params={{ requestId: problem.firstRequestId }} className="btn btn-sm" style={{ marginLeft: 'auto' }}>
+              Open the first failure
+            </Link>
+          )}
+        </div>
+      )}
+      {came && (
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          The request you came from ({fmtClock(came.t, false)}, <span className="mono">{came.title}</span>) is ringed in lime below.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function JourneyView({ data, came, now, shown, onMore }: { data: Journey; came?: string; now: number; shown: number; onMore: () => void }) {
   const s = data.summary;
+  const { project, environment } = useSession();
+  const win = timeWindow(s, now);
+  const releases = useQuery({
+    queryKey: ['releases', project?.id, environment, 'journey', win.from, win.to],
+    enabled: !!project,
+    queryFn: () => api.releases(project?.id ?? '', win.from, win.to, environment),
+    staleTime: 60_000,
+  });
+  const markers = useMemo(() => (releases.data ?? []).filter((r) => r.at >= win.from && r.at <= win.to), [releases.data, win.from, win.to]);
+  const problem = useMemo(() => findProblem(data.items, markers), [data.items, markers]);
+  const cameItem = came ? data.items.find((i) => i.kind === 'request' && i.requestId === came) : undefined;
+  const hasProblems = s.errors + s.warnings > 0;
+  const [onlyProblems, setOnlyProblems] = useState(hasProblems);
+  const logItems = onlyProblems ? data.items.filter((i) => i.status !== 'ok' || (!!came && i.requestId === came)) : data.items;
   const last = data.items[data.items.length - 1];
   const recovered = s.errors > 0 && last?.status === 'ok';
   const elapsed = Math.max(0, s.last - s.first);
   const tiles = [
     { value: fmtDuration(elapsed), label: s.inProgress ? 'since first activity' : 'first to last activity' },
-    { value: fmtInt(s.requests), label: 'API requests' },
+    { value: `${fmtInt(s.requests)}${data.truncated ? '+' : ''}`, label: 'API requests' },
     { value: fmtInt(s.jobs), label: 'background jobs' },
     {
       value: fmtInt(s.errors),
@@ -169,7 +322,7 @@ function JourneyView({ data, came, now, shown, onMore }: { data: Journey; came?:
         </h1>
         {s.inProgress ? (
           <span className="chip accent" style={{ fontFamily: 'var(--font)', fontWeight: 600, borderRadius: 999, padding: '4px 12px' }}>
-            <span className="dot" style={{ background: 'var(--accent)' }} /> In progress
+            <span className="dot" style={{ background: 'var(--accent)' }} /> Active now
           </span>
         ) : (
           <span className="chip" style={{ fontFamily: 'var(--font)', borderRadius: 999, padding: '4px 12px' }}>
@@ -177,10 +330,12 @@ function JourneyView({ data, came, now, shown, onMore }: { data: Journey; came?:
           </span>
         )}
         <span className="muted" style={{ fontSize: 13 }}>
-          {s.errors === 0 ? 'no errors' : recovered ? `recovered after ${s.errors} error${s.errors > 1 ? 's' : ''}` : `${s.errors} error${s.errors > 1 ? 's' : ''}, last step failed`}
-          {data.truncated && ' · showing the first 2,000 items'}
+          {s.errors === 0 ? 'no errors' : recovered ? 'working again now' : 'the last step failed'}
+          {data.truncated && ' · very active: only the first 2,000 items are shown, pick a shorter window'}
         </span>
       </header>
+
+      <Story data={data} problem={problem} came={cameItem} />
 
       <section aria-label="Summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
         {tiles.map((t) => (
@@ -195,24 +350,38 @@ function JourneyView({ data, came, now, shown, onMore }: { data: Journey; came?:
         ))}
       </section>
 
-      <Swimlanes data={data} came={came} now={now} />
+      <Swimlanes data={data} came={came} now={now} win={win} markers={markers} problem={problem} />
 
       <div className="row wrap" style={{ gap: 16, alignItems: 'flex-start' }}>
         <section aria-label="Event log" className="panel" style={{ flex: '999 1 520px', minWidth: 0, overflow: 'hidden' }}>
-          <div className="row" style={{ gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
+          <div className="row wrap" style={{ gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
             <h2 className="panel-title">Event log</h2>
             <span className="panel-sub">
-              {s.collapsed > 0 ? `${fmtInt(s.collapsed)} repetitive items collapsed` : `${fmtInt(data.items.length)} items`}
+              {onlyProblems ? 'errors and retries only, oldest first' : `everything, oldest first${s.collapsed > 0 ? ` · ${fmtInt(s.collapsed)} repetitive items collapsed` : ''}`}
             </span>
+            {hasProblems && (
+              <span style={{ marginLeft: 'auto' }}>
+                <Segmented
+                  small
+                  label="Show"
+                  value={onlyProblems ? 'problems' : 'all'}
+                  onChange={(v) => setOnlyProblems(v === 'problems')}
+                  options={[
+                    { id: 'problems', label: `Problems (${fmtInt(s.errors + s.warnings)})` },
+                    { id: 'all', label: `Everything (${fmtInt(data.items.length)})` },
+                  ]}
+                />
+              </span>
+            )}
           </div>
           <div className="scroll-x">
             <div style={{ minWidth: 640 }}>
-              {data.items.slice(0, shown).map((e, i) => (
+              {logItems.slice(0, shown).map((e, i) => (
                 <EventRow key={`${e.t}-${i}`} e={e} came={came} />
               ))}
-              {data.items.length > shown && (
+              {logItems.length > shown && (
                 <button type="button" className="btn btn-ghost" style={{ width: '100%', borderRadius: 0 }} onClick={onMore}>
-                  Show {fmtInt(Math.min(PAGE, data.items.length - shown))} more
+                  Show {fmtInt(Math.min(PAGE, logItems.length - shown))} more
                 </button>
               )}
             </div>
@@ -266,14 +435,34 @@ function JourneyView({ data, came, now, shown, onMore }: { data: Journey; came?:
   );
 }
 
-function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: number }) {
+function Swimlanes({
+  data,
+  came,
+  now,
+  win,
+  markers,
+  problem,
+}: {
+  data: Journey;
+  came?: string;
+  now: number;
+  win: ReturnType<typeof timeWindow>;
+  markers: Release[];
+  problem: Problem | null;
+}) {
   const s = data.summary;
-  const end = s.inProgress ? Math.max(now, s.last) : s.last;
-  const pad = Math.round(Math.max(1000, (end - s.first) * 0.04));
-  const from = s.first - pad;
-  const to = end + (s.inProgress ? pad * 2 : pad);
-  const span = Math.max(1, to - from);
-  const pos = (t: number) => `${(((t - from) / span) * 100).toFixed(2)}%`;
+  const { from, span, pos } = win;
+  // Release labels go on two rows so close ones don't print on top of each other;
+  // one too close to both rows is left unlabelled (its line stays).
+  const labelled: { r: Release; row: number }[] = [];
+  const lastAt = [-Infinity, -Infinity];
+  for (const r of [...markers].sort((a, b) => a.at - b.at)) {
+    const row = lastAt.findIndex((t) => (r.at - t) / span > 0.07);
+    if (row < 0) continue;
+    lastAt[row] = r.at;
+    labelled.push({ r, row });
+  }
+  const shade = problem && { left: pos(problem.start - 30_000), width: `max(6px, calc(${pos(problem.end + 30_000)} - ${pos(problem.start - 30_000)}))` };
   const byLane = useMemo(() => {
     const m = new Map<string, JourneyItem[]>();
     for (const lane of data.lanes) m.set(lane, []);
@@ -283,19 +472,11 @@ function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: num
     for (const list of m.values()) list.sort((a, b) => rank(a) - rank(b));
     return m;
   }, [data, came]);
-  const { project, environment } = useSession();
-  const releases = useQuery({
-    queryKey: ['releases', project?.id, environment, 'journey', from, to],
-    enabled: !!project,
-    queryFn: () => api.releases(project?.id ?? '', from, to, environment),
-    staleTime: 60_000,
-  });
-  const markers = (releases.data ?? []).filter((r) => r.at >= from && r.at <= to);
   return (
     <section aria-label="Swimlane timeline" className="panel panel-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="row wrap" style={{ gap: 12 }}>
-        <h2 className="panel-title">Across services</h2>
-        <span className="panel-sub">every request, job and event carrying this value, one lane per service</span>
+        <h2 className="panel-title">Timeline</h2>
+        <span className="panel-sub">each row is a service · each dot is one request, job or log line · time runs left to right · hover a dot for details</span>
         <span className="row muted" style={{ marginLeft: 'auto', gap: 14, fontSize: 12 }}>
           {[
             ['ok', 'ok'],
@@ -311,6 +492,19 @@ function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: num
       </div>
       <div className="scroll-x">
         <div style={{ minWidth: 760, display: 'flex', flexDirection: 'column' }}>
+          {problem && shade && (
+            <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', gap: 14 }}>
+              <span />
+              <span style={{ position: 'relative', height: 22, display: 'block' }}>
+                <span
+                  className="mono"
+                  style={{ position: 'absolute', left: pos(problem.start), bottom: 2, fontSize: 11.5, fontWeight: 600, color: 'var(--err-text)', whiteSpace: 'nowrap' }}
+                >
+                  ▼ {fmtInt(problem.count)} errors here
+                </span>
+              </span>
+            </div>
+          )}
           {data.lanes.map((lane) => (
             <div key={lane} style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', gap: 14, alignItems: 'center', minHeight: 40, borderBottom: '1px solid var(--line-soft)' }}>
               <span className="mono ellipsis" style={{ fontSize: 12, color: 'var(--text-2)' }} title={lane}>
@@ -318,6 +512,7 @@ function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: num
               </span>
               <span style={{ position: 'relative', height: 40, display: 'block' }}>
                 <span style={{ position: 'absolute', left: 0, right: 0, top: 19, height: 1, background: 'var(--selected)' }} />
+                {shade && <span style={{ position: 'absolute', top: 0, bottom: 0, left: shade.left, width: shade.width, background: 'var(--err-soft)' }} />}
                 {markers.map((r) => (
                   <span key={r.id} style={{ position: 'absolute', top: 0, bottom: 0, left: pos(r.at), borderLeft: '1px dashed var(--accent-line)' }} />
                 ))}
@@ -328,10 +523,12 @@ function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: num
                   </>
                 )}
                 {(byLane.get(lane) ?? []).map((i, n) => {
-                  const big = i.status !== 'ok' || i.requestId === came;
-                  const size = i.similar > 1 ? 6 : big ? 12 : 9;
-                  const color = i.similar > 1 ? 'var(--span)' : (COLORS[i.status] ?? 'var(--ok)');
-                  const ring = i.requestId && i.requestId === came ? '0 0 0 2px var(--panel), 0 0 0 4px var(--accent)' : big ? '0 0 0 2px var(--panel)' : undefined;
+                  // Problems are big and bright; normal traffic is small and faded so they stand out.
+                  const isCame = !!i.requestId && i.requestId === came;
+                  const size = isCame ? 14 : i.status === 'error' ? 12 : i.status === 'warn' ? 9 : i.similar > 1 ? 4 : 6;
+                  const color = i.similar > 1 && i.status === 'ok' ? 'var(--span)' : (COLORS[i.status] ?? 'var(--ok)');
+                  const ring = isCame ? '0 0 0 2px var(--panel), 0 0 0 4px var(--accent)' : i.status === 'error' ? '0 0 0 2px var(--panel)' : undefined;
+                  const opacity = isCame || i.status !== 'ok' ? 1 : 0.4;
                   const tip = `${fmtClock(i.t, false)} ${i.title}${i.similar > 1 ? ` (${i.similar}×)` : ''}${i.detail ? `\n${i.detail}` : ''}`;
                   return (
                     <span
@@ -347,6 +544,7 @@ function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: num
                         borderRadius: 999,
                         background: color,
                         boxShadow: ring,
+                        opacity,
                       }}
                     />
                   );
@@ -356,15 +554,15 @@ function Swimlanes({ data, came, now }: { data: Journey; came?: string; now: num
           ))}
           <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', gap: 14, paddingTop: 8 }}>
             <span />
-            <span className="mono dim" style={{ position: 'relative', height: markers.length ? 32 : 16, display: 'block', fontSize: 11 }}>
+            <span className="mono dim" style={{ position: 'relative', height: labelled.some((l) => l.row === 1) ? 47 : markers.length ? 32 : 16, display: 'block', fontSize: 11 }}>
               {[0, 1 / 3, 2 / 3].map((f) => (
                 <span key={f} style={{ position: 'absolute', left: `${f * 100}%`, transform: f ? 'translateX(-50%)' : undefined }}>
                   {span > 36 * 3_600_000 ? `${new Date(from + span * f).getMonth() + 1}/${new Date(from + span * f).getDate()} ` : ''}
                   {span < 10 * 60_000 ? fmtClock(from + span * f, false) : fmtHm(from + span * f)}
                 </span>
               ))}
-              {markers.map((r) => (
-                <span key={r.id} title={`${r.service} ${r.version} · ${fmtClock(r.at, false)}`} style={{ position: 'absolute', left: pos(r.at), transform: 'translateX(-50%)', color: 'var(--accent)', whiteSpace: 'nowrap', top: 16 }}>
+              {labelled.map(({ r, row }) => (
+                <span key={r.id} title={`${r.service} ${r.version} · ${fmtClock(r.at, false)}`} style={{ position: 'absolute', left: pos(r.at), transform: 'translateX(-50%)', color: 'var(--accent)', whiteSpace: 'nowrap', top: 16 + row * 15 }}>
                   {r.version}
                 </span>
               ))}
