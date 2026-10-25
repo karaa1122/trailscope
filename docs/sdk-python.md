@@ -1,10 +1,12 @@
-# Python: `logbox`
+# Python: `logbox-sdk`
 
 Request logging for Django and ASGI apps (FastAPI, Starlette), job events for Celery, and a `logging` handler. Python 3.10+, standard library only. Shared behaviour is described in [sdk-spec.md](sdk-spec.md).
 
 ```bash
-pip install logbox
+pip install logbox-sdk
 ```
+
+The package is published as `logbox-sdk` and imported as `logbox`.
 
 ## FastAPI and Starlette
 

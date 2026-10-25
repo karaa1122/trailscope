@@ -1,5 +1,8 @@
-// Captures UI screenshots from a running Logbox with demo data.
+// Captures UI screenshots from a running Logbox with demo data (live traffic
+// from `logbox demo` makes Live tail and the heatmap come alive).
 //   BASE_URL=http://localhost:8080 OUT=../docs/images node screenshots.mjs
+// Optional: PROJECT_ID (project to show), THEME (dark|light), CHROMIUM_PATH,
+// JOURNEY (key:value) and JOURNEY_RANGE, LOGBOX_EMAIL / LOGBOX_PASSWORD.
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,23 +12,35 @@ const OUT = process.env.OUT ?? '../docs/images';
 const EMAIL = process.env.LOGBOX_EMAIL ?? 'owner@example.com';
 const PASSWORD = process.env.LOGBOX_PASSWORD ?? 'correct horse battery';
 const THEME = process.env.THEME ?? 'dark';
+const PROJECT = process.env.PROJECT_ID;
 
 mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 1200 }, deviceScaleFactor: 1 });
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 page.on('console', (m) => m.type() === 'error' && console.error('[browser]', m.text()));
 page.on('pageerror', (e) => console.error('[pageerror]', e.message));
 
 await page.goto(`${BASE}/login`);
-await page.evaluate((t) => localStorage.setItem('logbox.theme', t), THEME);
+await page.evaluate(
+  ([theme, project]) => {
+    localStorage.setItem('logbox.theme', theme);
+    if (project) localStorage.setItem('logbox.project', project);
+  },
+  [THEME, PROJECT],
+);
 await page.getByLabel('Email').fill(EMAIL);
 await page.getByLabel('Password').fill(PASSWORD);
-await page.getByRole('button', { name: 'Sign in' }).click();
+await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 await page.waitForURL('**/live**');
+if (PROJECT) {
+  // The session reads the stored project when the app loads.
+  await page.evaluate((p) => localStorage.setItem('logbox.project', p), PROJECT);
+  await page.goto(`${BASE}/live`);
+}
 
-const shot = async (name) => {
+const shot = async (name, { full = false } = {}) => {
   await page.waitForTimeout(2500);
-  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: true });
+  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: full });
   console.log('saved', name);
 };
 
@@ -36,15 +51,27 @@ await page.goto(`${BASE}/explore?mode=search&q=status%3A5xx&range=6h`);
 await page.waitForSelector('text=Requests');
 await shot('explore');
 
-const row = page.locator('.table-row').first();
-await row.click();
+await page.locator('.table-row').first().click();
 await page.waitForURL('**/requests/**');
-await shot('inspector');
+await shot('inspector', { full: true });
 
 await page.goto(`${BASE}/explore?view=group&group=route&range=6h`);
 await shot('explore-group');
 
-await page.setViewportSize({ width: 390, height: 900 });
+await page.goto(`${BASE}/errors?range=24h`);
+await shot('errors');
+
+await page.goto(`${BASE}/routes`);
+await shot('routes');
+
+const journey = process.env.JOURNEY ?? 'account_id:acc_108';
+await page.goto(`${BASE}/journeys?q=${encodeURIComponent(journey)}&range=${process.env.JOURNEY_RANGE ?? '1h'}`);
+await shot('journey');
+
+await page.goto(`${BASE}/alerts?tab=email`);
+await shot('alerts-email');
+
+await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(`${BASE}/live`);
 await shot('live-tail-mobile');
 

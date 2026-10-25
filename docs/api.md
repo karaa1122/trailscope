@@ -64,8 +64,8 @@ A token bound to a project can only see that project. A token can never act beyo
 
 | Area | Endpoints |
 |---|---|
-| Setup | `GET /api/v1/setup`, `POST /api/v1/setup` |
-| Auth | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, `POST /api/v1/auth/password` |
+| Setup | `GET /api/v1/setup` (also says whether single sign-on is on), `POST /api/v1/setup` |
+| Auth | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, `POST /api/v1/auth/password`; single sign-on: `GET /api/v1/auth/oidc/start` and `/callback` (browser redirects, see [configuration.md](configuration.md#oidc)) |
 | Members | `GET /api/v1/members`, `PATCH`/`DELETE /api/v1/members/{id}`, `POST`/`GET /api/v1/invites`, `POST /api/v1/invites/accept` |
 | Tokens | `GET`/`POST /api/v1/tokens`, `DELETE /api/v1/tokens/{id}` |
 | Projects | `GET`/`POST /api/v1/projects`, `GET`/`PATCH`/`DELETE /api/v1/projects/{id}`, plus `/keys`, `/redaction-rules`, `/replay-targets`, `/environments`, `/services` and `/releases` under each project |

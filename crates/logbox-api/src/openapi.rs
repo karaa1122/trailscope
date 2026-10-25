@@ -9,8 +9,8 @@ use utoipa_axum::routes;
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    AppState, alerts, errors, inspector, journeys, live, overview, projects, query, setup, users,
-    views,
+    AppState, alerts, errors, inspector, journeys, live, oidc, overview, projects, query, setup,
+    users, views,
 };
 
 #[derive(OpenApi)]
@@ -113,6 +113,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(alerts::list_mutes))
         .routes(routes!(alerts::delete_mute))
         .routes(routes!(alerts::mute_page, alerts::mute_apply))
+        .routes(routes!(oidc::start))
+        .routes(routes!(oidc::callback))
 }
 
 /// `/api/openapi.json` and the `/api/docs` reference page.

@@ -1,0 +1,41 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Steps, a query, a request payload or a minimal app. Remove secrets and personal data.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Logbox version
+      description: From `logbox --version` or `GET /api/v1/setup`. Include the SDK and its version if it's an SDK issue.
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How you run Logbox
+      options:
+        - docker compose (all-in-one)
+        - docker compose (split mode)
+        - Kubernetes or another orchestrator
+        - binary
+        - from source
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant server logs (`LOGBOX_LOG_LEVEL=debug` helps) or browser console output.
+      render: text

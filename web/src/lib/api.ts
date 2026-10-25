@@ -105,7 +105,8 @@ export interface Scope {
 }
 
 export const api = {
-  setupStatus: () => get<{ needsSetup: boolean; version: string }>('/api/v1/setup'),
+  setupStatus: () =>
+    get<{ needsSetup: boolean; version: string; oidc: { enabled: boolean; displayName: string } }>('/api/v1/setup'),
   setup: (body: { email: string; name: string; password: string; projectName: string }) =>
     post<{ user: User; projectId: string; projectSlug: string; ingestKey: string; csrfToken: string }>(
       '/api/v1/setup',

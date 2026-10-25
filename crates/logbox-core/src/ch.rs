@@ -13,11 +13,18 @@ use crate::config::{Config, QueryConfig};
 use crate::error::{Error, Result};
 
 /// Embedded migrations, applied in order. Add new files here.
-const MIGRATIONS: &[(u32, &str, &str)] = &[(
-    1,
-    "init",
-    include_str!("../../../migrations/clickhouse/0001_init.sql"),
-)];
+const MIGRATIONS: &[(u32, &str, &str)] = &[
+    (
+        1,
+        "init",
+        include_str!("../../../migrations/clickhouse/0001_init.sql"),
+    ),
+    (
+        2,
+        "route_minute_order",
+        include_str!("../../../migrations/clickhouse/0002_route_minute_order.sql"),
+    ),
+];
 
 const READER_PROFILE: &str = "logbox_reader_profile";
 

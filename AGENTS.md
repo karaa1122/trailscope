@@ -32,7 +32,7 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 | M5 Web part 2 | done | Journeys (`/api/v1/journeys` + swimlane UI), Errors list/detail, Routes (full heatmap + `/api/v1/routes/series`), release markers on every chart, Saved views page, Settings; RFC 3339 timestamps in API responses |
 | M6 Alerts + email-on-5xx | done | rules (count, 5xx rate, p95, new/spiking error group) with cooldown; webhook/Slack/Telegram/email channels; real-time Email on 5xx with throttle, digest, cap, regression and signed mute links; Postgres outbox with retries = History; SMTP settings with env locking; encrypted secrets; Mailpit `dev` profile; docs/alerts.md. Smoke-tested end to end against Mailpit (no new test suites, per the M4 instruction) |
 | M7 SDKs | done | `@logbox/express`, `@logbox/fastify`, `@logbox/nestjs` (module, interceptor, opt-in filter, Logger bridge, BullMQ helper), Python `logbox` (Django, ASGI, Celery, logging handler); shared HTTP recorder in each core; SDKs read `/v1/config`; `examples/` (Express, Fastify, NestJS+BullMQ, FastAPI, Django+Celery) verified against a running Logbox; overhead benchmarks (all < 0.05 ms p99 added); docs/sdk-*.md |
-| M8 Harden and ship | **next** | |
+| M8 Harden and ship | done | OTLP/HTTP receiver (traces + logs, protobuf + JSON); OIDC sign-in (code flow + PKCE); `route_minute` re-sorted by time (migration 0002); performance verified on 102M requests (docs/benchmarks.md); README with screenshots, architecture/self-hosting/security docs, CONTRIBUTING/SECURITY/CoC, issue and PR templates; release workflow (GHCR, npm via changesets, PyPI `logbox-sdk`), Dependabot; Playwright e2e suite not written (decision 055) |
 
 ## Dev environment (Linux, current since M6)
 
@@ -49,7 +49,11 @@ docker run -d --name logbox-dev-pg --network logbox-dev -p 25432:5432 \
 docker run -d --name logbox-dev-mailpit --network logbox-dev -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.32.0
 docker run -d --name logbox-dev-redis --network logbox-dev -p 26379:6379 redis:8-alpine   # BullMQ/Celery examples
 # later: docker start logbox-dev-ch logbox-dev-pg logbox-dev-mailpit logbox-dev-redis
+# Optional mock OIDC provider (issuer http://127.0.0.1:18080/default; see decision 054):
+#   docker run -d --name logbox-dev-oidc -p 18080:8080 -e JSON_CONFIG='{...}' ghcr.io/navikt/mock-oauth2-server:latest
 ```
+
+Contributors can instead run `docker compose -f deploy/docker-compose.dev.yml up -d` and `source scripts/dev/local.env` (same ports); the commands above are what this machine uses.
 
 Python: a venv at `sdks/python/.venv` (Python 3.12) with `pip install -e ".[dev]"` plus `uvicorn` and `redis` for the examples. Checks: `cd sdks/python && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy`.
 
@@ -73,6 +77,8 @@ Linux machine notes:
 - The ingest wire format is camelCase (`requestId`, `durationMs`, `errorType`…); snake_case fields are silently ignored.
 - Test project on the dev database ("Demo"): its ingest key isn't kept anywhere (keys are shown once), so create a new one under Settings → Ingest keys when you need to send traffic.
 - When killing example servers, match by PID: `pkill -f "<pattern>"` also matches the shell running it.
+- The dev ClickHouse holds a "Bench" project (slug `bench-2`) with 102M requests over 15 days, built for the M8 benchmarks (about 7 GB). Its ingest key isn't kept either. Drop it with `ALTER TABLE … DELETE` or recreate the volume if disk gets tight.
+- In ClickHouse a `SELECT` alias is visible in `WHERE`: `SELECT * REPLACE (… AS timestamp) … WHERE timestamp …` filters on the alias (decision 026 again). Filter in a subquery.
 
 ## Dev environment (previous Windows machine)
 
@@ -142,7 +148,7 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `crates/logbox-server/src/ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). `crates/logbox-api/src/overview.rs` (tiles, heatmap and per-route series from route_minute), `errors.rs` (groups list/detail with new/spiking) and `journeys.rs` (requests + events + spans for one key, collapsed into lanes).
 - `e2e/screenshots.mjs`: Playwright screenshots of a running instance (`BASE_URL=… OUT=… node screenshots.mjs`); Chromium is installed on the host.
 - `crates/logbox-alerts` (M6): `crypto` (`Keys`: XChaCha20-Poly1305 for stored secrets, HMAC tokens; key from `secret_key` or generated into the Postgres `settings` table), `smtp` (stored + configured settings merged per field, `locked_fields`, lettre send with the full error chain), `channels` (webhook with `X-Logbox-Signature`, Slack, Telegram, email recipients), `outbox` (`notifications` table: queue with lease and backoff, also the history), `rules` (60 s evaluator, SQL per kind, ok/firing with cooldown, Explore links), `throttle` (pure noise-control state), `email5xx` (`Engine` on `LiveBus::subscribe_errors()`, saves `email_groups` every 15 s), `render` (email HTML/text, rule messages), `mute` (signed links). `start()` is called by `serve.rs` for the `all` and `alerts` roles. `crates/logbox-api/src/alerts.rs` has the endpoints; `AppState` carries `secrets` and an `outbox`. Postgres schema: `migrations/postgres/0002_alerts.sql`.
-- Not built yet (M8): OTLP receiver, OIDC login (config and the `oidc` field of `/auth/me` exist, no flow), Playwright e2e tests, release workflow, Dependabot, CONTRIBUTING/SECURITY/CoC, issue and PR templates.
+- M8: `crates/logbox-ingest/src/otlp.rs` (OTLP messages with prost + serde derives, mapping to wire types; handlers in `lib.rs`), `crates/logbox-api/src/oidc.rs` (discovery/JWKS cache, `start` and `callback`, user linking), `migrations/clickhouse/0002_route_minute_order.sql`, `.github/workflows/{release,changesets}.yml`, `.github/dependabot.yml`, `.changeset/`, `deploy/docker-compose.dev.yml`, `deploy/.env.example`, `scripts/dev/local.env`, `docs/images/` (from `e2e/screenshots.mjs`).
 
 ## Query language (M2, done)
 
@@ -153,17 +159,15 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - M6: decisions 036–043, user docs in docs/alerts.md. Verified by hand against Mailpit (a 500 emailed in about 2 s, no body/header/IP data, throttling, mute links, ok → firing → resolved). The brief's unit and Mailpit tests weren't written (tests skipped from M4 on); `throttle.rs` is pure and easy to cover later.
 - M7: decisions 044–052, docs/sdk-spec.md plus docs/sdk-{node,express,fastify,nestjs,python}.md, examples/README.md, SDK rows in docs/benchmarks.md. Each integration was exercised against the dev server through its example (routes, request IDs, `traceparent`, users, correlation keys, 5xx errors, job linking and attempts, log lines, spans, remote config). Things learned: Starlette runs the last-added middleware first (add `LogboxMiddleware` last); BullMQ 6 needs `ioredis` installed by the app; Nest's `ExceptionsHandler` log line would duplicate error groups, so the Logger bridge ignores it; Nest on Fastify needs the `preHandler` hook for guards to see the context.
 
-## Plan for M8 (harden and ship)
+## After M8: open items
 
-Spec: "OTLP receiver, OIDC login, Playwright e2e and screenshots, performance verification and `docs/benchmarks.md`, full docs and README, release workflow. Then do a final pass over the whole repo for any industry-specific wording", plus the "Open source setup" section of docs/agents/spec.md.
+All milestones are done. What's left, roughly in priority order:
 
-1. **OTLP receiver** in `logbox-ingest`: OTLP/HTTP protobuf (and JSON) at `/v1/otlp/v1/traces` and `/v1/otlp/v1/logs`, ingest-key auth, mapped into `spans` and `events` (server spans with `http.*` attributes could also become `requests`; decide and log it). Check the current `opentelemetry-proto` / `prost` versions.
-2. **OIDC login**: authorization code flow with PKCE against `oidc.issuer` (discovery, JWKS validation), link users by verified email, `auto_create_domains` creates viewers; login button in the UI (`/auth/me` already reports `oidc.enabled`).
-3. **Playwright e2e** in `e2e/` against the compose stack with demo data (setup wizard, live tail, explore filter, inspector, journeys, errors, alerts), plus README screenshots in `docs/images/` from `e2e/screenshots.mjs`. CI job against `docker compose`.
-4. **Performance verification**: query p95 over a large demo dataset (spec: 100M rows), heatmap/tiles < 150 ms, live tail < 2 s, web bundle size and 10k-row table smoothness; record in docs/benchmarks.md (the ingest numbers are from the Windows machine; rerun here).
-5. **Docs and repo**: README (pitch, screenshot, features, 60-second quickstart, SDK snippets, Mermaid architecture, links), `docs/architecture.md`, `docs/self-hosting.md`, `docs/security.md`, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates.
-6. **Release**: tag workflow building multi-arch images to GHCR, npm publish with changesets (add `.changeset/`), PyPI trusted publishing; Dependabot for cargo, npm, pip and Actions. Check current action versions.
-7. **Final pass** for industry-specific wording across the repo, then the closing summary the spec asks for.
+1. **First release:** own the `@logbox` npm scope (or rename the Node packages), add the `NPM_TOKEN` secret, configure PyPI trusted publishing for `logbox-sdk` (environment `pypi`), then push a `v0.1.0` tag. The image build was verified locally with `docker build .`.
+2. **Tests the user deferred** (decisions 028, 052, 055): Email on 5xx throttle unit tests and the Mailpit integration test, SDK test suites, a Playwright e2e suite against the compose stack.
+3. **Journeys on low-cardinality keys** read every matching row (about 0.7 s over 7 days for a key with a few hundred values on 100M requests); a per-key rollup or a capped, time-ordered read would help.
+4. The ingest benchmark numbers are from the previous Windows machine; rerunning `logbox demo --load` here would refresh them.
+5. Journey header: when the 2,000-item cap is hit, "Quiet since" refers to the last loaded item, not the real last activity.
 
 ## How to resume
 

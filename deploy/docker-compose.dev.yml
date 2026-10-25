@@ -1,0 +1,40 @@
+# Services for developing Logbox on your machine (Logbox itself runs from source):
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#   source scripts/dev/local.env && cargo run -- all
+# Ports are offset so they don't clash with other local databases.
+name: logbox-dev
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8
+    environment:
+      CLICKHOUSE_USER: logbox
+      CLICKHOUSE_PASSWORD: logbox
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["18123:8123", "19000:9000"]
+    volumes: [clickhouse:/var/lib/clickhouse]
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: logbox
+      POSTGRES_PASSWORD: logbox
+      POSTGRES_DB: logbox
+    ports: ["25432:5432"]
+    volumes: [postgres:/var/lib/postgresql]
+
+  # Catches every email: SMTP on 1025, web UI on http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports: ["1025:1025", "8025:8025"]
+
+  # Split mode and the BullMQ/Celery examples
+  redis:
+    image: redis:8-alpine
+    ports: ["26379:6379"]
+
+volumes:
+  clickhouse:
+  postgres:

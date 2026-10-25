@@ -35,8 +35,10 @@ export function Login() {
   const status = useQuery({ queryKey: ['setup'], queryFn: api.setupStatus });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  // Single sign-on failures come back as /login?error=…
+  const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('error'));
   const [busy, setBusy] = useState(false);
+  const oidc = status.data?.oidc;
 
   useEffect(() => {
     if (status.data?.needsSetup) void navigate({ to: '/setup' });
@@ -76,6 +78,11 @@ export function Login() {
         <button type="submit" className="btn btn-primary" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+        {oidc?.enabled && (
+          <a className="btn" href="/api/v1/auth/oidc/start" style={{ justifyContent: 'center' }}>
+            Sign in with {oidc.displayName || 'single sign-on'}
+          </a>
+        )}
       </form>
     </AuthCard>
   );
@@ -130,9 +137,9 @@ function snippet(fw: Framework, endpoint: string, key: string): string {
     case 'nestjs':
       return `// npm install @logbox/nestjs\nimport { Module } from '@nestjs/common';\nimport { LogboxModule } from '@logbox/nestjs';\n\n@Module({\n  imports: [LogboxModule.forRoot({ endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' })],\n})\nexport class AppModule {}`;
     case 'fastapi':
-      return `# pip install "logbox[fastapi]"\nfrom fastapi import FastAPI\nimport logbox\nfrom logbox.asgi import LogboxMiddleware\n\nlogbox.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(LogboxMiddleware)  # add it last, so it runs first`;
+      return `# pip install "logbox-sdk[fastapi]"\nfrom fastapi import FastAPI\nimport logbox\nfrom logbox.asgi import LogboxMiddleware\n\nlogbox.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(LogboxMiddleware)  # add it last, so it runs first`;
     case 'django':
-      return `# pip install "logbox[django]"\n# settings.py\nLOGBOX = {"endpoint": "${endpoint}", "ingest_key": "${key}", "service": "api"}\nMIDDLEWARE = ["logbox.django.LogboxMiddleware", *MIDDLEWARE]`;
+      return `# pip install "logbox-sdk[django]"\n# settings.py\nLOGBOX = {"endpoint": "${endpoint}", "ingest_key": "${key}", "service": "api"}\nMIDDLEWARE = ["logbox.django.LogboxMiddleware", *MIDDLEWARE]`;
     case 'http':
       return `curl -X POST ${endpoint}/v1/ingest \\\n  -H 'Authorization: Bearer ${key}' \\\n  -H 'Content-Type: application/x-ndjson' \\\n  --data-binary '{"type":"request","service":"api","method":"GET","path":"/hello","status":200,"durationMs":12}'`;
   }

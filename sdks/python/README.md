@@ -1,9 +1,9 @@
-# logbox
+# logbox-sdk
 
 The [Logbox](https://github.com/karaa1122/LogBox) SDK for Python 3.10+: logs every request with its route, timing, user, journey keys and (on errors) bodies and stack, plus Celery jobs and log lines, without blocking your request path. No dependencies beyond the standard library.
 
 ```bash
-pip install logbox
+pip install logbox-sdk   # imported as `logbox`
 ```
 
 ## FastAPI / Starlette

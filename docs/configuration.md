@@ -34,6 +34,7 @@ url = "postgres://logbox:change-me@postgres:5432/logbox"
 | `cors_origins` | `LOGBOX_SERVER_CORS_ORIGINS` | `[]` | Extra origins allowed to call the API (the embedded UI needs none) |
 | `shutdown_timeout_secs` | `LOGBOX_SERVER_SHUTDOWN_TIMEOUT_SECS` | `20` | How long shutdown keeps retrying the final flush |
 | `session_ttl_hours` | `LOGBOX_SERVER_SESSION_TTL_HOURS` | `336` | Login session lifetime (14 days) |
+| `trust_proxy` | `LOGBOX_SERVER_TRUST_PROXY` | `false` | Take the client IP from the first `X-Forwarded-For` hop (for login throttling and audit). Turn on only behind a reverse proxy you control |
 
 ## `[clickhouse]`
 
@@ -140,15 +141,17 @@ Email notifications. Each field can also be entered in the UI (Settings → Noti
 
 ## `[oidc]`
 
-Optional single sign-on.
+Optional single sign-on with any OpenID Connect provider (Google, Microsoft Entra ID, Okta, Auth0, Keycloak, Authentik, Dex…), using the authorization code flow with PKCE. Password sign-in keeps working alongside it.
 
 | Key | Env | Default | Description |
 |---|---|---|---|
-| `issuer` | `LOGBOX_OIDC_ISSUER` | empty | Issuer URL. Empty disables OIDC |
+| `issuer` | `LOGBOX_OIDC_ISSUER` | empty | Issuer URL; `<issuer>/.well-known/openid-configuration` must exist. Empty disables OIDC |
 | `client_id` | `LOGBOX_OIDC_CLIENT_ID` | empty | |
 | `client_secret` | `LOGBOX_OIDC_CLIENT_SECRET` | empty | |
-| `display_name` | `LOGBOX_OIDC_DISPLAY_NAME` | empty | Label on the login button |
-| `auto_create_domains` | `LOGBOX_OIDC_AUTO_CREATE_DOMAINS` | `[]` | Email domains whose users get a `viewer` account on first login |
+| `display_name` | `LOGBOX_OIDC_DISPLAY_NAME` | empty | Label on the sign-in button ("Sign in with …") |
+| `auto_create_domains` | `LOGBOX_OIDC_AUTO_CREATE_DOMAINS` | `[]` | Email domains whose users get a `viewer` account on first sign-in, e.g. `'["example.com"]'` |
+
+Register `<server.public_url>/api/v1/auth/oidc/callback` as the redirect URI at the provider, with the scopes `openid email profile`. On sign-in, Logbox matches the provider's subject to a member, then the email address (which must not be marked unverified), and remembers the subject. Someone without an account is signed in only if their email domain is in `auto_create_domains`; everyone else needs an invite first. Disabled members can't sign in either way.
 
 ## `[log]`
 

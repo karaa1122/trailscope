@@ -3,7 +3,7 @@ requires = ["hatchling>=1.32"]
 build-backend = "hatchling.build"
 
 [project]
-name = "logbox"
+name = "logbox-sdk"
 version = "0.1.0"
 description = "Logbox SDK for Python: non-blocking API request logging for Django, FastAPI/Starlette and Celery"
 readme = "README.md"

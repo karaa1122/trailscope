@@ -117,7 +117,6 @@ pub async fn overview(
            quantilesTDigestMerge(0.5, 0.95, 0.99)(latency)[2] AS p95 \
          FROM route_minute WHERE {scope} GROUP BY t ORDER BY t"
     );
-    let per_minute = fetch_json(&state, &text, &sql.params).await?;
 
     // Window totals, so p95 is a true quantile rather than an average of minutes.
     let mut sql2 = Sql::default();
@@ -140,7 +139,10 @@ pub async fn overview(
            quantilesTDigestMerge(0.5, 0.95, 0.99)(latency)[2] AS p95 \
          FROM route_minute WHERE {scope2} GROUP BY cur"
     );
-    let windows = fetch_json(&state, &text2, &sql2.params).await?;
+    let (per_minute, windows) = tokio::try_join!(
+        fetch_json(&state, &text, &sql.params),
+        fetch_json(&state, &text2, &sql2.params),
+    )?;
 
     let now_min = (crate::now_ms() / 60_000) * 60_000;
     let start = now_min - i64::from(minutes - 1) * 60_000;

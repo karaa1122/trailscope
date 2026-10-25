@@ -313,3 +313,27 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** The brief asks for tests in every package; the user asked to skip new tests from M4 on (decision 028).
 - **Choice:** No new test suites. New Node packages run `vitest run --passWithNoTests` so CI stays green, and the core keeps its existing tests. Every integration was verified against a running Logbox with the apps in `examples/` (Express, Fastify, NestJS on both platforms with BullMQ, FastAPI, Django with a prefork Celery worker): routes, request IDs, `traceparent`, users, correlation keys, 5xx errors, job linking and attempts, log lines, spans and remote settings.
 - **Alternatives:** Writing the brief's test suites now (against the user's instruction).
+
+## 053. OTLP/HTTP receiver: hand-written messages, server spans become requests
+
+- **Context:** M8 asks for an OTLP receiver at `/v1/otlp/v1/traces` and `/v1/otlp/v1/logs`, mapped into spans and events.
+- **Choice:** OTLP/HTTP with protobuf or JSON (gzip allowed), authenticated with an ingest key. The dozen OTLP messages the mapping reads are declared in `otlp.rs` with prost derives (unknown fields skipped), and the same structs derive serde for OTLP/JSON (hex IDs, 64-bit integers as strings or numbers). Spans become spans; a server span with an HTTP method also becomes a request (request ID = span ID; route, path, status, user and client from semantic conventions; the first `exception` event as the error), so OpenTelemetry-instrumented services show up in Live tail, Explore, Errors, alerts and Email on 5xx. Route syntaxes (`{id}`, `<int:id>`) are rewritten to `:id`. Log records become `log` events. Everything then goes through the same normalization, redaction, limits and queue as `/v1/ingest`, and rejected items are reported in `partialSuccess`. Metrics and OTLP/gRPC are out of scope.
+- **Alternatives:** The `opentelemetry-proto` crate (its `trace` and `logs` features pull in the OpenTelemetry SDK), spans only (Logbox's views are built on requests), or a separate `/v1/traces` path (the spec names `/v1/otlp`).
+
+## 054. OIDC sign-in: code flow with PKCE, link by subject then email
+
+- **Context:** Optional OIDC login, configured by `[oidc]`; `/auth/me` already reported whether it's enabled.
+- **Choice:** `GET /api/v1/auth/oidc/start` redirects to the provider with `state`, `nonce` and a PKCE challenge kept in a short-lived signed cookie (HMAC with the secret key, `SameSite=Lax`, scoped to the callback path). The callback checks the state, exchanges the code (`client_secret_basic` unless the provider only lists `client_secret_post`), validates the ID token against the provider's JWKS (issuer, audience, expiry with 60 s leeway, nonce; keys refreshed once on an unknown `kid`; HS* tokens with the client secret), and takes the email from the token or the userinfo endpoint. A member is found by `oidc_subject`, then by email (not marked unverified), and the subject is stored; unknown people get a viewer account only for `auto_create_domains`. Failures redirect to `/login?error=…`. `GET /api/v1/setup` now reports OIDC, since the sign-in page has no session. Verified against a mock provider: existing member linked, viewer auto-created, unknown domain refused, replayed callbacks rejected.
+- **Alternatives:** The `openidconnect` crate (more complete, many more dependencies), linking by email only (a provider reusing an address could take over an account), or storing pending logins in Postgres (a signed cookie needs no cleanup).
+
+## 055. No Playwright e2e suite
+
+- **Context:** M8 lists "Playwright e2e and screenshots"; tests are skipped from M4 on (decision 028).
+- **Choice:** No e2e test suite or CI job. Playwright is used for the README screenshots (`e2e/screenshots.mjs`) and for the manual checks behind docs/benchmarks.md.
+- **Alternatives:** Writing the suite now (against the user's instruction); it can be added later on top of `e2e/`.
+
+## 056. The Python SDK is published as `logbox-sdk`
+
+- **Context:** The name `logbox` on PyPI belongs to an unrelated project (a terminal output toolbox), so the release workflow couldn't publish under it. The npm names `@logbox/*` are unclaimed.
+- **Choice:** The distribution is `logbox-sdk` (`pip install logbox-sdk`); the import name stays `logbox`, so code and docs keep `import logbox`. Whoever publishes the first release must also own the `@logbox` npm scope (or rename the Node packages) and set up PyPI trusted publishing for `logbox-sdk`.
+- **Alternatives:** Renaming the import package as well (longer imports for no benefit), or asking the owner of `logbox` to transfer it (uncertain and slow).

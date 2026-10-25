@@ -20,6 +20,8 @@ use crate::users::{ClientIp, user_agent, valid_email};
 pub struct SetupStatus {
     pub needs_setup: bool,
     pub version: &'static str,
+    /// Single sign-on, for the sign-in page.
+    pub oidc: crate::users::OidcInfo,
 }
 
 /// Whether the install still needs its owner account.
@@ -31,6 +33,10 @@ pub async fn status(State(state): State<AppState>) -> ApiResult<Json<SetupStatus
     Ok(Json(SetupStatus {
         needs_setup: users == 0,
         version: env!("CARGO_PKG_VERSION"),
+        oidc: crate::users::OidcInfo {
+            enabled: state.config.oidc.enabled(),
+            display_name: state.config.oidc.display_name.clone(),
+        },
     }))
 }
 

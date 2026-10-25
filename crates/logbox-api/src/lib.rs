@@ -7,6 +7,7 @@ pub mod errors;
 pub mod inspector;
 pub mod journeys;
 pub mod live;
+pub mod oidc;
 pub mod openapi;
 pub mod overview;
 pub mod projects;
@@ -46,6 +47,8 @@ pub struct Inner {
     pub secrets: logbox_alerts::Keys,
     /// Queues notifications (the alerts worker delivers them).
     pub outbox: logbox_alerts::Outbox,
+    /// Single sign-on discovery and keys, cached.
+    pub oidc: oidc::Oidc,
 }
 
 #[derive(Clone)]
@@ -86,6 +89,7 @@ impl AppState {
             shutdown,
             secrets,
             outbox,
+            oidc: oidc::Oidc::default(),
         })))
     }
 

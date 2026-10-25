@@ -1,4 +1,5 @@
-//! Logbox ingest: `POST /v1/ingest`, `POST /v1/releases`, `GET /v1/config`.
+//! Logbox ingest: `POST /v1/ingest`, `POST /v1/releases`, `GET /v1/config`,
+//! and the OTLP/HTTP receiver at `/v1/otlp/v1/traces` and `/v1/otlp/v1/logs`.
 //!
 //! Batches are authenticated, decompressed, split into items, validated and
 //! redacted item by item, fingerprinted, then admitted to a bounded queue that
@@ -8,6 +9,7 @@ pub mod decode;
 pub mod fingerprint;
 pub mod keys;
 pub mod normalize;
+pub mod otlp;
 pub mod pipeline;
 pub mod redact;
 
@@ -118,6 +120,14 @@ fn router(state: IngestState, max_body: usize) -> Router {
             post(release).layer(DefaultBodyLimit::max(64 * 1024)),
         )
         .route("/v1/config", get(sdk_config))
+        .route(
+            "/v1/otlp/v1/traces",
+            post(otlp_traces).layer(DefaultBodyLimit::max(max_body)),
+        )
+        .route(
+            "/v1/otlp/v1/logs",
+            post(otlp_logs).layer(DefaultBodyLimit::max(max_body)),
+        )
         .with_state(state)
 }
 
@@ -396,4 +406,222 @@ async fn sdk_config(State(state): State<IngestState>, headers: HeaderMap) -> Res
         Ok(ctx) => Json(&ctx.settings).into_response(),
         Err(r) => r.into_response(),
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Signal {
+    Traces,
+    Logs,
+}
+
+impl Signal {
+    fn as_str(self) -> &'static str {
+        match self {
+            Signal::Traces => "traces",
+            Signal::Logs => "logs",
+        }
+    }
+}
+
+/// `POST /v1/otlp/v1/traces` (OTLP/HTTP, protobuf or JSON).
+async fn otlp_traces(
+    State(state): State<IngestState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    otlp(&state, &headers, body, Signal::Traces).await
+}
+
+/// `POST /v1/otlp/v1/logs` (OTLP/HTTP, protobuf or JSON).
+async fn otlp_logs(State(state): State<IngestState>, headers: HeaderMap, body: Bytes) -> Response {
+    otlp(&state, &headers, body, Signal::Logs).await
+}
+
+async fn otlp(state: &IngestState, headers: &HeaderMap, body: Bytes, signal: Signal) -> Response {
+    let started = Instant::now();
+    let resp = otlp_inner(state, headers, body, signal).await;
+    let status = resp.status().as_u16().to_string();
+    metrics::counter!("logbox_otlp_requests_total", "signal" => signal.as_str(), "status" => status)
+        .increment(1);
+    metrics::histogram!("logbox_ingest_request_seconds").record(started.elapsed().as_secs_f64());
+    resp
+}
+
+async fn otlp_inner(
+    state: &IngestState,
+    headers: &HeaderMap,
+    body: Bytes,
+    signal: Signal,
+) -> Response {
+    let ctx = match authenticate(state, headers).await {
+        Ok(c) => c,
+        Err(r) => return r.into_response(),
+    };
+    if state.queue.is_full() {
+        return too_busy(state.cfg.retry_after_secs).into_response();
+    }
+    let Ok(_permit) = state.processing.acquire().await else {
+        return error(StatusCode::SERVICE_UNAVAILABLE, "shutting down").into_response();
+    };
+    let encoding = headers
+        .get(header::CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let json = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|ct| ct.to_ascii_lowercase().contains("json"));
+
+    let big = body.len() > BLOCKING_THRESHOLD;
+    let work = {
+        let ctx = ctx.clone();
+        let cfg = state.cfg.clone();
+        let days = state.retention_days;
+        move || process_otlp(&ctx, &cfg, days, encoding.as_deref(), json, signal, &body)
+    };
+    let outcome = if big {
+        match tokio::task::spawn_blocking(work).await {
+            Ok(o) => o,
+            Err(e) => {
+                tracing::error!(error = %e, "otlp worker panicked");
+                return error(StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response();
+            }
+        }
+    } else {
+        work()
+    };
+    let (batch, rejected, message) = match outcome {
+        Ok(v) => v,
+        Err(e) => return e.into_response(),
+    };
+    let accepted = batch.len();
+    if accepted > 0 {
+        match state.queue.try_push(batch) {
+            Ok(()) => {}
+            Err(PushError::Full) => return too_busy(state.cfg.retry_after_secs).into_response(),
+            Err(PushError::Closed) => {
+                return error(StatusCode::SERVICE_UNAVAILABLE, "shutting down").into_response();
+            }
+        }
+    }
+    metrics::counter!("logbox_ingest_items_total", "result" => "accepted")
+        .increment(accepted as u64);
+    metrics::counter!("logbox_ingest_items_total", "result" => "rejected")
+        .increment(rejected as u64);
+    otlp_response(json, signal, rejected, &message)
+}
+
+/// An `Export*ServiceResponse` in the request's encoding, with `partialSuccess`
+/// when items were rejected.
+fn otlp_response(json: bool, signal: Signal, rejected: usize, message: &str) -> Response {
+    if json {
+        let body = if rejected == 0 {
+            json!({})
+        } else {
+            let field = if signal == Signal::Traces {
+                "rejectedSpans"
+            } else {
+                "rejectedLogRecords"
+            };
+            json!({ "partialSuccess": { field: rejected.to_string(), "errorMessage": message } })
+        };
+        return (StatusCode::OK, Json(body)).into_response();
+    }
+    let msg = otlp::ExportResponse {
+        partial_success: (rejected > 0).then(|| otlp::PartialSuccess {
+            rejected: rejected as i64,
+            error_message: message.to_string(),
+        }),
+    };
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/x-protobuf")],
+        prost::Message::encode_to_vec(&msg),
+    )
+        .into_response()
+}
+
+/// Decode, map and normalize one OTLP export request.
+fn process_otlp(
+    ctx: &ProjectCtx,
+    cfg: &logbox_core::config::IngestConfig,
+    retention_days: u32,
+    encoding: Option<&str>,
+    json: bool,
+    signal: Signal,
+    body: &[u8],
+) -> Result<(Batch, usize, String), IngestError> {
+    use prost::Message;
+
+    let buf = decode::decompress(encoding, body, cfg.max_decompressed_bytes).map_err(|e| {
+        let status = match e {
+            decode::DecodeError::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            decode::DecodeError::UnsupportedEncoding(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            _ => StatusCode::BAD_REQUEST,
+        };
+        error(status, e.to_string())
+    })?;
+    let bad = |e: String| {
+        error(
+            StatusCode::BAD_REQUEST,
+            format!("invalid OTLP {} payload: {e}", signal.as_str()),
+        )
+    };
+    let mapped = match (signal, json) {
+        (Signal::Traces, true) => serde_json::from_slice::<otlp::ExportTraceServiceRequest>(&buf)
+            .map(otlp::map_traces)
+            .map_err(|e| bad(e.to_string()))?,
+        (Signal::Traces, false) => otlp::ExportTraceServiceRequest::decode(buf.as_slice())
+            .map(otlp::map_traces)
+            .map_err(|e| bad(e.to_string()))?,
+        (Signal::Logs, true) => serde_json::from_slice::<otlp::ExportLogsServiceRequest>(&buf)
+            .map(otlp::map_logs)
+            .map_err(|e| bad(e.to_string()))?,
+        (Signal::Logs, false) => otlp::ExportLogsServiceRequest::decode(buf.as_slice())
+            .map(otlp::map_logs)
+            .map_err(|e| bad(e.to_string()))?,
+    };
+    let total = mapped.requests.len() + mapped.spans.len() + mapped.events.len();
+    if total > cfg.max_items {
+        return Err(error(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            format!("export has {total} items; the limit is {}", cfg.max_items),
+        ));
+    }
+    let now = now_ms();
+    let lim = Limits {
+        now_ms: now,
+        oldest_ms: now - i64::from(retention_days) * 86_400_000,
+        max_body_bytes: cfg.max_stored_body_bytes,
+    };
+    let pid = ctx.project_key.as_str();
+    let mut batch = Batch::default();
+    let mut rejected = 0;
+    let mut message = String::new();
+    let mut fail = |e: String| {
+        rejected += 1;
+        if message.is_empty() {
+            message = e;
+        }
+    };
+    for r in mapped.requests {
+        match normalize::request(r, pid, &ctx.redactor, &lim) {
+            Ok(row) => batch.requests.push(row),
+            // The span itself is still stored; count it once, under spans.
+            Err(e) => tracing::debug!(error = %e, "otlp request mapping rejected"),
+        }
+    }
+    for s in mapped.spans {
+        match normalize::span(s, pid, &lim) {
+            Ok(row) => batch.spans.push(row),
+            Err(e) => fail(e),
+        }
+    }
+    for ev in mapped.events {
+        match normalize::event(ev, pid, &ctx.redactor, &lim) {
+            Ok(row) => batch.events.push(row),
+            Err(e) => fail(e),
+        }
+    }
+    Ok((batch, rejected, message))
 }

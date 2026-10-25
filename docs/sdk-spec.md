@@ -8,7 +8,7 @@ What every official Logbox SDK does, so that a request logged from Express looks
 | [`@logbox/express`](sdk-express.md) | Node.js 18+ | Express 4 and 5 |
 | [`@logbox/fastify`](sdk-fastify.md) | Node.js 20+ | Fastify 5 |
 | [`@logbox/nestjs`](sdk-nestjs.md) | Node.js 20+ | NestJS 11 and 12 (Express or Fastify platform), Logger bridge, BullMQ |
-| [`logbox`](sdk-python.md) | Python 3.10+ | Django, ASGI (FastAPI, Starlette), Celery, `logging` |
+| [`logbox-sdk`](sdk-python.md) (import `logbox`) | Python 3.10+ | Django, ASGI (FastAPI, Starlette), Celery, `logging` |
 
 ## 1. Never block the request path
 

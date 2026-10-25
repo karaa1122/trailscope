@@ -9,8 +9,9 @@ SDKs (or anything that speaks HTTP) send telemetry to Logbox in batches. This pa
 | `POST` | `/v1/ingest` | Send a batch of requests, spans and events |
 | `POST` | `/v1/releases` | Mark a deploy (shown as a marker on every time chart) |
 | `GET` | `/v1/config` | Sampling and capture defaults for the key's project |
+| `POST` | `/v1/otlp/v1/traces`, `/v1/otlp/v1/logs` | OpenTelemetry (OTLP/HTTP) traces and logs |
 
-All three authenticate with an **ingest key**:
+All of them authenticate with an **ingest key**:
 
 ```
 Authorization: Bearer lbx_ingest_…
@@ -185,3 +186,31 @@ Returns the project's SDK defaults, so they can be tuned from the UI:
   "maxBodyBytes": 8192
 }
 ```
+
+## OpenTelemetry (OTLP/HTTP)
+
+Services instrumented with OpenTelemetry can send to Logbox without a Logbox SDK. Logbox accepts OTLP/HTTP with protobuf (`application/x-protobuf`) or JSON (`application/json`) bodies, optionally gzip-compressed. Metrics and OTLP/gRPC aren't supported.
+
+Point any OpenTelemetry SDK or Collector at it:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://logs.example.com/v1/otlp
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20lbx_ingest_…
+```
+
+The exporter appends `/v1/traces` and `/v1/logs`. In a Collector, use the `otlphttp` exporter with `endpoint: https://logs.example.com/v1/otlp` and the `Authorization` header.
+
+How the data is mapped:
+
+| OpenTelemetry | Logbox |
+|---|---|
+| Resource `service.name` | `service` (default `unknown_service`) |
+| Resource `deployment.environment.name` (or `deployment.environment`) | `environment` |
+| Resource `service.version` | `release` |
+| Every span | a span: trace and span IDs, parent, name, duration, `error` when the status is `ERROR`, attributes. Kind: `db` with `db.system`, `queue` for messaging, producer and consumer spans, `external` for other client spans, `http` for server spans with an HTTP method, otherwise `fn` |
+| Server span with `http.request.method` (or `http.method`) | also a **request**: request ID = span ID, method, `http.route` (`{id}` and `<int:id>` become `:id`), `url.path` and `url.query` (or `http.target`, `url.full`), `http.response.status_code` (or 500/200 from the span status), `client.address`, `user_agent.original`, `enduser.id`. The span's first `exception` event gives the error type, message and stack. Other attributes are kept as attributes |
+| Log record | a `log` event: `event_name`, the `event.name` attribute or the instrumentation scope as the name, severity as the level (1–8 debug, 9–12 info, 13–16 warn, 17–24 error), the body as the message, trace ID, `exception.*` attributes as the error, other attributes as attributes |
+
+The same validation, redaction, fingerprinting, limits and `429` back-pressure apply as for `/v1/ingest`. The response is an `Export…ServiceResponse` in the request's encoding; items that failed validation are reported in `partialSuccess` (`rejectedSpans` or `rejectedLogRecords`, with the first error message).
+
