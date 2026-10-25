@@ -1,0 +1,38 @@
+{
+  "name": "@logbox/fastify",
+  "version": "0.1.0",
+  "description": "Logbox plugin for Fastify: request logging, error capture and context",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "sideEffects": false,
+  "publishConfig": { "access": "public", "provenance": true },
+  "repository": { "type": "git", "url": "https://github.com/karaa1122/LogBox", "directory": "sdks/node/packages/fastify" },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "bench": "node bench/overhead.mjs"
+  },
+  "dependencies": {
+    "@logbox/node": "workspace:^"
+  },
+  "peerDependencies": {
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "fastify": "5.12.7",
+    "tsup": "9.0.0"
+  }
+}

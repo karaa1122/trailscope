@@ -124,13 +124,13 @@ function snippet(fw: Framework, endpoint: string, key: string): string {
   const env = `LOGBOX_ENDPOINT=${endpoint}\nLOGBOX_INGEST_KEY=${key}\nLOGBOX_SERVICE=api`;
   switch (fw) {
     case 'express':
-      return `# npm install @logbox/express\n# ${env.replace(/\n/g, '\n# ')}\nimport express from 'express';\nimport { logbox } from '@logbox/express';\n\nconst app = express();\napp.use(express.json());\napp.use(logbox());   // reads LOGBOX_* from the environment\napp.get('/users/:id', (req, res) => res.json({ id: req.params.id }));\napp.listen(3000);`;
+      return `# npm install @logbox/express\n# ${env.replace(/\n/g, '\n# ')}\nimport express from 'express';\nimport { logbox } from '@logbox/express';\n\nconst app = express();\napp.use(logbox());   // first; reads LOGBOX_* from the environment\napp.use(express.json());\napp.get('/users/:id', (req, res) => res.json({ id: req.params.id }));\napp.listen(3000);`;
     case 'fastify':
       return `# npm install @logbox/fastify\nimport Fastify from 'fastify';\nimport logbox from '@logbox/fastify';\n\nconst app = Fastify();\nawait app.register(logbox, { endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' });\napp.get('/users/:id', async (req) => ({ id: req.params.id }));\nawait app.listen({ port: 3000 });`;
     case 'nestjs':
       return `// npm install @logbox/nestjs\nimport { Module } from '@nestjs/common';\nimport { LogboxModule } from '@logbox/nestjs';\n\n@Module({\n  imports: [LogboxModule.forRoot({ endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' })],\n})\nexport class AppModule {}`;
     case 'fastapi':
-      return `# pip install "logbox[fastapi]"\nfrom fastapi import FastAPI\nimport logbox\nfrom logbox.starlette import LogboxMiddleware\n\nlogbox.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(LogboxMiddleware)`;
+      return `# pip install "logbox[fastapi]"\nfrom fastapi import FastAPI\nimport logbox\nfrom logbox.asgi import LogboxMiddleware\n\nlogbox.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(LogboxMiddleware)  # add it last, so it runs first`;
     case 'django':
       return `# pip install "logbox[django]"\n# settings.py\nLOGBOX = {"endpoint": "${endpoint}", "ingest_key": "${key}", "service": "api"}\nMIDDLEWARE = ["logbox.django.LogboxMiddleware", *MIDDLEWARE]`;
     case 'http':

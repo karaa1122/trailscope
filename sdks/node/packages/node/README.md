@@ -47,8 +47,11 @@ Every option has an environment variable fallback.
 | `maxBodyBytes` | | `8192` |
 | `ignoreRoutes` | | `/health`, `/healthz`, `/ready`, `/readyz`, `/livez` |
 | `redact` | | `{ headers, keys, patterns, maskIp: true }` |
+| `remoteConfig` | | `true` (`false` with a custom `fetch`): load sampling and capture settings from `/v1/config` |
 | `beforeSend` | | edit or drop items (return `null`) |
 | `debug` | `LOGBOX_DEBUG=1` | `false` |
+
+Sampling and capture options set in code win over the project's settings from the server.
 
 ## API
 
@@ -59,11 +62,17 @@ client.captureSpan({ kind: 'db', name: 'SELECT users', durationMs: 4.2 })
 client.log('warn', 'cache miss storm', { attributes: { keyspace: 'sessions' } })
 client.captureException(err)
 await client.span('external', 'POST billing-provider/charges', () => fetch(...))
-await client.trackJob('email.send', () => send(), { attempt: job.attemptsMade + 1, context })
+await client.trackJob('email.send', () => send(), { attempt: job.attemptsMade + 1, context }) // inside a request, `context` defaults to it
 await client.flush()
 await client.shutdown()
 client.stats() // { queued, dropped, sent, rejected, failedBatches }
+
+// For framework integrations
+observeHttp(client, req, res, next, { route, body, ip }) // instruments a Node.js request/response pair
+client.recordHttp(ctx, exchange)                          // records a finished exchange
 ```
+
+Full documentation: [docs/sdk-node.md](../../../../docs/sdk-node.md).
 
 ## Overhead
 

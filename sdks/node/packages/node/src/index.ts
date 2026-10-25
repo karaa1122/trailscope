@@ -1,14 +1,17 @@
 export { LogboxClient, init, getClient, toError, SDK_VERSION } from './client.js';
-export type { ClientStats, EventInput, JobOptions, RequestInput, SpanInput } from './client.js';
+export type { ClientStats, EventInput, JobOptions, RemoteConfig, RequestInput, SpanInput } from './client.js';
 export {
   currentContext,
   enterContext,
+  recordError,
   runWithContext,
   setAttribute,
   setCorrelation,
   setUser,
 } from './context.js';
 export type { LogboxContext } from './context.js';
+export { attachContext, clientIp, contextOf, observeHttp } from './http.js';
+export type { HttpExchange, ObserveOptions } from './http.js';
 export {
   acceptRequestId,
   formatTraceparent,

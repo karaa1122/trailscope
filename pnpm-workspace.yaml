@@ -1,4 +1,7 @@
 packages:
   - web
   - sdks/node/packages/*
+  - examples/express
+  - examples/fastify
+  - examples/nestjs
   - e2e

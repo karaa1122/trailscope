@@ -1,0 +1,4 @@
+# The SDK from this repository; use `logbox` from PyPI in your own app.
+-e ../../sdks/python
+fastapi==0.162.0
+uvicorn==0.54.0

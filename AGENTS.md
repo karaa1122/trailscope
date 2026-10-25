@@ -31,8 +31,8 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 | M4 Web part 1 | done | shell, palette, setup/login/invite, query bar (3 modes, quick filters, CodeMirror), Live tail, Explore, Inspector; UI embedded via rust-embed; overview/heatmap/errors endpoints |
 | M5 Web part 2 | done | Journeys (`/api/v1/journeys` + swimlane UI), Errors list/detail, Routes (full heatmap + `/api/v1/routes/series`), release markers on every chart, Saved views page, Settings; RFC 3339 timestamps in API responses |
 | M6 Alerts + email-on-5xx | done | rules (count, 5xx rate, p95, new/spiking error group) with cooldown; webhook/Slack/Telegram/email channels; real-time Email on 5xx with throttle, digest, cap, regression and signed mute links; Postgres outbox with retries = History; SMTP settings with env locking; encrypted secrets; Mailpit `dev` profile; docs/alerts.md. Smoke-tested end to end against Mailpit (no new test suites, per the M4 instruction) |
-| M7 SDKs | **next** | |
-| M8 Harden and ship | todo | |
+| M7 SDKs | done | `@logbox/express`, `@logbox/fastify`, `@logbox/nestjs` (module, interceptor, opt-in filter, Logger bridge, BullMQ helper), Python `logbox` (Django, ASGI, Celery, logging handler); shared HTTP recorder in each core; SDKs read `/v1/config`; `examples/` (Express, Fastify, NestJS+BullMQ, FastAPI, Django+Celery) verified against a running Logbox; overhead benchmarks (all < 0.05 ms p99 added); docs/sdk-*.md |
+| M8 Harden and ship | **next** | |
 
 ## Dev environment (Linux, current since M6)
 
@@ -47,8 +47,11 @@ docker run -d --name logbox-dev-pg --network logbox-dev -p 25432:5432 \
   -e POSTGRES_USER=logbox -e POSTGRES_PASSWORD=logbox -e POSTGRES_DB=logbox \
   -v logbox-dev-pg:/var/lib/postgresql postgres:18-alpine
 docker run -d --name logbox-dev-mailpit --network logbox-dev -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.32.0
-# later: docker start logbox-dev-ch logbox-dev-pg logbox-dev-mailpit
+docker run -d --name logbox-dev-redis --network logbox-dev -p 26379:6379 redis:8-alpine   # BullMQ/Celery examples
+# later: docker start logbox-dev-ch logbox-dev-pg logbox-dev-mailpit logbox-dev-redis
 ```
+
+Python: a venv at `sdks/python/.venv` (Python 3.12) with `pip install -e ".[dev]"` plus `uvicorn` and `redis` for the examples. Checks: `cd sdks/python && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy`.
 
 Run the server natively (UI at http://localhost:8090, owner@example.com / "correct horse battery" on the existing dev database; SMTP there points at Mailpit, host 127.0.0.1 port 1025):
 
@@ -68,6 +71,8 @@ Linux machine notes:
 - clang isn't installed; the workspace builds without it.
 - Playwright: `e2e` pins `@playwright/test` 1.64.1, which expects a newer Chromium than the one in `~/.cache/ms-playwright`. Launch with `executablePath: '/home/kk/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome'` instead of downloading another.
 - The ingest wire format is camelCase (`requestId`, `durationMs`, `errorType`…); snake_case fields are silently ignored.
+- Test project on the dev database ("Demo"): its ingest key isn't kept anywhere (keys are shown once), so create a new one under Settings → Ingest keys when you need to send traffic.
+- When killing example servers, match by PID: `pkill -f "<pattern>"` also matches the shell running it.
 
 ## Dev environment (previous Windows machine)
 
@@ -127,32 +132,38 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `crates/logbox-demo`: a deterministic generic SaaS traffic generator (`generator.rs`), backfill, live traffic and a scripted incident (release v1.43.0 breaks `GET /projects/:id/tasks`, v1.43.1 fixes it), and `--load` with `--target-eps` for open-loop latency tests.
 - `crates/logbox-server`: the `logbox` binary. `serve.rs` wires the roles; `ops.rs` serves `/healthz`, `/readyz` and `/metrics`. Uses mimalloc. Shutdown order: stop accepting, then drain the writer.
 - `migrations/clickhouse/0001_init.sql` (embedded with `include_str!` in `ch.rs`; add new files to its `MIGRATIONS` list) and `migrations/postgres/0001_init.sql` (sqlx).
-- `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, benchmark in `bench/`).
+- `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, remote config from `/v1/config`, `recordHttp` and `observeHttp` in `http.ts` for integrations, benchmark in `bench/`).
+- `sdks/node/packages/{express,fastify,nestjs}` (M7): thin integrations over the core (tsup ESM+CJS builds; `vitest --passWithNoTests`). NestJS: `module.ts` (forRoot/forRootAsync, middleware on `{*path}`, Fastify `preHandler` hook), `http.ts` (middleware, interceptor, `LogboxExceptionFilter`), `logger.ts` (`LogboxLogger`), `jobs.ts` (BullMQ `withLogboxContext`, `trackJob`, `@TrackJob`). Express and Fastify have `bench/overhead.mjs`.
+- `sdks/python/src/logbox` (M7): `client.py` (Client, transport thread, `record_http`, `track_job`/`JobScope`, `span`, remote config, fork handling, `init`/`get_client`), `_context.py`, `_ids.py`, `_redact.py`, `_capture.py`, `asgi.py`, `django.py`, `celery.py`, `handler.py` (`LogboxHandler`). Benchmark: `sdks/python/bench/overhead.py`.
+- `examples/` (M7): `express`, `fastify`, `nestjs` (pnpm workspace members, `PLATFORM=fastify` switch, BullMQ needs Redis), `fastapi`, `django` (Celery on Redis). See examples/README.md.
 - `scripts/dev/rust.sh` runs a command in the Rust container with the test env vars; `scripts/dev/env.sh` holds the env for running `logbox` against the dev services.
 - `crates/logbox-api`: `AppState` (config, ClickHouse, Postgres, LiveBus, optional ingest KeyCache, login limiter, replay HTTP client, shutdown token). Modules: `auth` (Auth extractor: session cookie + CSRF or Bearer API token; `require(Role, Scope)`, `can_view_bodies`), `setup`, `users` (login/logout/me/password, members, invites, tokens, `ClientIp`), `projects`, `query` (`prepare` → `Prepared`, `fetch_json` runs as the reader and strips the `_c_` alias prefix), `inspector`, `live`, `views`, `openapi` (utoipa-axum route table). The integration test is `tests/api.rs`.
 - `web/src`: `main.tsx`, `router.tsx` (code-based TanStack routes, typed search params, `Guard`), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx` (me, projects, current project/env, theme), `query.ts` (QueryValue ↔ URL, addCondition, history), `live.ts` (SSE hook with pause buffer), `hotkeys.ts`, `format.ts`), `components/` (`Shell` sidebar/rail, `CommandPalette`, `QueryBar`, `SqlEditor` (lazy CodeMirror), `charts.tsx` (Heatmap, Histogram, TimeChart, Waterfall, JsonView), `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Journeys`, `Errors` (list + group), `Routes`, `Views`, `Settings` (`?tab=`, including `SettingsNotifications` for SMTP), `Alerts` (`?tab=rules|email|channels|history`), `Auth` (login, invite, setup wizard), `Placeholder` (the "no projects" screen)). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
 - `crates/logbox-server/src/ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). `crates/logbox-api/src/overview.rs` (tiles, heatmap and per-route series from route_minute), `errors.rs` (groups list/detail with new/spiking) and `journeys.rs` (requests + events + spans for one key, collapsed into lanes).
 - `e2e/screenshots.mjs`: Playwright screenshots of a running instance (`BASE_URL=… OUT=… node screenshots.mjs`); Chromium is installed on the host.
 - `crates/logbox-alerts` (M6): `crypto` (`Keys`: XChaCha20-Poly1305 for stored secrets, HMAC tokens; key from `secret_key` or generated into the Postgres `settings` table), `smtp` (stored + configured settings merged per field, `locked_fields`, lettre send with the full error chain), `channels` (webhook with `X-Logbox-Signature`, Slack, Telegram, email recipients), `outbox` (`notifications` table: queue with lease and backoff, also the history), `rules` (60 s evaluator, SQL per kind, ok/firing with cooldown, Explore links), `throttle` (pure noise-control state), `email5xx` (`Engine` on `LiveBus::subscribe_errors()`, saves `email_groups` every 15 s), `render` (email HTML/text, rule messages), `mute` (signed links). `start()` is called by `serve.rs` for the `all` and `alerts` roles. `crates/logbox-api/src/alerts.rs` has the endpoints; `AppState` carries `secrets` and an `outbox`. Postgres schema: `migrations/postgres/0002_alerts.sql`.
-- Not built yet: the Python SDK is a skeleton.
+- Not built yet (M8): OTLP receiver, OIDC login (config and the `oidc` field of `/auth/me` exist, no flow), Playwright e2e tests, release workflow, Dependabot, CONTRIBUTING/SECURITY/CoC, issue and PR templates.
 
 ## Query language (M2, done)
 
 `crates/logbox-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs` (AST plus `Display` back to SQL), `compile.rs` (`compile`, `where_clause`; values are always `{pN:Type}` params), `eval.rs` (`Prepared` evaluator; `Record` is implemented for `LiveRequest` and `RequestRow`), `regex.rs` (RE2 validation and ASCII class rewriting), `search.rs`, `chips.rs`, and `QueryInput` in `lib.rs` (sql/search/filters). Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `LOGBOX_DIFF_CASES=4000 LOGBOX_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`; nightly and cargo-fuzz are installed in the dev container).
 
-## Alerts (M6, done)
+## Alerts (M6) and SDKs (M7), done
 
-Decisions 036–043 in docs/DECISIONS.md; user-facing behaviour in docs/alerts.md. Verified by hand against Mailpit: a 500 from ingest is emailed in about 2 s with the spec's subject, no body/header/IP data in the raw message, later occurrences are throttled, mute links confirm on POST and reject tampered tokens, and an error-rate rule went ok → firing → resolved with one email each. The brief's unit and Mailpit integration tests were not written (tests are skipped from M4 on); `throttle.rs` is pure and easy to cover if the user asks for tests later.
+- M6: decisions 036–043, user docs in docs/alerts.md. Verified by hand against Mailpit (a 500 emailed in about 2 s, no body/header/IP data, throttling, mute links, ok → firing → resolved). The brief's unit and Mailpit tests weren't written (tests skipped from M4 on); `throttle.rs` is pure and easy to cover later.
+- M7: decisions 044–052, docs/sdk-spec.md plus docs/sdk-{node,express,fastify,nestjs,python}.md, examples/README.md, SDK rows in docs/benchmarks.md. Each integration was exercised against the dev server through its example (routes, request IDs, `traceparent`, users, correlation keys, 5xx errors, job linking and attempts, log lines, spans, remote config). Things learned: Starlette runs the last-added middleware first (add `LogboxMiddleware` last); BullMQ 6 needs `ioredis` installed by the app; Nest's `ExceptionsHandler` log line would duplicate error groups, so the Logger bridge ignores it; Nest on Fastify needs the `preHandler` hook for guards to see the context.
 
-## Plan for M7 (SDKs)
+## Plan for M8 (harden and ship)
 
-Spec ("SDKs" section of docs/agents/spec.md): shared behaviour in `docs/sdk-spec.md` (bounded queue 10k dropping oldest, flush every 1 s or 500 events, gzip, backoff with jitter, `Retry-After`, flush on shutdown; `X-Request-Id` + W3C `traceparent`; async-local context; default redaction list; body capture `errors|always|never`, 8 KB, skip binary/multipart; sampling that keeps errors and slow requests; ignore health routes; < 0.2 ms p99 overhead benchmark).
+Spec: "OTLP receiver, OIDC login, Playwright e2e and screenshots, performance verification and `docs/benchmarks.md`, full docs and README, release workflow. Then do a final pass over the whole repo for any industry-specific wording", plus the "Open source setup" section of docs/agents/spec.md.
 
-1. Read `sdks/node/packages/node` (the M1 core) and `docs/ingest-protocol.md`; write `docs/sdk-spec.md` from the core's actual behaviour.
-2. `@logbox/express` (middleware), `@logbox/fastify` (plugin), `@logbox/nestjs` (module, interceptor, exception filter with error type/message/stack, `Logger` bridge to `events`, BullMQ helper that carries context in job data and logs runs as `kind=job` with `attempt`). Each with typed config and a README with a 10-line quickstart.
-3. Python `logbox` in `sdks/python`: background-thread transport, contextvars, Django middleware, Starlette/FastAPI middleware, Celery signal hooks, `logging` handler. Python isn't set up on this machine yet: `python3` exists; create a venv for `ruff`, `mypy` and building.
-4. `examples/`: minimal Express, NestJS, Django and FastAPI apps wired to the SDKs, runnable against the dev server.
-5. Benchmarks per SDK (overhead per request), results in `docs/benchmarks.md`. One doc per SDK under `docs/`.
+1. **OTLP receiver** in `logbox-ingest`: OTLP/HTTP protobuf (and JSON) at `/v1/otlp/v1/traces` and `/v1/otlp/v1/logs`, ingest-key auth, mapped into `spans` and `events` (server spans with `http.*` attributes could also become `requests`; decide and log it). Check the current `opentelemetry-proto` / `prost` versions.
+2. **OIDC login**: authorization code flow with PKCE against `oidc.issuer` (discovery, JWKS validation), link users by verified email, `auto_create_domains` creates viewers; login button in the UI (`/auth/me` already reports `oidc.enabled`).
+3. **Playwright e2e** in `e2e/` against the compose stack with demo data (setup wizard, live tail, explore filter, inspector, journeys, errors, alerts), plus README screenshots in `docs/images/` from `e2e/screenshots.mjs`. CI job against `docker compose`.
+4. **Performance verification**: query p95 over a large demo dataset (spec: 100M rows), heatmap/tiles < 150 ms, live tail < 2 s, web bundle size and 10k-row table smoothness; record in docs/benchmarks.md (the ingest numbers are from the Windows machine; rerun here).
+5. **Docs and repo**: README (pitch, screenshot, features, 60-second quickstart, SDK snippets, Mermaid architecture, links), `docs/architecture.md`, `docs/self-hosting.md`, `docs/security.md`, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates.
+6. **Release**: tag workflow building multi-arch images to GHCR, npm publish with changesets (add `.changeset/`), PyPI trusted publishing; Dependabot for cargo, npm, pip and Actions. Check current action versions.
+7. **Final pass** for industry-specific wording across the repo, then the closing summary the spec asks for.
 
 ## How to resume
 

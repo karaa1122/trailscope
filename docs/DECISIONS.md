@@ -259,3 +259,57 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** In split mode every subscriber receives every Redis message, and the rule loop has no leader election.
 - **Choice:** Run exactly one `logbox alerts` process (documented in docs/alerts.md). The outbox itself is safe with several workers, but the 5xx engine and the rule loop would each send twice.
 - **Alternatives:** Leader election with a Postgres advisory lock (worth adding if someone needs alert high availability).
+
+## 044. One HTTP recorder per SDK, shared by its integrations
+
+- **Context:** Express, Fastify and NestJS (and Django and ASGI in Python) must record requests the same way: ignore list, sampling, body policy, truncation, error fields.
+- **Choice:** The core client owns `recordHttp(ctx, exchange)` / `record_http(ctx, exchange)`, which applies every rule. Integrations only collect the exchange. In Node, `observeHttp()` instruments any `IncomingMessage`/`ServerResponse` pair (context, request ID header, a bounded copy of the response body taken in `write`/`end`, record on `close`). Express and NestJS (on both platforms, where Nest middleware receives the raw Node objects) use it. Fastify uses its hooks and calls `recordHttp` directly.
+- **Alternatives:** Each integration building its own items (the rules would drift apart), or monkey-patching `http.Server` (catches everything, but no route patterns and surprising in a library).
+
+## 045. Error details only on 5xx responses
+
+- **Context:** Ingest fingerprints any request that carries an error type, so a handled `NotFoundException` or validation error would create error groups.
+- **Choice:** SDKs attach the exception's type, message and stack only when the response status is ≥ 500. The status already marks 4xx responses, and their bodies are still captured under the `errors` policy.
+- **Alternatives:** Fingerprinting only 5xx on the server (but an SDK sending a 4xx with an error type may mean it, e.g. from a custom `captureRequest`).
+
+## 046. SDKs load project settings, code wins
+
+- **Context:** Decision 035 made sampling, body capture and ignored routes project settings delivered through `/v1/config`, but no SDK read them.
+- **Choice:** SDKs fetch `/v1/config` at startup and every 5 minutes (in the background) and apply each setting the application didn't set in code. Node skips it when a custom `fetch` is injected (tests and special transports) unless `remoteConfig: true` is passed; Python has `remote_config=False`. The Python flush thread starts with the client, so the settings arrive before the first request.
+- **Alternatives:** Server settings always win (surprising when code sets a rate explicitly), or a fetch per flush (needless load).
+
+## 047. Jobs belong to the request that started them
+
+- **Context:** A job started in a request handler (`trackJob` without a `context`) got fresh IDs, so it didn't show up in the request's journey.
+- **Choice:** `trackJob` / `track_job` default to the current context: the job's events carry the request's ID, trace, user and correlation keys, with a new span ID. Jobs in other processes restore a serialized context (BullMQ job data `__logbox`, a Celery message header `logbox`).
+- **Alternatives:** Always new IDs, linking only through correlation keys (journeys would miss jobs that don't repeat the keys).
+
+## 048. Fastify without fastify-plugin, context re-entered before handlers
+
+- **Context:** The plugin must apply to the whole instance, and Fastify parses bodies on stream events, outside the request's async context.
+- **Choice:** The plugin sets the `skip-override`, display-name and plugin-meta symbols that fastify-plugin would set, avoiding a dependency whose v6 compatibility with Fastify 5 isn't documented. `onRequest` runs the rest of the lifecycle inside the context, and `preHandler` enters it again with `enterWith`. NestJS does the same on the Fastify platform by adding a `preHandler` hook through the HTTP adapter, so guards (which run before interceptors) see the context too.
+- **Alternatives:** `AsyncResource` binding of every hook (more code for the same result), or documenting that handlers lose the context (not acceptable).
+
+## 049. NestJS: middleware, interceptor and an opt-in filter
+
+- **Context:** The brief asks for a module, an interceptor and an exception filter that captures errors, plus a `Logger` bridge.
+- **Choice:** `LogboxModule.forRoot()` applies the middleware to every route (`{*path}`, the Nest 11+ wildcard, so the peer range is Nest 11 and 12) and registers the interceptor globally; the interceptor records handler exceptions and sets the route. `LogboxExceptionFilter` (a `BaseExceptionFilter`, so responses are unchanged) is registered only with `exceptionFilter: true`, because a global catch-all filter could shadow or be shadowed by the application's own. `LogboxLogger` extends `ConsoleLogger` and skips Nest's startup contexts and `ExceptionsHandler`, whose unhandled-exception lines would create a second error group for the error the request already carries. The package is built with tsup and uses explicit `@Inject()` tokens, since esbuild doesn't emit decorator metadata.
+- **Alternatives:** Always registering the filter (conflicts), or a filter only (misses the route pattern).
+
+## 050. Python SDK: standard library only
+
+- **Context:** The SDK runs inside Django, FastAPI and Celery processes, often preforked.
+- **Choice:** No runtime dependencies: `urllib` for HTTP (gzip NDJSON), a lock-guarded `deque` (so a failed batch can go back to the front and the oldest items are the ones dropped), a daemon flush thread, `contextvars` for context and `atexit` for the final flush. `os.register_at_fork` gives a forked child an empty queue, fresh locks and a new thread. The ASGI middleware is plain ASGI (no Starlette import), reads the route from `scope["route"]`, and must be added last, since Starlette runs the most recently added middleware outermost. The Django middleware supports sync and async stacks, reads bodies only when the capture policy keeps them, and records the authenticated user only if Django already loaded it, to avoid a query. Celery is instrumented with signals: `before_task_publish` adds the context header, `task_prerun`/`task_postrun` record the run, and retries count as failed attempts.
+- **Alternatives:** httpx or requests (a dependency for every user), an asyncio transport (doesn't fit WSGI or Celery), or a Celery base task class (users would have to change their tasks).
+
+## 051. SDK benchmarks use synthetic requests
+
+- **Context:** The target is under 0.2 ms p99 added per request, which network noise would hide.
+- **Choice:** Each benchmark measures the integration in process: Express with synthetic request and response objects against the bare handler, Fastify with `app.inject()` on two identical apps, Python's ASGI and Django middleware around a trivial app or view. Every benchmark exits non-zero over budget. Results are in docs/benchmarks.md.
+- **Alternatives:** Load tests over real sockets (useful for throughput, not for a 0.2 ms budget).
+
+## 052. Examples instead of new SDK tests
+
+- **Context:** The brief asks for tests in every package; the user asked to skip new tests from M4 on (decision 028).
+- **Choice:** No new test suites. New Node packages run `vitest run --passWithNoTests` so CI stays green, and the core keeps its existing tests. Every integration was verified against a running Logbox with the apps in `examples/` (Express, Fastify, NestJS on both platforms with BullMQ, FastAPI, Django with a prefork Celery worker): routes, request IDs, `traceparent`, users, correlation keys, 5xx errors, job linking and attempts, log lines, spans and remote settings.
+- **Alternatives:** Writing the brief's test suites now (against the user's instruction).

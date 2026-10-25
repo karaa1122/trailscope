@@ -62,6 +62,13 @@ export interface LogboxOptions {
 
   redact?: RedactOptions;
 
+  /**
+   * Fetch the project's sampling and capture settings from `/v1/config` at
+   * startup and every 5 minutes, so they can be tuned in the UI. Options set
+   * here always win. Default true, or false when a custom `fetch` is given.
+   */
+  remoteConfig?: boolean;
+
   /** Last chance to edit or drop an item (return null to drop). Runs during flush. */
   beforeSend?: (item: Item) => Item | null;
   /** Log SDK diagnostics. `true` logs to console.debug. */
@@ -93,6 +100,7 @@ export interface ResolvedOptions {
   ignoreRoutes: (string | RegExp)[];
   requestIdHeader: string;
   redact: Required<Omit<RedactOptions, 'disableDefaults'>> & { disableDefaults: boolean };
+  remoteConfig: boolean;
   beforeSend: ((item: Item) => Item | null) | undefined;
   log: (message: string) => void;
   fetch: typeof fetch;
@@ -143,6 +151,7 @@ export function resolveOptions(o: LogboxOptions = {}): ResolvedOptions {
       maskIp: o.redact?.maskIp ?? true,
       disableDefaults: o.redact?.disableDefaults ?? false,
     },
+    remoteConfig: o.remoteConfig ?? o.fetch === undefined,
     beforeSend: o.beforeSend,
     log,
     fetch: o.fetch ?? globalThis.fetch.bind(globalThis),

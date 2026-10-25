@@ -12,6 +12,8 @@ export interface LogboxContext {
   attributes: Record<string, string | number | boolean>;
   /** Route pattern, once the framework has matched one. */
   route?: string;
+  /** The exception that failed the request, recorded by an error handler. */
+  error?: unknown;
 }
 
 const storage = new AsyncLocalStorage<LogboxContext>();
@@ -45,4 +47,12 @@ export function setCorrelation(key: string, value: string | number): void {
 export function setAttribute(key: string, value: string | number | boolean): void {
   const ctx = storage.getStore();
   if (ctx && key) ctx.attributes[key] = value;
+}
+
+/**
+ * Attaches the exception that failed the current request, so its type,
+ * message and stack are recorded with it (when the response is a 5xx).
+ */
+export function recordError(error: unknown, ctx: LogboxContext | undefined = storage.getStore()): void {
+  if (ctx && error !== undefined && ctx.error === undefined) ctx.error = error;
 }

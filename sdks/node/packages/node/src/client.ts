@@ -1,9 +1,11 @@
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 
+import { flattenHeaders, serializeBody, shouldCaptureBodies, splitUrl } from './capture.js';
 import { type LogboxContext, currentContext, runWithContext } from './context.js';
+import type { HttpExchange } from './http.js';
 import { acceptRequestId, newRequestId, newSpanId, newTraceId, parseTraceparent } from './ids.js';
-import { type LogboxOptions, type ResolvedOptions, resolveOptions } from './options.js';
+import { type BodyCapture, type LogboxOptions, type ResolvedOptions, resolveOptions } from './options.js';
 import { BoundedQueue } from './queue.js';
 import { Redactor } from './redact.js';
 import type {
@@ -19,6 +21,18 @@ import type {
 
 const gzipAsync = promisify(gzip);
 export const SDK_VERSION = '0.1.0';
+const CONFIG_REFRESH_MS = 5 * 60_000;
+
+/** `GET /v1/config`: the project's SDK settings, editable in the UI. */
+export interface RemoteConfig {
+  maskIp?: boolean;
+  bodyCapture?: BodyCapture;
+  slowMs?: number;
+  sampleRate?: number;
+  routeSampleRates?: Record<string, number>;
+  ignoreRoutes?: string[];
+  maxBodyBytes?: number;
+}
 
 export type RequestInput = Omit<RequestItem, 'type' | 'service'> & { service?: string };
 export type EventInput = Omit<EventItem, 'type' | 'service'> & { service?: string };
@@ -41,7 +55,10 @@ type SendResult = { kind: 'ok' } | { kind: 'retry'; afterMs?: number } | { kind:
 export interface JobOptions {
   /** 1-based attempt number (BullMQ: `job.attemptsMade + 1`). */
   attempt?: number;
-  /** Context to restore (e.g. one serialized into job data with `serializeContext`). */
+  /**
+   * Context to restore (e.g. one serialized into job data with
+   * `serializeContext`). Default: the current request's context, if any.
+   */
   context?: Partial<LogboxContext>;
   attributes?: Attributes;
 }
@@ -54,9 +71,11 @@ export interface JobOptions {
  */
 export class LogboxClient {
   readonly options: ResolvedOptions;
-  readonly redactor: Redactor;
+  redactor: Redactor;
+  private readonly explicit: LogboxOptions;
   private readonly queue: BoundedQueue<Item>;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private configTimer: ReturnType<typeof setInterval> | undefined;
   private flushing: Promise<void> | undefined;
   private flushScheduled = false;
   private backoffUntil = 0;
@@ -66,6 +85,7 @@ export class LogboxClient {
   private readonly counters = { sent: 0, rejected: 0, failedBatches: 0 };
 
   constructor(options: LogboxOptions = {}) {
+    this.explicit = options;
     this.options = resolveOptions(options);
     this.redactor = new Redactor(this.options.redact);
     this.queue = new BoundedQueue<Item>(this.options.maxQueueSize);
@@ -75,6 +95,11 @@ export class LogboxClient {
       }
       this.timer = setInterval(() => void this.flush(), this.options.flushIntervalMs);
       this.timer.unref?.();
+      if (this.options.remoteConfig && this.options.ingestKey) {
+        void this.refreshConfig();
+        this.configTimer = setInterval(() => void this.refreshConfig(), CONFIG_REFRESH_MS);
+        this.configTimer.unref?.();
+      }
     }
   }
 
@@ -165,7 +190,8 @@ export class LogboxClient {
    * `kind=job` event with its duration, outcome and attempt number.
    */
   async trackJob<T>(name: string, fn: () => Promise<T> | T, opts: JobOptions = {}): Promise<T> {
-    const parent = opts.context;
+    // A job started inside a request belongs to it, unless a context is given.
+    const parent = opts.context ?? currentContext();
     const ctx: LogboxContext = {
       requestId: parent?.requestId ?? newRequestId(),
       traceId: parent?.traceId ?? newTraceId(),
@@ -232,6 +258,69 @@ export class LogboxClient {
     };
   }
 
+  /**
+   * Records a finished HTTP exchange: applies the ignore list, sampling and
+   * the body capture policy, then queues the request. Error details are kept
+   * only for 5xx responses; a handled 4xx is an expected outcome.
+   */
+  recordHttp(ctx: LogboxContext, ex: HttpExchange): void {
+    if (!this.options.enabled || this.closed) return;
+    const { path, query } = splitUrl(ex.url);
+    const route = ex.route ?? ctx.route;
+    if (this.isIgnored(route) || this.isIgnored(path)) return;
+    const status = ex.status;
+    const durationMs = round(ex.durationMs);
+    const failed = status >= 500 ? (ex.error ?? ctx.error) : undefined;
+    const sampleRate = this.sample(route ?? path, status, durationMs, failed !== undefined);
+    if (sampleRate === 0) return;
+    const reqHeaders = flattenHeaders(ex.reqHeaders);
+    const resHeaders = flattenHeaders(ex.resHeaders);
+    let reqBody: string | undefined;
+    let resBody: string | undefined;
+    let truncated = false;
+    if (shouldCaptureBodies(this.options.captureBodies, status, durationMs, this.options.slowMs)) {
+      const limit = this.options.maxBodyBytes;
+      const rq = serializeBody(ex.reqBody, reqHeaders['content-type'], limit);
+      const encoding = resHeaders['content-encoding'];
+      const rs =
+        encoding && encoding !== 'identity'
+          ? undefined
+          : serializeBody(ex.resBody, resHeaders['content-type'], limit);
+      reqBody = rq?.body;
+      resBody = rs?.body;
+      truncated = !!(rq?.truncated || rs?.truncated);
+    }
+    const e = failed === undefined ? undefined : toError(failed);
+    this.captureRequest({
+      timestamp: ex.timestamp,
+      requestId: ctx.requestId,
+      traceId: ctx.traceId,
+      spanId: ctx.spanId,
+      method: ex.method.toUpperCase(),
+      route,
+      path,
+      query: query || undefined,
+      status,
+      durationMs,
+      reqSize: ex.reqSize,
+      resSize: ex.resSize,
+      userId: ctx.userId,
+      ip: ex.ip,
+      userAgent: reqHeaders['user-agent'],
+      reqHeaders,
+      resHeaders,
+      reqBody,
+      resBody,
+      bodyTruncated: truncated || undefined,
+      errorType: e?.name,
+      errorMessage: e?.message,
+      errorStack: e?.stack,
+      attributes: Object.keys(ctx.attributes).length ? { ...ctx.attributes } : undefined,
+      correlation: Object.keys(ctx.correlation).length ? { ...ctx.correlation } : undefined,
+      sampleRate: sampleRate < 1 ? sampleRate : undefined,
+    });
+  }
+
   isIgnored(routeOrPath: string | undefined): boolean {
     if (!routeOrPath) return false;
     return this.options.ignoreRoutes.some((r) =>
@@ -273,6 +362,7 @@ export class LogboxClient {
     if (this.closed) return;
     this.closed = true;
     if (this.timer) clearInterval(this.timer);
+    if (this.configTimer) clearInterval(this.configTimer);
     this.backoffUntil = 0;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
@@ -283,6 +373,51 @@ export class LogboxClient {
       }),
     ]);
     if (timeout) clearTimeout(timeout);
+  }
+
+  /** Fetches the project's SDK settings from `/v1/config` and applies them. */
+  async refreshConfig(): Promise<void> {
+    try {
+      const res = await this.options.fetch(`${this.options.endpoint}/v1/config`, {
+        headers: { authorization: `Bearer ${this.options.ingestKey}`, 'user-agent': `logbox-node/${SDK_VERSION}` },
+        signal: AbortSignal.timeout(this.options.requestTimeoutMs),
+      });
+      if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
+        this.options.log(`could not load /v1/config: HTTP ${res.status}`);
+        return;
+      }
+      this.applyRemoteConfig((await res.json()) as RemoteConfig);
+    } catch (e) {
+      this.options.log(`could not load /v1/config: ${String(e)}`);
+    }
+  }
+
+  /** Applies project settings to every option the application didn't set itself. */
+  applyRemoteConfig(c: RemoteConfig): void {
+    const set = this.explicit;
+    const o = this.options;
+    const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+    if (set.sampleRate === undefined && num(c.sampleRate)) o.sampleRate = Math.min(1, Math.max(0, c.sampleRate));
+    if (set.routeSampleRates === undefined && c.routeSampleRates && typeof c.routeSampleRates === 'object') {
+      const rates: Record<string, number> = {};
+      for (const [route, rate] of Object.entries(c.routeSampleRates)) {
+        if (num(rate)) rates[route] = Math.min(1, Math.max(0, rate));
+      }
+      o.routeSampleRates = rates;
+    }
+    if (set.slowMs === undefined && num(c.slowMs) && c.slowMs > 0) o.slowMs = c.slowMs;
+    if (set.captureBodies === undefined && (c.bodyCapture === 'errors' || c.bodyCapture === 'always' || c.bodyCapture === 'never')) {
+      o.captureBodies = c.bodyCapture;
+    }
+    if (set.maxBodyBytes === undefined && num(c.maxBodyBytes) && c.maxBodyBytes >= 0) o.maxBodyBytes = c.maxBodyBytes;
+    if (set.ignoreRoutes === undefined && Array.isArray(c.ignoreRoutes)) {
+      o.ignoreRoutes = c.ignoreRoutes.filter((r): r is string => typeof r === 'string');
+    }
+    if (set.redact?.maskIp === undefined && typeof c.maskIp === 'boolean' && c.maskIp !== o.redact.maskIp) {
+      o.redact.maskIp = c.maskIp;
+      this.redactor = new Redactor(o.redact);
+    }
   }
 
   private enqueue(item: Item): void {

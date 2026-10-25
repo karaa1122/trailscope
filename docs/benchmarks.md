@@ -61,15 +61,35 @@ The first run reached only 27k events/s, with p99 at 320 ms under saturation and
 
 Target: **< 0.2 ms p99 per request.**
 
+Every benchmark measures the work the SDK adds in the request's own thread or event loop: building the context, echoing the request ID, keeping the first `maxBodyBytes` of the bodies and queueing the request. Redaction, serialization, gzip and the network happen later in the background flush, so they're not on the request path. 2% of the requests are 500s, so their bodies are captured. Each benchmark exits non-zero when the added p99 is over budget.
+
+Integration numbers were measured on a Linux workstation (Intel Core i7-12650H, Ubuntu 24.04, Node 24.21, Python 3.12.3), not on the ingest test machine above.
+
 ### `@logbox/node` core
 
-`sdks/node/packages/node/bench/overhead.mjs` times building and enqueueing one request event (headers, correlation, body capture on 2% of requests) for 200,000 iterations on Node 24. Redaction, serialization and gzip happen later, in the background flush, so they're not on the request path.
+`sdks/node/packages/node/bench/overhead.mjs` times building and enqueueing one request event (headers, correlation, body capture on 2% of requests) for 200,000 iterations.
 
-| p50 | p99 | p99.9 |
-|---|---|---|
-| 0.0005 ms | **0.0049 ms** | 0.059 ms |
+| Machine | p50 | p99 | p99.9 |
+|---|---|---|---|
+| Ingest test machine (Windows, Node 24) | 0.0005 ms | **0.0049 ms** | 0.059 ms |
+| Linux workstation | 0.0001 ms | **0.0012 ms** | 0.0027 ms |
 
-Framework middleware benchmarks (Express, Fastify, NestJS, Django, FastAPI) are added with the integrations.
+### Framework integrations
+
+| Integration | How | Added p50 | Added p99 |
+|---|---|---|---|
+| `@logbox/express` | `bench/overhead.mjs`: the middleware around a route handler, with synthetic request and response objects, 200,000 iterations, against the bare handler | 0.0043 ms | **0.0089 ms** |
+| `@logbox/fastify` | `bench/overhead.mjs`: two identical apps through `app.inject()` (in process, no sockets), 50,000 requests each | 0.0088 ms | **0.0021 ms** (within noise) |
+| `@logbox/nestjs` | Not measured separately: the same Node HTTP instrumentation as Express, plus one interceptor call per request | — | — |
+| Python, ASGI (FastAPI, Starlette) | `sdks/python/bench/overhead.py`: the middleware around an ASGI app, 50,000 requests, against the bare app | 0.0167 ms | **0.0331 ms** |
+| Python, Django | Same script: the middleware around a view with `RequestFactory` requests | 0.0291 ms | **0.0495 ms** |
+
+```bash
+pnpm --filter "./sdks/node/**" build
+node sdks/node/packages/express/bench/overhead.mjs
+node sdks/node/packages/fastify/bench/overhead.mjs
+cd sdks/python && python bench/overhead.py
+```
 
 ## Query, live tail and web
 

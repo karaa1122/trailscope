@@ -1,0 +1,12 @@
+{
+  "name": "@logbox/example-fastify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@logbox/fastify": "workspace:^",
+    "fastify": "5.12.7"
+  }
+}
