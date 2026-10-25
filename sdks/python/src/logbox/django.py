@@ -63,8 +63,31 @@ def _user_id(request: Any) -> str | None:
     return None
 
 
-def _request_body(request: Any, client: Client) -> bytes | None:
-    if is_binary_content_type(request.META.get("CONTENT_TYPE")):
+def _form_fields(request: Any) -> dict[str, Any] | None:
+    """A multipart form's text fields, with files listed by name, size and type
+    (never their content). Only if Django or DRF already parsed the form, so
+    logging never triggers parsing a large upload."""
+    post = getattr(request, "_post", None)
+    files = getattr(request, "_files", None)
+    out: dict[str, Any] = {}
+    if post is not None:
+        for key in post:
+            values = post.getlist(key)
+            out[key] = values[0] if len(values) == 1 else values
+    if files is not None:
+        for key in files:
+            listed = [
+                f"[file {f.name}, {f.size} bytes, {f.content_type}]" for f in files.getlist(key)
+            ]
+            out[key] = listed[0] if len(listed) == 1 else listed
+    return out or None
+
+
+def _request_body(request: Any, client: Client) -> bytes | dict[str, Any] | None:
+    content_type = request.META.get("CONTENT_TYPE", "")
+    if content_type.startswith("multipart/form-data"):
+        return _form_fields(request)
+    if is_binary_content_type(content_type):
         return None
     try:
         body = request.body

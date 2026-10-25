@@ -41,7 +41,7 @@ MIDDLEWARE = [
 LOGBOX = {"service": "orders-api"}      # keyword options for logbox.Client
 ```
 
-The middleware works under WSGI and ASGI. Routes come from `resolver_match.route` (`orders/<int:order_id>` becomes `/orders/:order_id`). Exceptions raised in views are recorded through `process_exception`. The authenticated user is recorded automatically if the request already loaded it (no extra query); otherwise call `logbox.set_user()`. Request bodies are read only when the capture policy keeps them, and not for multipart or binary content; streaming responses are skipped.
+The middleware works under WSGI and ASGI. Routes come from `resolver_match.route` (`orders/<int:order_id>` becomes `/orders/:order_id`). Exceptions raised in views are recorded through `process_exception`. The authenticated user is recorded automatically if the request already loaded it (no extra query); otherwise call `logbox.set_user()`. Request bodies are read only when the capture policy keeps them. For multipart forms (Postman form-data, file uploads), the text fields Django or DRF parsed are kept and files are listed by name, size and type; other binary bodies and streaming responses are skipped.
 
 ## Celery
 

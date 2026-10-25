@@ -51,9 +51,14 @@ def truncate(text: str, limit: int) -> tuple[str, bool]:
 def serialize_body(value: Any, content_type: str | None, limit: int) -> tuple[str, bool] | None:
     """Serializes a body-like value and truncates it to ``limit`` bytes.
 
-    Returns None for binary or empty bodies.
+    Returns None for binary or empty bodies. Raw bodies of binary and multipart
+    requests are skipped; already parsed form fields (a dict) are kept.
     """
-    if value is None or is_binary_content_type(content_type):
+    if value is None:
+        return None
+    if isinstance(value, (bytes, bytearray, memoryview, str)) and is_binary_content_type(
+        content_type
+    ):
         return None
     if isinstance(value, (bytes, bytearray, memoryview)):
         raw = bytes(value[: limit + 4])

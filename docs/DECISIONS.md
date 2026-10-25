@@ -337,3 +337,9 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** The name `logbox` on PyPI belongs to an unrelated project (a terminal output toolbox), so the release workflow couldn't publish under it. The npm names `@logbox/*` are unclaimed.
 - **Choice:** The distribution is `logbox-sdk` (`pip install logbox-sdk`); the import name stays `logbox`, so code and docs keep `import logbox`. Whoever publishes the first release must also own the `@logbox` npm scope (or rename the Node packages) and set up PyPI trusted publishing for `logbox-sdk`.
 - **Alternatives:** Renaming the import package as well (longer imports for no benefit), or asking the owner of `logbox` to transfer it (uncertain and slow).
+
+## 057. Django keeps the text fields of multipart forms
+
+- **Context:** Multipart bodies were skipped entirely, so a login form sent as `form-data` (Postman's default) showed no request body even on errors.
+- **Choice:** For `multipart/form-data`, the Django middleware records the form fields Django or DRF already parsed (`request._post`, `request._files`): text values as-is (then redacted like JSON keys), files as `[file name, size, type]`. If the view never parsed the form, nothing is read, so logging never parses a large upload. Raw multipart bytes are still skipped in every SDK.
+- **Alternatives:** Keeping multipart skipped (useless for form logins), or parsing the form in the middleware (would buffer uploads the application meant to stream).
