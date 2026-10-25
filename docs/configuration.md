@@ -111,21 +111,32 @@ Limits for user-driven queries. They are also enforced server-side by the reader
 
 | Key | Env | Default | Description |
 |---|---|---|---|
-| `interval_secs` | `LOGBOX_ALERTS_INTERVAL_SECS` | `60` | Rule evaluation interval |
-| `default_cooldown_secs` | `LOGBOX_ALERTS_DEFAULT_COOLDOWN_SECS` | `600` | Minimum time between notifications for one rule |
+| `interval_secs` | `LOGBOX_ALERTS_INTERVAL_SECS` | `60` | Rule evaluation interval (at least 10) |
+| `default_cooldown_secs` | `LOGBOX_ALERTS_DEFAULT_COOLDOWN_SECS` | `600` | Cooldown for new rules when none is given |
+| `email_throttle_minutes` | `LOGBOX_ALERTS_EMAIL_THROTTLE_MINUTES` | `15` | Email on 5xx: at most one email per error group per this many minutes |
+| `email_hourly_cap` | `LOGBOX_ALERTS_EMAIL_HOURLY_CAP` | `30` | Email on 5xx: emails per project per hour before a single "paused" email |
+| `regression_hours` | `LOGBOX_ALERTS_REGRESSION_HOURS` | `24` | Email on 5xx: a group quiet this long that comes back is emailed as a regression |
+| `mute_link_days` | `LOGBOX_ALERTS_MUTE_LINK_DAYS` | `7` | How long the mute links in emails stay valid |
+
+## Secret key
+
+| Key | Env | Default | Description |
+|---|---|---|---|
+| `secret_key` (top level, not in a section) | `LOGBOX_SECRET_KEY` | empty | Encrypts stored secrets (SMTP password, channel URLs and tokens) and signs mute links. When empty, a key is generated and kept in Postgres. **Set a long random value in production** (`openssl rand -base64 48`); changing it makes stored secrets unreadable. See [alerts.md](alerts.md#secret-key) |
 
 ## `[smtp]`
 
-Email notifications. Values set here (or through env vars) take precedence over the values entered in the UI, and the UI shows them locked. Full details are in [alerts.md](alerts.md).
+Email notifications. Each field can also be entered in the UI (Settings → Notifications). A field set here or through its env var takes precedence over the UI value and shows as locked in the UI. Full details are in [alerts.md](alerts.md).
 
 | Key | Env | Default | Description |
 |---|---|---|---|
 | `host` | `LOGBOX_SMTP_HOST` | empty | Empty disables email (unless configured in the UI) |
 | `port` | `LOGBOX_SMTP_PORT` | `587` | |
 | `security` | `LOGBOX_SMTP_SECURITY` | `starttls` | `starttls`, `tls` (implicit TLS, usually port 465) or `none` |
-| `username` | `LOGBOX_SMTP_USERNAME` | empty | |
+| `username` | `LOGBOX_SMTP_USERNAME` | empty | Empty sends without authentication |
 | `password` | `LOGBOX_SMTP_PASSWORD` | empty | |
-| `from` | `LOGBOX_SMTP_FROM` | `Logbox <logbox@localhost>` | From address |
+| `from` | `LOGBOX_SMTP_FROM` | empty | Sender address, e.g. `logbox@example.com`. Required to send |
+| `from_name` | `LOGBOX_SMTP_FROM_NAME` | empty (`Logbox`) | Sender display name |
 
 ## `[oidc]`
 

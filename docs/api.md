@@ -76,7 +76,8 @@ A token bound to a project can only see that project. A token can never act beyo
 | Overview | `GET /api/v1/overview`, `GET /api/v1/routes/heatmap`, `GET /api/v1/routes/series` |
 | Errors | `GET /api/v1/errors`, `GET /api/v1/errors/{fingerprint}` |
 | Journeys | `GET /api/v1/journeys` |
-| Settings | `GET /api/v1/settings/retention` |
+| Alerts | `/api/v1/alerts/rules` (CRUD, `/preview`), `/api/v1/alerts/channels` (CRUD, `/{id}/test`), `/api/v1/alerts/email-rule` (`GET`/`PUT`, `/test`), `/api/v1/alerts/history`, `/api/v1/alerts/mutes`, `/api/v1/alerts/mute` (signed link, no login). Details in [alerts.md](alerts.md#api) |
+| Settings | `GET /api/v1/settings/retention`, `GET`/`PUT /api/v1/settings/smtp`, `POST /api/v1/settings/smtp/test` |
 
 ### Query endpoints
 

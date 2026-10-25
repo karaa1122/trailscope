@@ -211,3 +211,51 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** M5 adds settings for projects, keys, members, tokens, redaction, replay targets, sampling and retention.
 - **Choice:** A single `/settings` page with a section list (`?tab=`), showing only the sections the signed-in role can use. Secrets (ingest keys, API tokens, invite links) are shown once with a copy button. Sampling and ignored routes are project settings delivered to SDKs through `/v1/config`; retention is read-only in the UI because it is applied to ClickHouse TTLs at startup.
 - **Alternatives:** Separate pages per area (more navigation for rarely used screens).
+
+## 036. One secret key, with a database fallback
+
+- **Context:** The email brief asks for the SMTP password to be encrypted with `LOGBOX_SECRET_KEY` (AES-256-GCM or XChaCha20-Poly1305) and for signed mute links. Channel secrets (webhook and Slack URLs, bot tokens) need the same protection.
+- **Choice:** XChaCha20-Poly1305 with a random 24-byte nonce per value (`nonce || ciphertext`), and HMAC-SHA256 for mute links and webhook signatures. Two subkeys are derived from the one secret with SHA-256 and distinct labels. When `LOGBOX_SECRET_KEY` is unset, a random key is generated once and stored in the Postgres `settings` table, and the UI and the logs warn about it, so `docker compose up` works without extra setup.
+- **Alternatives:** Refusing to start without the key (a worse first run), AES-256-GCM (random 96-bit nonces are uncomfortable for long-lived keys), or a KDF like HKDF (unnecessary for a high-entropy secret).
+
+## 037. SMTP settings: configuration wins per field
+
+- **Context:** SMTP can be set in the UI or through `LOGBOX_SMTP_*`, and "env wins over UI values, and the UI shows those fields as locked".
+- **Choice:** A field is locked when its env var is present or `logbox.toml` sets it to something other than the default. Locked fields come from configuration and the rest from the stored UI values. The UI password is encrypted, never returned (only `passwordSet`), kept when the form sends `null`, and cleared with an empty string. SMTP counts as configured with a host and a from address. Every send opens its own connection with a 20-second timeout.
+- **Alternatives:** All-or-nothing (env set → UI read-only), which breaks the common case of setting only the password through a secret store.
+
+## 038. Email on 5xx runs on the error signal stream
+
+- **Context:** The rule must fire in real time, within 30 seconds, not on the 60-second loop, and must never include bodies, headers or IPs.
+- **Choice:** The engine subscribes to the `ErrorSignal` stream ingest publishes after each flush (built in M1). Signals carry no bodies, headers or IPs, so emails can't leak them. The rule's filter is evaluated in memory with the query language evaluator over the signal's fields (`ErrorSignal` implements `Record`). Rules, recipients, SMTP status and mutes are reloaded every 30 seconds. Projects without an active rule are skipped before any work.
+- **Alternatives:** Querying ClickHouse on a short loop (more load, slower, and more columns within reach).
+
+## 039. Noise control lives in memory and is saved to Postgres
+
+- **Context:** First occurrence immediately, then at most one digest per 15 minutes per group, a regression after 24 quiet hours, and a cap of 30 emails per project per hour with one "paused" email.
+- **Choice:** A pure `Throttle` (no I/O, explicit timestamps) holds per-group state. The engine saves changed groups to `email_groups` every 15 seconds and on shutdown, and reloads groups seen in the last 30 days at startup, so restarts don't resend "first" emails. Digests go out when a new occurrence arrives after the window or from the 15-second timer when the window ended with occurrences pending. The cap counts messages (one email to five recipients counts once) per UTC clock hour. Occurrences over the cap stay pending, so the next digest includes them. Errors without a fingerprint are grouped by status, method and route.
+- **Alternatives:** Keeping all state in Postgres with row locks per signal (a database round trip per error during an incident), or a sliding-hour cap (harder to explain in the "paused until" email).
+
+## 040. Mute links confirm before muting
+
+- **Context:** "Mute this error for 1h / 24h / forever" links must work without logging in and expire.
+- **Choice:** The token is `base64url(json).base64url(hmac)` with the project, fingerprint, duration and an expiry (7 days by default). The link opens a small confirmation page, and the mute applies on a form `POST`, because mail security scanners fetch every link in an email and would otherwise mute errors on delivery. Mutes are stored on `email_groups.muted_until` (`infinity` for forever) and can be lifted under Alerts.
+- **Alternatives:** Muting on `GET` (simpler, but scanners trigger it), or single-use tokens (needs a token table; a replayed mute is harmless).
+
+## 041. One outbox table that is also the history
+
+- **Context:** Sends need a persistent queue with exponential backoff and 5 attempts, and every send must be recorded and shown under Alerts → History.
+- **Choice:** Each message per recipient (or per channel) is a row in `notifications` holding the rendered message, status, attempts, next attempt, last error and the server's response. The worker claims due rows with `FOR UPDATE SKIP LOCKED` and a 2-minute lease, so a crashed worker's rows are retried and two workers never send the same row. Retries wait 30 s, 1, 2 and 4 minutes. Test sends run synchronously so the UI can show the exact SMTP or HTTP error, and they are recorded in the same table. History is the same rows, newest first.
+- **Alternatives:** Separate queue and log tables (two writes per send, and they can drift apart), or an external queue (another service to run).
+
+## 042. Alert rules: state, cooldown and links
+
+- **Context:** "A rule is a query, a condition and a window … States ok/firing/resolved with dedupe and a cooldown, so each state change sends one notification … Messages link back to the UI with the query pre-filled."
+- **Choice:** Rules are stored with the same `QueryInput` as Explore and compiled with `logbox_query::where_clause`, so filters are parameterized and run as the read-only user. Bodies and headers can't be used in rule filters. The stored states are `ok` and `firing`; "resolved" is the firing → ok transition. A firing notification is skipped if the previous notification was less than the cooldown ago, and a resolved notification is sent only if the firing was announced. Editing the definition resets the state. Error rate and p95 count requests as stored, while counts are weighted by `1 / sample_rate`. Links open Explore with the query and the evaluated window as absolute `from`/`to`. Channels are per project and created by admins. Rules can be edited by members.
+- **Alternatives:** Pending states with "for N minutes" (more to explain; the window already smooths spikes), or weighting error rate by sampling (the ratio is the same when sampling is uniform).
+
+## 043. A single alerts process in split mode
+
+- **Context:** In split mode every subscriber receives every Redis message, and the rule loop has no leader election.
+- **Choice:** Run exactly one `logbox alerts` process (documented in docs/alerts.md). The outbox itself is safe with several workers, but the 5xx engine and the rule loop would each send twice.
+- **Alternatives:** Leader election with a Postgres advisory lock (worth adding if someone needs alert high availability).

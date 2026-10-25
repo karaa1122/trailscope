@@ -112,6 +112,11 @@ impl Engine {
                     if let Err(e) = self.persist().await {
                         tracing::warn!(error = %e, "saving 5xx email state");
                     }
+                    // Same horizon as `load_groups`; digests only need the latest
+                    // signal while occurrences are pending.
+                    self.throttle.prune(now_ms(), 30 * 86_400_000);
+                    let groups = &self.throttle.groups;
+                    self.latest.retain(|k, _| groups.get(k).is_some_and(|g| g.pending > 0));
                 }
             }
         }
@@ -127,7 +132,7 @@ impl Engine {
             Err(e) => tracing::warn!(error = %e, "loading email rules"),
         }
         match self.load_mutes().await {
-            Ok(m) => self.throttle.set_mutes(&m),
+            Ok(m) => self.throttle.set_mutes(m),
             Err(e) => tracing::warn!(error = %e, "loading mutes"),
         }
     }

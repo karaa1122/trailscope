@@ -6,6 +6,7 @@ import { Skeleton } from './components/ui';
 import { api } from './lib/api';
 import { parseQuerySearch } from './lib/query';
 import { useSession } from './lib/session';
+import { Alerts, type AlertsTab } from './pages/Alerts';
 import { InviteAccept, Login, Setup } from './pages/Auth';
 import { ErrorGroupPage, Errors, type ErrorsSearch } from './pages/Errors';
 import { Explore, type ExploreSearch } from './pages/Explore';
@@ -146,7 +147,12 @@ const routesRoute = createRoute({
 const alertsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/alerts',
-  component: () => <Placeholder title="Alerts" note="Alerts arrive in a later milestone." />,
+  validateSearch: (raw: Record<string, unknown>): { tab?: AlertsTab } => ({
+    tab: raw.tab === 'rules' || raw.tab === 'email' || raw.tab === 'channels' || raw.tab === 'history' ? raw.tab : undefined,
+  }),
+  component: function AlertsPage() {
+    return <Alerts tab={alertsRoute.useSearch().tab} />;
+  },
 });
 
 const viewsRoute = createRoute({

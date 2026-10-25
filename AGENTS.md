@@ -30,13 +30,48 @@ Logbox: an open-source, self-hosted API request logging tool (Rust server + Clic
 | M3 API | done | auth (sessions+CSRF, tokens, roles, invites, rate limit), setup, projects/keys/rules/targets, query endpoints, inspector/cURL/replay, live SSE, views, OpenAPI at /api/docs; docs/api.md |
 | M4 Web part 1 | done | shell, palette, setup/login/invite, query bar (3 modes, quick filters, CodeMirror), Live tail, Explore, Inspector; UI embedded via rust-embed; overview/heatmap/errors endpoints |
 | M5 Web part 2 | done | Journeys (`/api/v1/journeys` + swimlane UI), Errors list/detail, Routes (full heatmap + `/api/v1/routes/series`), release markers on every chart, Saved views page, Settings; RFC 3339 timestamps in API responses |
-| M6 Alerts + email-on-5xx | **next** | includes the follow-up email brief |
-| M7 SDKs | todo | |
+| M6 Alerts + email-on-5xx | done | rules (count, 5xx rate, p95, new/spiking error group) with cooldown; webhook/Slack/Telegram/email channels; real-time Email on 5xx with throttle, digest, cap, regression and signed mute links; Postgres outbox with retries = History; SMTP settings with env locking; encrypted secrets; Mailpit `dev` profile; docs/alerts.md. Smoke-tested end to end against Mailpit (no new test suites, per the M4 instruction) |
+| M7 SDKs | **next** | |
 | M8 Harden and ship | todo | |
 
-## Dev environment (this Windows machine)
+## Dev environment (Linux, current since M6)
 
-The host has Node 24 + pnpm 9 + Docker, but **no Rust or Python**. Toolchains run in containers with the repo bind-mounted:
+The repo is at `/home/kk/Documents/LogBox` on Ubuntu 24.04. Rust 1.99.1 (rustup, picked up from `rust-toolchain.toml`), Node 24 (fnm), pnpm 9 and Docker are on the host, so cargo and pnpm run natively. Only the databases run in containers (same names and ports as on Windows):
+
+```bash
+docker network create logbox-dev
+docker run -d --name logbox-dev-ch --network logbox-dev -p 18123:8123 -p 19000:9000 \
+  -e CLICKHOUSE_USER=logbox -e CLICKHOUSE_PASSWORD=logbox -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+  --ulimit nofile=262144:262144 -v logbox-dev-ch:/var/lib/clickhouse clickhouse/clickhouse-server:26.8
+docker run -d --name logbox-dev-pg --network logbox-dev -p 25432:5432 \
+  -e POSTGRES_USER=logbox -e POSTGRES_PASSWORD=logbox -e POSTGRES_DB=logbox \
+  -v logbox-dev-pg:/var/lib/postgresql postgres:18-alpine
+docker run -d --name logbox-dev-mailpit --network logbox-dev -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.32.0
+# later: docker start logbox-dev-ch logbox-dev-pg logbox-dev-mailpit
+```
+
+Run the server natively (UI at http://localhost:8090, owner@example.com / "correct horse battery" on the existing dev database; SMTP there points at Mailpit, host 127.0.0.1 port 1025):
+
+```bash
+pnpm build && cargo build -p logbox-server
+LOGBOX_CLICKHOUSE_URL=http://127.0.0.1:18123 LOGBOX_CLICKHOUSE_USER=logbox LOGBOX_CLICKHOUSE_PASSWORD=logbox \
+LOGBOX_POSTGRES_URL=postgres://logbox:logbox@127.0.0.1:25432/logbox LOGBOX_SERVER_LISTEN=127.0.0.1:8090 \
+LOGBOX_SERVER_PUBLIC_URL=http://localhost:8090 LOGBOX_SECRET_KEY=dev-secret-key-for-local-testing-only \
+./target/debug/logbox all
+```
+
+Everyday checks: `cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings`, then `pnpm install && pnpm build && pnpm lint && pnpm typecheck`.
+
+Linux machine notes:
+
+- Other projects' containers run here (`ch_postgres` on 5433, `eventy_db` on 15432, `mongodb` on 27017, and more); leave them alone.
+- clang isn't installed; the workspace builds without it.
+- Playwright: `e2e` pins `@playwright/test` 1.64.1, which expects a newer Chromium than the one in `~/.cache/ms-playwright`. Launch with `executablePath: '/home/kk/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome'` instead of downloading another.
+- The ingest wire format is camelCase (`requestId`, `durationMs`, `errorType`…); snake_case fields are silently ignored.
+
+## Dev environment (previous Windows machine)
+
+The host had Node 24 + pnpm 9 + Docker, but **no Rust or Python**. Toolchains ran in containers with the repo bind-mounted:
 
 ```bash
 # Git Bash on Windows: always export this, or `-w /work` and `-v` paths get mangled
@@ -95,34 +130,29 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, benchmark in `bench/`).
 - `scripts/dev/rust.sh` runs a command in the Rust container with the test env vars; `scripts/dev/env.sh` holds the env for running `logbox` against the dev services.
 - `crates/logbox-api`: `AppState` (config, ClickHouse, Postgres, LiveBus, optional ingest KeyCache, login limiter, replay HTTP client, shutdown token). Modules: `auth` (Auth extractor: session cookie + CSRF or Bearer API token; `require(Role, Scope)`, `can_view_bodies`), `setup`, `users` (login/logout/me/password, members, invites, tokens, `ClientIp`), `projects`, `query` (`prepare` → `Prepared`, `fetch_json` runs as the reader and strips the `_c_` alias prefix), `inspector`, `live`, `views`, `openapi` (utoipa-axum route table). The integration test is `tests/api.rs`.
-- `web/src`: `main.tsx`, `router.tsx` (code-based TanStack routes, typed search params, `Guard`), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx` (me, projects, current project/env, theme), `query.ts` (QueryValue ↔ URL, addCondition, history), `live.ts` (SSE hook with pause buffer), `hotkeys.ts`, `format.ts`), `components/` (`Shell` sidebar/rail, `CommandPalette`, `QueryBar`, `SqlEditor` (lazy CodeMirror), `charts.tsx` (Heatmap, Histogram, TimeChart, Waterfall, JsonView), `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Journeys`, `Errors` (list + group), `Routes`, `Views`, `Settings` (`?tab=`), `Auth` (login, invite, setup wizard), `Placeholder` (still used for Alerts)). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
+- `web/src`: `main.tsx`, `router.tsx` (code-based TanStack routes, typed search params, `Guard`), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx` (me, projects, current project/env, theme), `query.ts` (QueryValue ↔ URL, addCondition, history), `live.ts` (SSE hook with pause buffer), `hotkeys.ts`, `format.ts`), `components/` (`Shell` sidebar/rail, `CommandPalette`, `QueryBar`, `SqlEditor` (lazy CodeMirror), `charts.tsx` (Heatmap, Histogram, TimeChart, Waterfall, JsonView), `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Journeys`, `Errors` (list + group), `Routes`, `Views`, `Settings` (`?tab=`, including `SettingsNotifications` for SMTP), `Alerts` (`?tab=rules|email|channels|history`), `Auth` (login, invite, setup wizard), `Placeholder` (the "no projects" screen)). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
 - `crates/logbox-server/src/ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). `crates/logbox-api/src/overview.rs` (tiles, heatmap and per-route series from route_minute), `errors.rs` (groups list/detail with new/spiking) and `journeys.rs` (requests + events + spans for one key, collapsed into lanes).
 - `e2e/screenshots.mjs`: Playwright screenshots of a running instance (`BASE_URL=… OUT=… node screenshots.mjs`); Chromium is installed on the host.
-- Not built yet: `logbox-alerts` is an empty stub; the Python SDK is a skeleton.
+- `crates/logbox-alerts` (M6): `crypto` (`Keys`: XChaCha20-Poly1305 for stored secrets, HMAC tokens; key from `secret_key` or generated into the Postgres `settings` table), `smtp` (stored + configured settings merged per field, `locked_fields`, lettre send with the full error chain), `channels` (webhook with `X-Logbox-Signature`, Slack, Telegram, email recipients), `outbox` (`notifications` table: queue with lease and backoff, also the history), `rules` (60 s evaluator, SQL per kind, ok/firing with cooldown, Explore links), `throttle` (pure noise-control state), `email5xx` (`Engine` on `LiveBus::subscribe_errors()`, saves `email_groups` every 15 s), `render` (email HTML/text, rule messages), `mute` (signed links). `start()` is called by `serve.rs` for the `all` and `alerts` roles. `crates/logbox-api/src/alerts.rs` has the endpoints; `AppState` carries `secrets` and an `outbox`. Postgres schema: `migrations/postgres/0002_alerts.sql`.
+- Not built yet: the Python SDK is a skeleton.
 
 ## Query language (M2, done)
 
 `crates/logbox-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs` (AST plus `Display` back to SQL), `compile.rs` (`compile`, `where_clause`; values are always `{pN:Type}` params), `eval.rs` (`Prepared` evaluator; `Record` is implemented for `LiveRequest` and `RequestRow`), `regex.rs` (RE2 validation and ASCII class rewriting), `search.rs`, `chips.rs`, and `QueryInput` in `lib.rs` (sql/search/filters). Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `LOGBOX_DIFF_CASES=4000 LOGBOX_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`; nightly and cargo-fuzz are installed in the dev container).
 
-## Plan for M6 (alerts and email on 5xx)
+## Alerts (M6, done)
 
-Spec: "A rule is a query, a condition and a window: `count > N`, `error_rate > X%`, `p95(duration_ms) > X ms` on a filter, or `new error group` / `spiking error group`. Rules are evaluated every 60 s. States ok/firing/resolved with dedupe and a cooldown, so each state change sends one notification. Channels: webhook (HMAC-SHA256), Slack incoming webhook, Telegram bot, email over SMTP. Messages link back to the UI with the query pre-filled." Plus the whole follow-up brief (next section and docs/agents/spec-email-notifications.md).
+Decisions 036–043 in docs/DECISIONS.md; user-facing behaviour in docs/alerts.md. Verified by hand against Mailpit: a 500 from ingest is emailed in about 2 s with the spec's subject, no body/header/IP data in the raw message, later occurrences are throttled, mute links confirm on POST and reject tampered tokens, and an error-rate rule went ok → firing → resolved with one email each. The brief's unit and Mailpit integration tests were not written (tests are skipped from M4 on); `throttle.rs` is pure and easy to cover if the user asks for tests later.
 
-1. Postgres migration `0002_alerts.sql`: `alert_rules` (project, name, table, query JSON, kind, threshold, window, cooldown, channels, enabled, state, last_eval), `alert_channels` (kind webhook/slack/telegram/email, config JSON with secrets encrypted), `alert_events` (history), `smtp_settings` (one row; password encrypted), `email_rules` (built-in "Email on 5xx" per project: filter, recipients), `email_outbox` (queue: attempts, next_attempt_at, status, error), `error_mutes` (fingerprint, until).
-2. Config: `secret_key` (`LOGBOX_SECRET_KEY`), `smtp.from_name`; crypto with XChaCha20-Poly1305 (check the current `chacha20poly1305` version) and HMAC-SHA256 mute links.
-3. `crates/logbox-alerts`: evaluator task (60 s tick, compiles rule queries with `logbox_query::compile`, runs as the reader), state machine with cooldown, channel senders (reqwest; lettre with tokio + rustls for SMTP), the 5xx email pipeline subscribed to `LiveBus::subscribe_errors()` with throttling/digest/cap/regression, and the outbox worker. Started by `serve.rs` for the `all` and `alerts` roles.
-4. API: rules/channels CRUD, test-send, SMTP settings (env-locked fields, password never returned), history, mute link endpoint (no login).
-5. UI: `/alerts` page (rules list, editor using `QueryBar`, channels, Email on 5xx card, SMTP settings, history).
-6. Mailpit in a `dev` compose profile; docs/alerts.md and docs/configuration.md.
-7. The dev UI instance: container `logbox-ui` publishes 8090 (owner@example.com / "correct horse battery"); restart it after rebuilding the binary. Demo traffic runs separately in `logbox-rust` (`/target/debug/logbox demo --url http://logbox-ui:8080 --key <ingest key> --backfill-hours 0`); start it again after container restarts. Without `--key` the demo creates a new project.
+## Plan for M7 (SDKs)
 
-## Email-on-5xx (follow-up brief) integration points
+Spec ("SDKs" section of docs/agents/spec.md): shared behaviour in `docs/sdk-spec.md` (bounded queue 10k dropping oldest, flush every 1 s or 500 events, gzip, backoff with jitter, `Retry-After`, flush on shutdown; `X-Request-Id` + W3C `traceparent`; async-local context; default redaction list; body capture `errors|always|never`, 8 KB, skip binary/multipart; sampling that keeps errors and slow requests; ignore health routes; < 0.2 ms p99 overhead benchmark).
 
-- **Config:** `smtp.*` exists in `Config`. Still needed: `smtp.from_name`, a top-level `secret_key` (env `LOGBOX_SECRET_KEY`) used for AES-256-GCM or XChaCha20-Poly1305 encryption of the stored SMTP password and for HMAC-signed mute links. Env values override UI values and lock those fields in the UI.
-- **Ingest → alert engine:** done in M1. `LiveBus::subscribe_errors()` yields `ErrorSignal`s (5xx, without bodies, headers or IPs) after each successful flush; in split mode they arrive over Redis `<prefix>:errors`.
-- **Alerts crate:** throttle per `error_fingerprint` (first occurrence immediately, then at most one per 15 min with digest counts), a project cap of 30/hour with a single "paused" email, regression after 24 h quiet, signed mute links (1 h / 24 h / forever), and a Postgres-backed send queue with 5 attempts and exponential backoff. Every send is logged and shown under Alerts → History.
-- **Dev:** Mailpit in a `dev` compose profile; an integration test asserts the email arrives with the right subject and no body or header data.
-- **Docs:** `docs/alerts.md` and `docs/configuration.md`.
+1. Read `sdks/node/packages/node` (the M1 core) and `docs/ingest-protocol.md`; write `docs/sdk-spec.md` from the core's actual behaviour.
+2. `@logbox/express` (middleware), `@logbox/fastify` (plugin), `@logbox/nestjs` (module, interceptor, exception filter with error type/message/stack, `Logger` bridge to `events`, BullMQ helper that carries context in job data and logs runs as `kind=job` with `attempt`). Each with typed config and a README with a 10-line quickstart.
+3. Python `logbox` in `sdks/python`: background-thread transport, contextvars, Django middleware, Starlette/FastAPI middleware, Celery signal hooks, `logging` handler. Python isn't set up on this machine yet: `python3` exists; create a venv for `ruff`, `mypy` and building.
+4. `examples/`: minimal Express, NestJS, Django and FastAPI apps wired to the SDKs, runnable against the dev server.
+5. Benchmarks per SDK (overhead per request), results in `docs/benchmarks.md`. One doc per SDK under `docs/`.
 
 ## How to resume
 

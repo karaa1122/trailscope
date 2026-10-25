@@ -1,6 +1,6 @@
 import { Empty } from '../components/ui';
 
-/** Screens that land in later milestones render a short note instead of a 404. */
+/** A page with only a short note, e.g. when there are no projects yet. */
 export function Placeholder({ title, note }: { title: string; note: string }) {
   return (
     <main className="main">

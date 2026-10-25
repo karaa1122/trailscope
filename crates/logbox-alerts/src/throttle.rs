@@ -53,6 +53,8 @@ pub type Key = (Uuid, String);
 #[derive(Debug)]
 pub struct Throttle {
     pub groups: HashMap<Key, Group>,
+    /// Mutes from Postgres, also for groups not in memory yet.
+    mutes: HashMap<Key, i64>,
     caps: HashMap<Uuid, Cap>,
     throttle_ms: i64,
     regression_ms: i64,
@@ -63,6 +65,7 @@ impl Throttle {
     pub fn new(throttle_minutes: u32, regression_hours: u32, cap: u32) -> Self {
         Self {
             groups: HashMap::new(),
+            mutes: HashMap::new(),
             caps: HashMap::new(),
             throttle_ms: i64::from(throttle_minutes.max(1)) * 60_000,
             regression_ms: i64::from(regression_hours.max(1)) * 3_600_000,
@@ -77,16 +80,21 @@ impl Throttle {
     /// Records one occurrence; returns why to email now, if at all.
     pub fn observe(&mut self, key: &Key, user: &str, now: i64) -> Option<Reason> {
         let Some(g) = self.groups.get_mut(key) else {
+            let muted_until = self.mutes.get(key).copied();
             self.groups.insert(
                 key.clone(),
                 Group {
                     first_seen: now,
                     last_seen: now,
                     total: 1,
+                    muted_until,
                     dirty: true,
                     ..Group::default()
                 },
             );
+            if muted_until.is_some_and(|m| m > now) {
+                return None;
+            }
             return Some(Reason::First);
         };
         let quiet = now - g.last_seen;
@@ -178,9 +186,18 @@ impl Throttle {
     }
 
     /// Applies mutes loaded from Postgres (mute links may be clicked on any instance).
-    pub fn set_mutes(&mut self, mutes: &HashMap<Key, i64>) {
+    pub fn set_mutes(&mut self, mutes: HashMap<Key, i64>) {
         for (k, g) in &mut self.groups {
             g.muted_until = mutes.get(k).copied();
         }
+        self.mutes = mutes;
+    }
+
+    /// Forgets saved groups that have been quiet for `older_than_ms`. Keep it
+    /// well above the regression window: a forgotten group that comes back is
+    /// emailed as new rather than as a regression.
+    pub fn prune(&mut self, now: i64, older_than_ms: i64) {
+        self.groups
+            .retain(|_, g| g.dirty || g.pending > 0 || now - g.last_seen < older_than_ms);
     }
 }

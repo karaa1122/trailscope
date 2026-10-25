@@ -106,11 +106,11 @@ function RulesTab({ toast }: { toast: Toaster }) {
   const qc = useQueryClient();
   const canEdit = RANK[me?.user.role ?? 'viewer'] >= RANK.member;
   const [editing, setEditing] = useState<AlertRule | 'new' | null>(null);
-  const rules = useQuery({ queryKey: ['rules', project.id], queryFn: () => api.rules(project.id), refetchInterval: 30_000 });
+  const rules = useQuery({ queryKey: ['alert-rules', project.id], queryFn: () => api.alertRules(project.id), refetchInterval: 30_000 });
   const channels = useQuery({ queryKey: ['channels', project.id], queryFn: () => api.channels(project.id) });
   const remove = useMutation({
-    mutationFn: (id: string) => api.deleteRule(project.id, id),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['rules', project.id] }),
+    mutationFn: (id: string) => api.deleteAlertRule(project.id, id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['alert-rules', project.id] }),
     onError: (e) => toast(errText(e)),
   });
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? 'deleted channel';
@@ -122,7 +122,7 @@ function RulesTab({ toast }: { toast: Toaster }) {
         channels={channels.data ?? []}
         onDone={() => {
           setEditing(null);
-          void qc.invalidateQueries({ queryKey: ['rules', project.id] });
+          void qc.invalidateQueries({ queryKey: ['alert-rules', project.id] });
         }}
         toast={toast}
       />
@@ -251,7 +251,7 @@ function RuleEditor({ rule, channels, onDone, toast }: { rule: AlertRule | null;
     enabled,
   });
   const save = useMutation({
-    mutationFn: () => (rule ? api.updateRule(rule.id, input()) : api.createRule(input())),
+    mutationFn: () => (rule ? api.updateAlertRule(rule.id, input()) : api.createAlertRule(input())),
     onSuccess: () => {
       toast(rule ? 'Rule saved' : 'Rule created');
       onDone();
@@ -260,7 +260,7 @@ function RuleEditor({ rule, channels, onDone, toast }: { rule: AlertRule | null;
   });
   const runPreview = async () => {
     try {
-      setPreview(await api.previewRule({ ...input(), name: name.trim() || 'preview' }));
+      setPreview(await api.previewAlertRule({ ...input(), name: name.trim() || 'preview' }));
     } catch (e) {
       setPreview(errText(e));
     }

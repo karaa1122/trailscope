@@ -7,8 +7,9 @@ import { ApiError, api } from '../lib/api';
 import { fmtAgo, fmtDateTime } from '../lib/format';
 import { useProject, useSession } from '../lib/session';
 import type { Project, ProjectSettings, RedactionRule, Role } from '../lib/types';
+import { NotificationsSection } from './SettingsNotifications';
 
-export type SettingsTab = 'project' | 'keys' | 'redaction' | 'replay' | 'members' | 'tokens' | 'retention' | 'account';
+export type SettingsTab = 'project' | 'keys' | 'redaction' | 'replay' | 'members' | 'tokens' | 'notifications' | 'retention' | 'account';
 
 const RANK: Record<Role, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
 const ROLES: Role[] = ['viewer', 'member', 'admin', 'owner'];
@@ -20,6 +21,7 @@ const TABS: { id: SettingsTab; label: string; min: Role }[] = [
   { id: 'replay', label: 'Replay targets', min: 'admin' },
   { id: 'members', label: 'Members', min: 'admin' },
   { id: 'tokens', label: 'API tokens', min: 'viewer' },
+  { id: 'notifications', label: 'Notifications', min: 'admin' },
   { id: 'retention', label: 'Retention', min: 'viewer' },
   { id: 'account', label: 'Account', min: 'viewer' },
 ];
@@ -67,6 +69,7 @@ export function Settings({ tab }: { tab?: SettingsTab }) {
           {current === 'replay' && <ReplaySection toast={setToast} />}
           {current === 'members' && <MembersSection toast={setToast} isOwner={role === 'owner'} />}
           {current === 'tokens' && <TokensSection toast={setToast} role={role} />}
+          {current === 'notifications' && <NotificationsSection toast={setToast} />}
           {current === 'retention' && <RetentionSection />}
           {current === 'account' && <AccountSection toast={setToast} />}
         </div>

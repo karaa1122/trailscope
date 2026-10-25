@@ -219,11 +219,11 @@ export const api = {
     post<{ id: string; token: string; prefix: string }>('/api/v1/tokens', body),
   revokeToken: (id: string) => del(`/api/v1/tokens/${id}`),
 
-  rules: (project: string) => get<AlertRule[]>(`/api/v1/alerts/rules${qs({ project })}`),
-  createRule: (rule: RuleInput) => post<AlertRule>('/api/v1/alerts/rules', rule),
-  updateRule: (id: string, rule: RuleInput) => put<AlertRule>(`/api/v1/alerts/rules/${id}`, rule),
-  deleteRule: (project: string, id: string) => del(`/api/v1/alerts/rules/${id}${qs({ project })}`),
-  previewRule: (rule: RuleInput) => post<{ value: number; firing: boolean }>('/api/v1/alerts/rules/preview', rule),
+  alertRules: (project: string) => get<AlertRule[]>(`/api/v1/alerts/rules${qs({ project })}`),
+  createAlertRule: (rule: RuleInput) => post<AlertRule>('/api/v1/alerts/rules', rule),
+  updateAlertRule: (id: string, rule: RuleInput) => put<AlertRule>(`/api/v1/alerts/rules/${id}`, rule),
+  deleteAlertRule: (project: string, id: string) => del(`/api/v1/alerts/rules/${id}${qs({ project })}`),
+  previewAlertRule: (rule: RuleInput) => post<{ value: number; firing: boolean }>('/api/v1/alerts/rules/preview', rule),
   channels: (project: string) => get<AlertChannel[]>(`/api/v1/alerts/channels${qs({ project })}`),
   createChannel: (body: {
     project: string;
