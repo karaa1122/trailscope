@@ -600,6 +600,7 @@ function EventRow({ e, came }: { e: JourneyItem; came?: string }) {
             {e.title}
           </span>
           {e.similar > 1 && <span className="badge steady">{fmtInt(e.similar)} similar until {fmtClock(e.until, false)}</span>}
+          {e.requestId && e.kind !== 'request' && <span className="badge steady">opens the request that started it</span>}
           {inspected && (
             <span className="badge new" style={{ color: 'var(--accent-ink)' }}>
               YOU CAME FROM HERE
@@ -627,9 +628,16 @@ function EventRow({ e, came }: { e: JourneyItem; came?: string }) {
     color: 'var(--text)',
     background: inspected ? 'var(--accent-soft)' : undefined,
   } as const;
-  if (e.requestId && e.kind === 'request') {
+  // Requests open in the inspector; jobs and log events open the request that started them.
+  if (e.requestId) {
     return (
-      <Link to="/requests/$requestId" params={{ requestId: e.requestId }} className="table-row" style={{ ...style, minHeight: 0 }}>
+      <Link
+        to="/requests/$requestId"
+        params={{ requestId: e.requestId }}
+        className="table-row"
+        title={e.kind === 'request' ? 'Open this request' : 'Open the request that started this'}
+        style={{ ...style, minHeight: 0 }}
+      >
         {body}
       </Link>
     );
