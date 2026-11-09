@@ -129,7 +129,11 @@ pub struct WireRequest {
     pub res_headers: WireMap,
     pub req_body: WireBody,
     pub res_body: WireBody,
+    /// A body was cut (either one).
     pub body_truncated: bool,
+    /// The request body specifically was cut. Older SDKs don't send it; then
+    /// `body_truncated` may mean the request body too.
+    pub req_body_truncated: Option<bool>,
 
     pub error_type: Option<String>,
     pub error_message: Option<String>,

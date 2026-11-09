@@ -278,6 +278,7 @@ export class LogboxClient {
     let reqBody: string | undefined;
     let resBody: string | undefined;
     let truncated = false;
+    let reqTruncated = false;
     if (shouldCaptureBodies(this.options.captureBodies, status, durationMs, this.options.slowMs)) {
       const limit = this.options.maxBodyBytes;
       const rq = serializeBody(ex.reqBody, reqHeaders['content-type'], limit);
@@ -289,6 +290,7 @@ export class LogboxClient {
       reqBody = rq?.body;
       resBody = rs?.body;
       truncated = !!(rq?.truncated || rs?.truncated);
+      reqTruncated = !!rq?.truncated;
     }
     const e = failed === undefined ? undefined : toError(failed);
     this.captureRequest({
@@ -312,6 +314,8 @@ export class LogboxClient {
       reqBody,
       resBody,
       bodyTruncated: truncated || undefined,
+      // Said separately so a cut response alone doesn't block replaying the request.
+      reqBodyTruncated: truncated ? reqTruncated : undefined,
       errorType: e?.name,
       errorMessage: e?.message,
       errorStack: e?.stack,

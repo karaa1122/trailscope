@@ -69,7 +69,8 @@ Map fields (`attributes`, `correlation`, headers) take string, number or boolean
 | `userAgent` | string | | |
 | `reqHeaders`, `resHeaders` | map | | Names are lower-cased |
 | `reqBody`, `resBody` | string or JSON | | |
-| `bodyTruncated` | boolean | | Set by SDKs that truncated a body |
+| `bodyTruncated` | boolean | | Set by SDKs that truncated a body (either one) |
+| `reqBodyTruncated` | boolean | | Set by SDKs to say whether the request body itself was truncated. Replay refuses only requests whose request body was cut; without this field, `bodyTruncated` counts for the request body too |
 | `errorType`, `errorMessage`, `errorStack` | string | | |
 | `attributes` | map | | Free-form, up to 64 keys |
 | `correlation` | map | | Journey keys: `account_id`, `session_id`, anything |

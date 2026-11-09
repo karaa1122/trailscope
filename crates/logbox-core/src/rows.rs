@@ -37,6 +37,8 @@ pub struct RequestRow {
     pub req_body: String,
     pub res_body: String,
     pub body_truncated: u8,
+    /// The request body was cut, so the request can't be replayed faithfully.
+    pub req_body_truncated: u8,
     pub error_type: String,
     pub error_message: String,
     pub error_stack: String,

@@ -25,6 +25,21 @@ services:
       LOGBOX_LOG_FORMAT: json
       # Encrypts stored secrets and signs mute links. Set a long random value in production.
       LOGBOX_SECRET_KEY: ${LOGBOX_SECRET_KEY:-}
+      # Optional: email for alerts. Unset or empty values are ignored, and the field
+      # can then be set in Settings → Notifications instead; a value set here locks it.
+      LOGBOX_SMTP_HOST: ${LOGBOX_SMTP_HOST:-}
+      LOGBOX_SMTP_PORT: ${LOGBOX_SMTP_PORT:-}
+      LOGBOX_SMTP_SECURITY: ${LOGBOX_SMTP_SECURITY:-}
+      LOGBOX_SMTP_USERNAME: ${LOGBOX_SMTP_USERNAME:-}
+      LOGBOX_SMTP_PASSWORD: ${LOGBOX_SMTP_PASSWORD:-}
+      LOGBOX_SMTP_FROM: ${LOGBOX_SMTP_FROM:-}
+      LOGBOX_SMTP_FROM_NAME: ${LOGBOX_SMTP_FROM_NAME:-}
+      # Optional: single sign-on with an OpenID Connect provider (docs/configuration.md#oidc).
+      LOGBOX_OIDC_ISSUER: ${LOGBOX_OIDC_ISSUER:-}
+      LOGBOX_OIDC_CLIENT_ID: ${LOGBOX_OIDC_CLIENT_ID:-}
+      LOGBOX_OIDC_CLIENT_SECRET: ${LOGBOX_OIDC_CLIENT_SECRET:-}
+      LOGBOX_OIDC_DISPLAY_NAME: ${LOGBOX_OIDC_DISPLAY_NAME:-}
+      LOGBOX_OIDC_AUTO_CREATE_DOMAINS: ${LOGBOX_OIDC_AUTO_CREATE_DOMAINS:-}
     depends_on:
       clickhouse:
         condition: service_healthy

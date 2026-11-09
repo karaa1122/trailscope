@@ -24,6 +24,11 @@ const MIGRATIONS: &[(u32, &str, &str)] = &[
         "route_minute_order",
         include_str!("../../../migrations/clickhouse/0002_route_minute_order.sql"),
     ),
+    (
+        3,
+        "req_body_truncated",
+        include_str!("../../../migrations/clickhouse/0003_req_body_truncated.sql"),
+    ),
 ];
 
 const READER_PROFILE: &str = "logbox_reader_profile";

@@ -447,6 +447,8 @@ class Client:
             item["resBody"] = rs[0] if rs else None
             if (rq and rq[1]) or (rs and rs[1]):
                 item["bodyTruncated"] = True
+            # Said separately so a cut response alone doesn't block replaying the request.
+            item["reqBodyTruncated"] = bool(rq and rq[1])
         if failed is not None:
             item.update(error_fields(failed))
         self._enqueue(item)

@@ -228,12 +228,17 @@ pub fn request(
     let mut res_body = w.res_body.0;
     redactor.body(&mut req_body, &req_ct);
     redactor.body(&mut res_body, &res_ct);
-    let mut truncated = w.body_truncated;
-    for b in [&mut req_body, &mut res_body] {
-        if b.len() > lim.max_body_bytes {
-            *b = clip(std::mem::take(b), lim.max_body_bytes);
-            truncated = true;
-        }
+    // Without `reqBodyTruncated` (older SDKs), `bodyTruncated` may mean either body.
+    let mut req_truncated = w.req_body_truncated.unwrap_or(w.body_truncated);
+    let mut truncated = w.body_truncated || req_truncated;
+    if req_body.len() > lim.max_body_bytes {
+        req_body = clip(std::mem::take(&mut req_body), lim.max_body_bytes);
+        req_truncated = true;
+        truncated = true;
+    }
+    if res_body.len() > lim.max_body_bytes {
+        res_body = clip(std::mem::take(&mut res_body), lim.max_body_bytes);
+        truncated = true;
     }
 
     let mut ip = clip_opt(w.ip, 64);
@@ -293,6 +298,7 @@ pub fn request(
         req_body,
         res_body,
         body_truncated: u8::from(truncated),
+        req_body_truncated: u8::from(req_truncated),
         error_type,
         error_message,
         error_stack,

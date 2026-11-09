@@ -366,6 +366,7 @@ impl Record for RequestRow {
             "req_body" => s(&self.req_body),
             "res_body" => s(&self.res_body),
             "body_truncated" => Some(Val::Bool(self.body_truncated != 0)),
+            "req_body_truncated" => Some(Val::Bool(self.req_body_truncated != 0)),
             "error_type" => s(&self.error_type),
             "error_message" => s(&self.error_message),
             "error_stack" => s(&self.error_stack),

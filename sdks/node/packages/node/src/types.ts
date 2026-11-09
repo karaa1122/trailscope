@@ -29,6 +29,8 @@ export interface RequestItem {
   reqBody?: string;
   resBody?: string;
   bodyTruncated?: boolean;
+  /** The request body specifically was cut; without it, `bodyTruncated` may mean either body. */
+  reqBodyTruncated?: boolean;
   errorType?: string;
   errorMessage?: string;
   errorStack?: string;

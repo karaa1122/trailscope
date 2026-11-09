@@ -393,6 +393,7 @@ impl Config {
             .merge(
                 Env::prefixed("LOGBOX_")
                     .ignore(&["config"])
+                    .filter(|key| env_is_set(key.as_str()))
                     .map(|key| map_env_key(key.as_str()).into()),
             )
     }
@@ -454,6 +455,13 @@ fn lenient_string<'de, D: serde::Deserializer<'de>>(de: D) -> Result<String, D::
         Lenient::F(n) => n.to_string(),
         Lenient::B(b) => b.to_string(),
     })
+}
+
+/// Whether `LOGBOX_<key>` is set to something. An empty variable counts as
+/// unset, so a compose file can pass `${LOGBOX_SMTP_PORT:-}` through without
+/// overriding `logbox.toml` (or failing to parse "" as a number).
+pub fn env_is_set(key: &str) -> bool {
+    std::env::var_os(format!("LOGBOX_{key}")).is_some_and(|v| !v.is_empty())
 }
 
 /// `clickhouse_reader_user` -> `clickhouse.reader_user`.

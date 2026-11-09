@@ -84,7 +84,8 @@ impl SmtpSettings {
 /// Fields set by configuration (env or `logbox.toml`); the UI shows them locked.
 pub fn locked_fields(cfg: &SmtpConfig) -> Vec<&'static str> {
     let d = SmtpConfig::default();
-    let env = |k: &str| std::env::var_os(format!("LOGBOX_SMTP_{k}")).is_some();
+    // An empty variable (a compose file passing `${LOGBOX_SMTP_HOST:-}`) doesn't lock the field.
+    let env = |k: &str| logbox_core::config::env_is_set(&format!("SMTP_{k}"));
     let mut out = Vec::new();
     if env("HOST") || cfg.host != d.host {
         out.push("host");

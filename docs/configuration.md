@@ -4,7 +4,7 @@ Logbox reads configuration in three layers, each overriding the one before:
 
 1. Built-in defaults.
 2. `logbox.toml`: `./logbox.toml` if it exists, or the file given with `--config` or `$LOGBOX_CONFIG` (which must exist).
-3. Environment variables `LOGBOX_<SECTION>_<KEY>`, e.g. `LOGBOX_CLICKHOUSE_URL` sets `[clickhouse] url`.
+3. Environment variables `LOGBOX_<SECTION>_<KEY>`, e.g. `LOGBOX_CLICKHOUSE_URL` sets `[clickhouse] url`. An empty variable counts as unset, so the compose files can pass optional settings through (`LOGBOX_SMTP_HOST: ${LOGBOX_SMTP_HOST:-}`) without overriding anything when you leave them out of `deploy/.env`.
 
 Values that look like numbers are fine for string settings: `LOGBOX_CLICKHOUSE_PASSWORD=123456` stays the string `"123456"`. List values in env vars use TOML array syntax: `LOGBOX_SERVER_CORS_ORIGINS='["https://a.example"]'`.
 

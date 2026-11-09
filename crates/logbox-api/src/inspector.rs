@@ -370,13 +370,13 @@ pub async fn replay(
             .await?
             .ok_or_else(|| ApiError::not_found("replay target"))?;
     if row
-        .get("body_truncated")
+        .get("req_body_truncated")
         .and_then(Value::as_u64)
         .unwrap_or(0)
         == 1
     {
         return Err(ApiError::bad_request(
-            "the stored body was truncated, so it can't be replayed faithfully",
+            "the stored request body was truncated, so it can't be replayed faithfully",
         ));
     }
     let method = reqwest::Method::from_bytes(s(&row, "method").as_bytes())

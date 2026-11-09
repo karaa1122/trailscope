@@ -79,12 +79,25 @@ export function NotificationsSection({ toast }: { toast: (msg: string) => void }
     onError: (e) => toast(errText(e)),
   });
   const test = useMutation({
-    mutationFn: () => api.testSmtp(to.trim()),
+    // The server tests the stored settings, so edits still on screen are saved first.
+    mutationFn: async (saveFirst: boolean) => {
+      if (saveFirst && form) await save.mutateAsync(form);
+      return api.testSmtp(to.trim());
+    },
     onSuccess: setResult,
     onError: (e) => setResult({ ok: false, error: errText(e), response: null, recipients: [] }),
   });
   if (!form || !smtp.data) return <Skeleton h={300} />;
   const s = smtp.data;
+  const unsaved =
+    form.host !== s.host ||
+    form.port !== s.port ||
+    form.security !== s.security ||
+    form.username !== s.username ||
+    form.from !== s.from ||
+    form.fromName !== s.fromName ||
+    password !== '' ||
+    clearPassword;
   const locked = (f: string) => s.locked.includes(f);
   const lockHint = (f: string) => (locked(f) ? `locked: set by ${SMTP_ENV[f] ?? 'configuration'}` : undefined);
 
@@ -179,13 +192,18 @@ export function NotificationsSection({ toast }: { toast: (msg: string) => void }
           style={{ padding: 18 }}
           onSubmit={(e) => {
             e.preventDefault();
-            test.mutate();
+            test.mutate(unsaved);
           }}
         >
           <input className="input" type="email" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Send to" style={{ maxWidth: 320 }} required />
           <button type="submit" className="btn" disabled={test.isPending}>
-            {test.isPending ? 'Sending…' : 'Send test email'}
+            {test.isPending ? 'Sending…' : unsaved ? 'Save and send test email' : 'Send test email'}
           </button>
+          {unsaved && (
+            <span className="dim" style={{ fontSize: 12.5 }}>
+              The email settings above have unsaved changes; they are saved before the test.
+            </span>
+          )}
         </form>
         {result && (
           <div

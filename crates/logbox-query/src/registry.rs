@@ -222,6 +222,13 @@ pub static REQUESTS: &[Column] = &[
     )
     .not_live(),
     col(
+        "req_body_truncated",
+        "UInt8",
+        Bool,
+        "Whether the request body was truncated (such requests can't be replayed)",
+    )
+    .not_live(),
+    col(
         "error_type",
         "LowCardinality(String)",
         Str,

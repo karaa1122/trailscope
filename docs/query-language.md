@@ -107,6 +107,7 @@ Any other function, including casts, `CASE`, subqueries and table functions, is 
 | `error_stack` | string | Not in the live tail |
 | `error_fingerprint` | ID | Error group |
 | `body_truncated` | boolean | Not in the live tail |
+| `req_body_truncated` | boolean | The request body was cut; such requests can't be replayed. Not in the live tail |
 | `attributes` / `attr` | map | `attr['tenant']` |
 | `correlation` | map | `correlation['account_id']` |
 | `req_body`, `res_body`, `req_headers`, `res_headers` | string / map | Only for members with **can view bodies**. Not in the live tail |

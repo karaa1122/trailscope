@@ -349,3 +349,21 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** Explore only read the `requests` table, so job runs and log events (the `events` table) could be seen in Journeys but not filtered, charted, faceted or grouped. The query endpoints already accepted `table: "events"`.
 - **Choice:** A "Data" switch on Explore (Requests | Jobs & logs), kept in the URL as `?table=events`; without it Explore reads requests, so existing links, saved views and alert links are unchanged. Each table has its own default columns, facets (`kind` first, so jobs are one click away) and default grouping (`name`). Switching keeps the query and the time range and resets the columns and the grouping. An event row opens the request that started it, as in Journeys, without passing the events filter along (the inspector applies it to the nearby requests). Saved views store and restore the table. The list/group switch now reads "List | Group by" so it doesn't repeat "Requests".
 - **Alternatives:** One list mixing requests and events (different columns, statuses and sampling, and one keyset cursor can't page both tables), or a separate Jobs page (would duplicate Explore's chart, facets, grouping and query bar).
+
+## 059. Replay checks only whether the request body was cut
+
+- **Context:** One `body_truncated` flag covered both bodies, so a request with a complete body and a long (cut) response, typically an error page, couldn't be replayed ("the stored body was truncated").
+- **Choice:** A `req_body_truncated` column (ClickHouse migration 0003) and an optional `reqBodyTruncated` wire field. The server sets it when it cuts the request body itself; the SDKs send it next to `bodyTruncated`. When an older SDK sends only `bodyTruncated`, it counts for the request body too, and rows written before the migration inherit `body_truncated` through the column default, so replay stays cautious where it can't know. Replay refuses only on `req_body_truncated`; the column is also queryable.
+- **Alternatives:** Guessing from the stored body's length (wrong whenever an SDK's limit is lower than the server's), or replacing `body_truncated` with two new flags (breaks existing queries, saved views and older SDKs).
+
+## 060. Empty LOGBOX_* variables count as unset
+
+- **Context:** The compose files didn't pass `LOGBOX_SMTP_*` or `LOGBOX_OIDC_*` to the container, so setting them in `deploy/.env` did nothing (and OIDC can only be configured this way). Passing them as `${LOGBOX_SMTP_PORT:-}` would set empty values, which failed to parse for numbers and locked the SMTP fields in the UI to empty.
+- **Choice:** The config loader skips `LOGBOX_*` variables whose value is empty, and SMTP field locking uses the same rule. Both compose files now pass the SMTP and OIDC settings (and, in split mode, the secret key and retention) through; `.env.example` lists them.
+- **Alternatives:** A separate env file per optional feature (more files to explain), or documenting that people must edit the compose file (the bug this fixes).
+
+## 061. "Send test email" saves unsaved settings first
+
+- **Context:** The test endpoint uses the stored SMTP settings, so after editing the form without saving, the test reported on the old settings (for example, a test "sent" to a local catch-all while the form showed a real provider).
+- **Choice:** When the form has unsaved changes, the button reads "Save and send test email", saves, then sends; a line under it says so.
+- **Alternatives:** Letting the test endpoint accept unsaved settings (a second code path for credentials, and the password would have to be sent again), or disabling the button until saved (one more step for the common case).
