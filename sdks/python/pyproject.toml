@@ -31,16 +31,20 @@ dev = [
   "pytest-asyncio>=1.4",
   "ruff>=0.17",
   "mypy>=2.4",
-  "django>=6.1",
-  "starlette>=1.9",
+  # Newest releases need newer Pythons; 3.10 and 3.11 test against the previous lines.
+  "django>=6.1; python_version >= '3.12'",
+  "django>=5.2,<6; python_version < '3.12'",
+  "starlette>=1.9; python_version >= '3.11'",
+  "starlette>=1.0,<1.9; python_version < '3.11'",
   "fastapi>=0.162",
   "httpx>=0.28",
   "celery>=5.6",
 ]
 
 [project.urls]
-Homepage = "https://github.com/karaa1122/trailscope"
-Documentation = "https://github.com/karaa1122/trailscope/blob/main/docs/sdk-python.md"
+Homepage = "https://trailscope.pro"
+Source = "https://github.com/karaa1122/trailscope"
+Documentation = "https://trailscope.pro/docs/sdk-python/"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trailscope"]

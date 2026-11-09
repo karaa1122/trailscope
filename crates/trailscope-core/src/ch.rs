@@ -338,9 +338,15 @@ mod tests {
     #[test]
     fn migration_files_parse_into_statements() {
         let cfg = Config::default();
-        for (_, _, sql) in MIGRATIONS {
+        for (version, name, sql) in MIGRATIONS {
             let stmts = statements(&render(sql, &cfg));
-            assert!(stmts.len() >= 5);
+            // The first migration creates the schema; later ones can be a single ALTER.
+            let min = if *version == 1 { 5 } else { 1 };
+            assert!(
+                stmts.len() >= min,
+                "migration {version} ({name}) has {} statements",
+                stmts.len()
+            );
             assert!(stmts.iter().all(|s| !s.contains("{{")));
         }
     }

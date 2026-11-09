@@ -496,6 +496,8 @@ mod tests {
     #[test]
     fn layers_defaults_file_and_env() {
         figment::Jail::expect_with(|jail| {
+            // Don't let the developer's own TRAILSCOPE_* variables leak in.
+            jail.clear_env();
             jail.create_file(
                 "trailscope.toml",
                 r#"
