@@ -6,6 +6,8 @@
 
 Logbox records each HTTP request (route, timing, status, user, journey keys, and bodies when something goes wrong), plus spans, background jobs and log lines. Tiny SDKs send it in the background without slowing your app down; one Rust binary stores it in ClickHouse and serves a fast, keyboard-first UI. It runs on a single small server and is Apache-2.0 licensed.
 
+> **Status: early release (0.x).** Logbox works end to end and has been load-tested, but it hasn't run in many production setups yet, and the alerting, SDK and single sign-on code has fewer automated tests than the ingest and query core. Expect rough edges and breaking changes before 1.0, and please [open an issue](https://github.com/karaa1122/LogBox/issues) when something doesn't work.
+
 ## Features
 
 - **Live tail** of requests as they happen, with tiles, a route heatmap with release markers, and new or spiking errors.

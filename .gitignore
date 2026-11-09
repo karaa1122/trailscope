@@ -23,3 +23,6 @@ crates/logbox-query/fuzz/corpus/parse/*
 
 crates/logbox-query/fuzz/artifacts/
 .DS_Store
+
+# Personal Claude Code notes (machine paths, working instructions)
+CLAUDE.local.md
