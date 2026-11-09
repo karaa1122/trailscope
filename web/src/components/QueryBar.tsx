@@ -115,6 +115,9 @@ export function QueryBar({ table = 'requests', value, onRun, live = false, range
             <div className="editor-box">
               <Suspense fallback={<div style={{ padding: 10 }}><Skeleton h={22} /></div>}>
                 <SqlEditor
+                  // The placeholder is set when the editor is created, so switching tables recreates it.
+                  key={table}
+                  placeholder={table === 'events' ? "kind = 'job' AND status = 'error'" : undefined}
                   value={draft.text}
                   onChange={(text) => setDraft((d) => ({ ...d, text }))}
                   onRun={() => run()}
@@ -145,6 +148,7 @@ export function QueryBar({ table = 'requests', value, onRun, live = false, range
 
         {draft.mode === 'search' && (
           <SearchInput
+            placeholder={table === 'events' ? 'kind:job status:error "free text"' : 'status:>=500 route:/api/* "free text"'}
             value={draft.text}
             invalid={errors.length > 0}
             onChange={(text) => setDraft((d) => ({ ...d, text }))}
@@ -219,11 +223,13 @@ export function QueryBar({ table = 'requests', value, onRun, live = false, range
 }
 
 function SearchInput({
+  placeholder,
   value,
   invalid,
   onChange,
   onSubmit,
 }: {
+  placeholder: string;
   value: string;
   invalid: boolean;
   onChange: (v: string) => void;
@@ -246,7 +252,7 @@ function SearchInput({
         ref={ref}
         type="text"
         value={value}
-        placeholder='status:>=500 route:/api/* "free text"'
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') onSubmit();

@@ -12,9 +12,11 @@ import { ApiError, api } from '../lib/api';
 import { fmtClock, fmtCompact, fmtInt, fmtMs, fmtPct, num, rangeMs, str } from '../lib/format';
 import { addCondition, fromSearch, toInput, toSearch, type QuerySearch, type QueryValue } from '../lib/query';
 import { useProject, useSession } from '../lib/session';
-import type { ColumnInfo, Row } from '../lib/types';
+import type { ColumnInfo, Row, TableName } from '../lib/types';
 
 export interface ExploreSearch extends QuerySearch {
+  /** Absent means requests, so existing links keep working. */
+  table?: TableName;
   range?: string;
   from?: number;
   to?: number;
@@ -23,13 +25,31 @@ export interface ExploreSearch extends QuerySearch {
   cols?: string;
 }
 
-const DEFAULT_COLS = ['timestamp', 'method', 'status', 'route', 'duration_ms', 'user_id', 'client', 'service'];
-const FACETS = ['service', 'status', 'method', 'route', 'environment', 'client', 'release', 'error_type'];
+const DEFAULT_COLS: Record<TableName, string[]> = {
+  requests: ['timestamp', 'method', 'status', 'route', 'duration_ms', 'user_id', 'client', 'service'],
+  events: ['timestamp', 'service', 'kind', 'name', 'status', 'duration_ms', 'attempt', 'message'],
+};
+const FACETS: Record<TableName, string[]> = {
+  requests: ['service', 'status', 'method', 'route', 'environment', 'client', 'release', 'error_type'],
+  events: ['kind', 'service', 'name', 'status', 'level', 'environment', 'release', 'error_type'],
+};
+const DEFAULT_GROUP: Record<TableName, string> = { requests: 'route', events: 'name' };
+
+/** Request statuses are HTTP codes; event statuses are ok, warn or error. */
+function isError(table: TableName, r: Row): boolean {
+  return table === 'events' ? r.status === 'error' : num(r.status) >= 500;
+}
+
+/** Facet and group values are strings; request status filters need the number. */
+function conditionValue(table: TableName, column: string, v: string): string | number {
+  const n = Number(v);
+  return table === 'requests' && column === 'status' && !Number.isNaN(n) ? n : v;
+}
 
 /** Keeps "now" fixed between refetches so relative ranges don't drift per request. */
 function useRange(search: ExploreSearch): { from: number; to: number; absolute: boolean } {
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => setNow(Date.now()), [search.q, search.mode, search.chips, search.range]);
+  useEffect(() => setNow(Date.now()), [search.q, search.mode, search.chips, search.range, search.table]);
   if (search.from && search.to) return { from: search.from, to: search.to, absolute: true };
   return { from: now - rangeMs(search.range, '1h'), to: now, absolute: false };
 }
@@ -40,8 +60,10 @@ export function Explore({ search }: { search: ExploreSearch }) {
   const navigate = useNavigate();
   const value = useMemo(() => fromSearch(search, 'sql'), [search]);
   const range = useRange(search);
+  const table: TableName = search.table ?? 'requests';
+  const noun = table === 'events' ? 'events' : 'requests';
   const view = search.view ?? 'rows';
-  const cols = search.cols ? search.cols.split(',') : DEFAULT_COLS;
+  const cols = search.cols ? search.cols.split(',') : DEFAULT_COLS[table];
   const [toast, setToast] = useToast();
   const schema = useQuery({ queryKey: ['schema'], queryFn: api.schema, staleTime: Infinity });
 
@@ -50,12 +72,13 @@ export function Explore({ search }: { search: ExploreSearch }) {
 
   const scope = {
     project: project.id,
+    table,
     query: toInput(value),
     from: range.from,
     to: range.to,
     environment,
   };
-  const key = [project.id, environment, JSON.stringify(scope.query), range.from, range.to];
+  const key = [project.id, table, environment, JSON.stringify(scope.query), range.from, range.to];
 
   const hist = useQuery({
     queryKey: ['histogram', ...key],
@@ -68,7 +91,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
   });
   const facets = useQuery({
     queryKey: ['facets', ...key],
-    queryFn: () => api.facets({ ...scope, fields: FACETS.map((column) => ({ column })), limit: 8 }),
+    queryFn: () => api.facets({ ...scope, fields: FACETS[table].map((column) => ({ column })), limit: 8 }),
     placeholderData: keepPreviousData,
   });
   const rows = useInfiniteQuery({
@@ -78,7 +101,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
     getNextPageParam: (last) => last.nextCursor,
     enabled: view === 'rows',
   });
-  const groupBy = search.group ?? 'route';
+  const groupBy = search.group ?? DEFAULT_GROUP[table];
   const groups = useQuery({
     queryKey: ['group', ...key, groupBy],
     queryFn: () => api.group({ ...scope, by: groupBy.includes('.') ? { column: groupBy.split('.')[0]!, key: groupBy.split('.').slice(1).join('.') } : { column: groupBy }, limit: 100 }),
@@ -87,13 +110,15 @@ export function Explore({ search }: { search: ExploreSearch }) {
 
   const queryError = [hist.error, rows.error, groups.error].find((e) => e instanceof ApiError) as ApiError | undefined;
   const allRows = useMemo(() => rows.data?.pages.flatMap((p) => p.rows) ?? [], [rows.data]);
-  const columns: ColumnInfo[] = schema.data?.tables.requests ?? [];
+  const columns: ColumnInfo[] = schema.data?.tables[table] ?? [];
 
   const addFacet = (column: string, v: string) => {
-    const n = Number(v);
-    const next = addCondition(value, { field: column, op: '=', value: column === 'status' && !Number.isNaN(n) ? n : v });
+    const next = addCondition(value, { field: column, op: '=', value: conditionValue(table, column, v) });
     set({ ...toSearch(next) });
   };
+
+  // Columns and the grouping are per table; the query and range carry over.
+  const setTable = (t: TableName) => set({ table: t === 'events' ? 'events' : undefined, cols: undefined, group: undefined });
 
   const saveView = async (v: QueryValue) => {
     const name = window.prompt('Name this view');
@@ -102,7 +127,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
       await api.createView({
         project: project.id,
         name,
-        table: 'requests',
+        table,
         query: toInput(v),
         timeRange: range.absolute ? { from: range.from, to: range.to } : { relative: search.range ?? '1h' },
         columns: cols,
@@ -117,6 +142,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
   return (
     <main className="main">
       <QueryBar
+        table={table}
         value={value}
         onRun={(v) => set({ ...toSearch(v) })}
         range={range}
@@ -126,11 +152,20 @@ export function Explore({ search }: { search: ExploreSearch }) {
         actions={
           <>
             <Segmented
+              label="Data"
+              value={table}
+              onChange={setTable}
+              options={[
+                { id: 'requests', label: 'Requests' },
+                { id: 'events', label: 'Jobs & logs' },
+              ]}
+            />
+            <Segmented
               label="View"
               value={view}
               onChange={(v) => set({ view: v })}
               options={[
-                { id: 'rows', label: 'Requests' },
+                { id: 'rows', label: 'List' },
                 { id: 'group', label: 'Group by' },
               ]}
             />
@@ -152,8 +187,8 @@ export function Explore({ search }: { search: ExploreSearch }) {
 
       <section aria-label="Histogram" className="panel panel-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="panel-head">
-          <h2 className="panel-title">{hist.data ? `${fmtInt(hist.data.total)} requests` : 'Requests'}</h2>
-          <span className="panel-sub">drag to zoom · counts include sampling</span>
+          <h2 className="panel-title">{hist.data ? `${fmtInt(hist.data.total)} ${noun}` : table === 'events' ? 'Events' : 'Requests'}</h2>
+          <span className="panel-sub">{table === 'events' ? 'drag to zoom' : 'drag to zoom · counts include sampling'}</span>
           <span style={{ marginLeft: 'auto' }}>{hist.data && <Legend series={hist.data.series} />}</span>
         </div>
         {hist.data ? (
@@ -173,7 +208,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
 
       <div className="row wrap" style={{ gap: 16, alignItems: 'flex-start' }}>
         <aside aria-label="Facets" className="panel" style={{ flex: '1 1 240px', maxWidth: '100%', minWidth: 0 }}>
-          {FACETS.map((f) => {
+          {FACETS[table].map((f) => {
             const facet = facets.data?.facets.find((x) => x.field === f);
             const total = facet?.values.reduce((a, b) => a + b.count, 0) ?? 0;
             return (
@@ -197,7 +232,13 @@ export function Explore({ search }: { search: ExploreSearch }) {
                       style={{ position: 'absolute', left: 0, top: 4, bottom: 4, width: `${total ? (v.count / total) * 100 : 0}%`, background: 'var(--raised)', borderRadius: 4 }}
                     />
                     <span className="mono ellipsis" style={{ position: 'relative', fontSize: 12 }}>
-                      {f === 'status' ? <StatusPill status={Number(v.value)} /> : v.value || '(empty)'}
+                      {f === 'status' && table === 'requests' ? (
+                        <StatusPill status={Number(v.value)} />
+                      ) : f === 'status' && v.value ? (
+                        <EventStatusPill status={v.value} />
+                      ) : (
+                        v.value || '(empty)'
+                      )}
                     </span>
                     <span className="nav-hint" style={{ position: 'relative' }}>
                       {fmtCompact(v.count)}
@@ -213,7 +254,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
           {view === 'rows' ? (
             <>
               <div className="panel-bar">
-                <h2 className="panel-title">Requests</h2>
+                <h2 className="panel-title">{table === 'events' ? 'Events' : 'Requests'}</h2>
                 <span className="panel-sub">
                   {fmtInt(allRows.length)} loaded{rows.hasNextPage ? ' · scroll for more' : ''}
                 </span>
@@ -222,6 +263,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
                 </span>
               </div>
               <ResultsTable
+                table={table}
                 rows={allRows}
                 cols={cols}
                 columns={columns}
@@ -232,13 +274,16 @@ export function Explore({ search }: { search: ExploreSearch }) {
                   void navigate({
                     to: '/requests/$requestId',
                     params: { requestId: str(r.request_id) },
-                    search: { ...toSearch(value), from: range.from, to: range.to },
+                    // The inspector lists nearby requests with this filter, so an events query stays behind.
+                    search: table === 'events' ? { from: range.from, to: range.to } : { ...toSearch(value), from: range.from, to: range.to },
                   })
                 }
               />
             </>
           ) : (
             <GroupView
+              noun={noun}
+              table={table}
               columns={columns}
               groupBy={groupBy}
               onGroupBy={(g) => set({ group: g })}
@@ -246,8 +291,7 @@ export function Explore({ search }: { search: ExploreSearch }) {
               data={groups.data?.groups ?? []}
               onPick={(v) => {
                 const [column, key] = groupBy.includes('.') ? [groupBy.split('.')[0]!, groupBy.split('.').slice(1).join('.')] : [groupBy, undefined];
-                const n = Number(v);
-                set({ ...toSearch(addCondition(value, { field: column, key, op: '=', value: column === 'status' && !Number.isNaN(n) ? n : v })), view: 'rows' });
+                set({ ...toSearch(addCondition(value, { field: column, key, op: '=', value: conditionValue(table, column, v) })), view: 'rows' });
               }}
             />
           )}
@@ -299,8 +343,14 @@ function width(col: string): string {
       return '66px';
     case 'status':
       return '62px';
+    case 'kind':
+    case 'level':
+    case 'attempt':
+      return '72px';
     case 'route':
     case 'path':
+    case 'name':
+    case 'message':
     case 'error_message':
     case 'user_agent':
       return 'minmax(200px, 1fr)';
@@ -311,20 +361,28 @@ function width(col: string): string {
   }
 }
 
-function Cell({ col, value }: { col: string; value: unknown }) {
+function EventStatusPill({ status }: { status: string }) {
+  return <span className={`pill ${status === 'error' ? 's5' : status === 'warn' ? 's4' : 's2'}`}>{status}</span>;
+}
+
+function Cell({ table, col, value }: { table: TableName; col: string; value: unknown }) {
   if (col === 'timestamp') return <span className="cell-mono muted">{fmtClock(num(value))}</span>;
-  if (col === 'status') return <StatusPill status={num(value)} />;
+  if (col === 'status' && table === 'requests') return <StatusPill status={num(value)} />;
+  if (col === 'status' && str(value)) return <EventStatusPill status={str(value)} />;
   if (col === 'duration_ms') return <span className="cell-mono" style={{ textAlign: 'right' }}>{fmtMs(num(value))}</span>;
   if (col === 'method') return <span className="cell-mono" style={{ fontWeight: 600, color: 'var(--text-2)' }}>{str(value)}</span>;
   const s = typeof value === 'object' && value !== null ? JSON.stringify(value) : str(value);
+  // The column that names the row: the route of a request, the job or logger name of an event.
+  const main = col === (table === 'events' ? 'name' : 'route');
   return (
-    <span className={`cell-mono ellipsis${col === 'route' ? '' : ' muted'}`} style={col === 'route' ? { fontSize: 13 } : undefined} title={s}>
+    <span className={`cell-mono ellipsis${main ? '' : ' muted'}`} style={main ? { fontSize: 13 } : undefined} title={s}>
       {s || '—'}
     </span>
   );
 }
 
 function ResultsTable({
+  table,
   rows,
   cols,
   loading,
@@ -332,6 +390,7 @@ function ResultsTable({
   loadMore,
   onOpen,
 }: {
+  table: TableName;
   rows: Row[];
   cols: string[];
   columns: ColumnInfo[];
@@ -358,7 +417,7 @@ function ResultsTable({
     );
   }
   if (rows.length === 0) {
-    return <Empty title="No matching requests">Widen the time range or remove a condition.</Empty>;
+    return <Empty title={table === 'events' ? 'No matching events' : 'No matching requests'}>Widen the time range or remove a condition.</Empty>;
   }
   return (
     <div className="scroll-x">
@@ -372,18 +431,29 @@ function ResultsTable({
           <div style={{ height: v.getTotalSize(), position: 'relative' }}>
             {items.map((item) => {
               const r = rows[item.index]!;
+              // Jobs and log events open the request that started them, when there is one.
+              const link = str(r.request_id) !== '';
               return (
                 <div
                   key={item.key}
-                  role="link"
-                  tabIndex={0}
-                  className={`table-row${num(r.status) >= 500 ? ' err' : ''}`}
-                  onClick={() => onOpen(r)}
-                  onKeyDown={(e) => e.key === 'Enter' && onOpen(r)}
-                  style={{ gridTemplateColumns: template, position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${item.start}px)` }}
+                  role={link ? 'link' : undefined}
+                  tabIndex={link ? 0 : undefined}
+                  title={link && table === 'events' ? 'Open the request that started this' : undefined}
+                  className={`table-row${isError(table, r) ? ' err' : ''}`}
+                  onClick={link ? () => onOpen(r) : undefined}
+                  onKeyDown={link ? (e) => e.key === 'Enter' && onOpen(r) : undefined}
+                  style={{
+                    gridTemplateColumns: template,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${item.start}px)`,
+                    cursor: link ? undefined : 'default',
+                  }}
                 >
                   {cols.map((c) => (
-                    <Cell key={c} col={c} value={r[c]} />
+                    <Cell key={c} table={table} col={c} value={r[c]} />
                   ))}
                 </div>
               );
@@ -396,6 +466,8 @@ function ResultsTable({
 }
 
 function GroupView({
+  noun,
+  table,
   columns,
   groupBy,
   onGroupBy,
@@ -403,6 +475,8 @@ function GroupView({
   loading,
   onPick,
 }: {
+  noun: string;
+  table: TableName;
   columns: ColumnInfo[];
   groupBy: string;
   onGroupBy: (g: string) => void;
@@ -425,21 +499,21 @@ function GroupView({
               </option>
             ))}
         </select>
-        <span className="panel-sub">count · 5xx rate · latency percentiles</span>
+        <span className="panel-sub">{table === 'events' ? 'count · error rate · duration percentiles' : 'count · 5xx rate · latency percentiles'}</span>
       </div>
       {loading ? (
         <div style={{ padding: 18 }}>
           <Skeleton h={160} />
         </div>
       ) : data.length === 0 ? (
-        <Empty title="Nothing to group">No requests match in this range.</Empty>
+        <Empty title="Nothing to group">No {noun} match in this range.</Empty>
       ) : (
         <div className="scroll-x">
           <div style={{ minWidth: 760 }}>
             <div className="table-head" style={{ gridTemplateColumns: cols }}>
               <span>{groupBy}</span>
               <span>Count</span>
-              <span>5xx</span>
+              <span>{table === 'events' ? 'Errors' : '5xx'}</span>
               <span>p50</span>
               <span>p95</span>
               <span>p99</span>

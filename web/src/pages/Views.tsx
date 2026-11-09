@@ -43,6 +43,7 @@ export function Views() {
       to: '/explore',
       search: {
         ...toSearch(asValue(v)),
+        table: v.table === 'events' ? 'events' : undefined,
         range: tr.relative,
         from: tr.relative ? undefined : tr.from,
         to: tr.relative ? undefined : tr.to,

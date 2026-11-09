@@ -9,7 +9,7 @@ Logbox records each HTTP request (route, timing, status, user, journey keys, and
 ## Features
 
 - **Live tail** of requests as they happen, with tiles, a route heatmap with release markers, and new or spiking errors.
-- **Explore with a SQL `WHERE` filter** (`status >= 500 AND route LIKE '/checkout/%'`), a quick search syntax (`status:5xx user:u_42`) or filter chips, all shareable by URL. Group by any column with p50/p95/p99.
+- **Explore with a SQL `WHERE` filter** (`status >= 500 AND route LIKE '/checkout/%'`), a quick search syntax (`status:5xx user:u_42`) or filter chips, all shareable by URL. Group by any column with p50/p95/p99. Switch to jobs and log events to filter and group those the same way.
 - **Request inspector:** headers, bodies, the error and its stack, a timing waterfall, nearby requests, copy as cURL and replay to an allowed target.
 - **Journeys:** everything that happened for one account, order, session or user, across services and background jobs, on one timeline.
 - **Errors** grouped by fingerprint, with first and last seen, users affected, the release that introduced them and trends.

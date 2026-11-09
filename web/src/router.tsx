@@ -73,6 +73,7 @@ const exploreRoute = createRoute({
   path: '/explore',
   validateSearch: (raw: Record<string, unknown>): ExploreSearch => ({
     ...parseQuerySearch(raw),
+    table: raw.table === 'events' ? 'events' : undefined,
     range: strParam(raw.range),
     from: numParam(raw.from),
     to: numParam(raw.to),
