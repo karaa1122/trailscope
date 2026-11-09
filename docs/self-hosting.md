@@ -17,7 +17,7 @@ For reference, one `trailscope all` process limited to 4 CPUs ingested 50,000 ev
 ## Install with Docker Compose
 
 ```bash
-git clone https://github.com/karaa1122/trailscope && cd Trailscope/deploy
+git clone https://github.com/karaa1122/trailscope && cd trailscope/deploy
 cp .env.example .env        # set TRAILSCOPE_PUBLIC_URL, TRAILSCOPE_SECRET_KEY and the three passwords
 docker compose up -d
 ```
@@ -85,7 +85,7 @@ The UI and API are on port 8080 and ingest on 8081 (point SDKs there). Scale ing
 ## Upgrades
 
 ```bash
-cd Trailscope && git pull && cd deploy     # or bump TRAILSCOPE_IMAGE
+cd trailscope && git pull && cd deploy     # or bump TRAILSCOPE_IMAGE
 docker compose up -d --build
 ```
 

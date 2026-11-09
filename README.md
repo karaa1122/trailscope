@@ -1,10 +1,21 @@
-# Trailscope
+# <img src="docs/images/logo.svg" width="32" height="32" alt=""> Trailscope
+
+[![CI](https://github.com/karaa1122/trailscope/actions/workflows/ci.yml/badge.svg)](https://github.com/karaa1122/trailscope/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/trailscope?label=pypi%20trailscope)](https://pypi.org/project/trailscope/)
+[![npm](https://img.shields.io/npm/v/@trailscope/node?label=npm%20%40trailscope%2Fnode)](https://www.npmjs.com/package/@trailscope/node)
 
 **Self-hosted API request logging: see every request your services handle, query them with SQL, and follow one customer's journey across services and background jobs.**
 
 ![Live tail with tiles, the route heatmap and new errors](docs/images/live-tail.png)
 
-Trailscope records each HTTP request (route, timing, status, user, journey keys, and bodies when something goes wrong), plus spans, background jobs and log lines. Tiny SDKs send it in the background without slowing your app down; one Rust binary stores it in ClickHouse and serves a fast, keyboard-first UI. It runs on a single small server and is Apache-2.0 licensed.
+## Why Trailscope
+
+- **Debug the request, not a log line.** Open any request to see what was sent and answered, the error with its stack, and where the time went. Copy it as cURL or replay it against staging.
+- **Follow one customer across everything.** Journeys put the requests, background jobs and log lines for one user, order or session on a single timeline.
+- **Search the way you think.** A SQL `WHERE` filter or a quick search over every field, answered in well under a second on 100 million requests.
+- **Your data stays on your server.** One Rust binary plus ClickHouse and Postgres runs on a small machine, with no outside service involved. Apache-2.0.
+- **It doesn't slow your app down.** The SDKs add at most 0.05 ms per request, send in the background, and hide passwords and tokens before anything leaves the process.
 
 > **Status: early release (0.x).** Trailscope works end to end and has been load-tested, but it hasn't run in many production setups yet, and the alerting, SDK and single sign-on code has fewer automated tests than the ingest and query core. Expect rough edges and breaking changes before 1.0, and please [open an issue](https://github.com/karaa1122/trailscope/issues) when something doesn't work.
 
@@ -24,7 +35,7 @@ Trailscope records each HTTP request (route, timing, status, user, journey keys,
 ## Quickstart (about a minute)
 
 ```bash
-git clone https://github.com/karaa1122/trailscope && cd Trailscope/deploy
+git clone https://github.com/karaa1122/trailscope && cd trailscope/deploy
 docker compose up -d        # builds the image the first time; set TRAILSCOPE_IMAGE to use a published one
 ```
 
