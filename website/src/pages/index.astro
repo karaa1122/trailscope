@@ -5,7 +5,7 @@ import CodeTabs from '../components/CodeTabs.astro';
 import Icon from '../components/Icon.astro';
 import Keys from '../components/Keys.astro';
 import Waitlist from '../components/Waitlist.astro';
-import { REPO } from '../site';
+import { IMAGE, REGISTRIES, REPO } from '../site';
 
 import liveTail from '../../../docs/images/live-tail.png';
 import inspector from '../../../docs/images/inspector.png';
@@ -15,6 +15,7 @@ import routes from '../../../docs/images/routes.png';
 
 const quickstart = `git clone ${REPO}
 cd trailscope/deploy
+echo TRAILSCOPE_IMAGE=${IMAGE}:latest >> .env
 docker compose up -d`;
 
 const more = [
@@ -252,6 +253,17 @@ const more = [
         Then call <code>setUser(id)</code> or <code>setCorrelation('order_id', id)</code> anywhere in a
         request to make it part of a journey. <a href="/docs/sdk-spec/">All SDKs</a>
       </p>
+      <ul class="registries" aria-label="Where the SDKs are published">
+        {
+          REGISTRIES.map((r) => (
+            <li>
+              <a href={r.href}>
+                {r.name} <code>{r.pkg}</code>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
     </div>
   </section>
 
@@ -328,7 +340,10 @@ const more = [
       <ol class="steps">
         <li>
           <h3>Start it</h3>
-          <p>Trailscope, ClickHouse and Postgres in one Compose file.</p>
+          <p>
+            Trailscope, ClickHouse and Postgres in one Compose file, with the{' '}
+            <a href={`${REPO}/pkgs/container/trailscope`}>published server image</a>.
+          </p>
           <div class="snippet">
             <pre>{quickstart}</pre>
             <button class="copy" type="button" data-copy={quickstart} aria-label="Copy the commands">
@@ -366,7 +381,8 @@ TRAILSCOPE_INGEST_KEY=trs_ingest_…</pre>
           <span class="tag">Self-hosted</span>
           <h3>Free, forever, with everything</h3>
           <p>
-            Every feature, no limits and no license key. Your data never leaves your servers. Apache-2.0.
+            Every feature, no limits and no license key. Your data never leaves your servers. AGPL-3.0,
+            with Apache-2.0 SDKs.
           </p>
           <a class="btn" href="/docs/self-hosting/">Read the self-hosting guide</a>
         </div>

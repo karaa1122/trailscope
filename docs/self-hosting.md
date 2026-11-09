@@ -24,7 +24,7 @@ docker compose up -d
 
 Open `TRAILSCOPE_PUBLIC_URL` (http://localhost:8080 by default). The setup wizard creates the owner account and the first project, shows its ingest key once, and has copy-paste snippets for every SDK. Migrations run automatically at startup.
 
-The compose file builds the image from source the first time (several minutes). To use a published image instead, set `TRAILSCOPE_IMAGE=ghcr.io/karaa1122/trailscope:<version>` in `.env`.
+Set `TRAILSCOPE_IMAGE=ghcr.io/karaa1122/trailscope:<version>` in `.env` (for example `0.1.0`; images for linux/amd64 and arm64 are listed on the [package page](https://github.com/karaa1122/trailscope/pkgs/container/trailscope)) to pull the published image. Without it, the compose file builds the image from source the first time, which takes several minutes.
 
 ClickHouse is started with `deploy/clickhouse/config.d/low-memory.xml`, tuned for a 2–4 GB machine (smaller caches, fewer background threads, short internal logs). On a machine with 16 GB or more you can remove that mount.
 
@@ -85,8 +85,10 @@ The UI and API are on port 8080 and ingest on 8081 (point SDKs there). Scale ing
 ## Upgrades
 
 ```bash
-cd trailscope && git pull && cd deploy     # or bump TRAILSCOPE_IMAGE
-docker compose up -d --build
+cd trailscope && git pull && cd deploy
+docker compose up -d --build               # building from source
+# or, with a published image: bump the version in TRAILSCOPE_IMAGE, then
+docker compose pull trailscope && docker compose up -d
 ```
 
 Migrations are applied at startup and are forward-only, so back up Postgres before upgrading across minor versions. Retention changes (`TRAILSCOPE_RETENTION_DAYS`, `TRAILSCOPE_RETENTION_BODY_DAYS`) are applied to the ClickHouse TTLs on the next start, without rewriting data.

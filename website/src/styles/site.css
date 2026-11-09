@@ -679,6 +679,37 @@ html:not(.js) .tabpanel[hidden] {
   color: var(--text-2);
   font-size: 14px;
 }
+.registries {
+  list-style: none;
+  padding: 0;
+  margin: 16px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.registries a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-mid);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition:
+    border-color 150ms var(--ease),
+    color 150ms var(--ease);
+}
+.registries a:hover {
+  border-color: var(--line-focus);
+  color: var(--text);
+}
+.registries code {
+  font: 400 13px/1.4 var(--mono);
+  color: var(--text-2);
+}
 
 /* ---------- stats ---------- */
 
