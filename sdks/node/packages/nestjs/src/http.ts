@@ -2,10 +2,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { Catch, type ArgumentsHost, type CallHandler, type ExecutionContext, Inject, Injectable, type NestInterceptor, type NestMiddleware } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
-import { type LogboxClient, type LogboxContext, clientIp, contextOf, enterContext, observeHttp, recordError } from '@logbox/node';
+import { type TrailscopeClient, type TrailscopeContext, clientIp, contextOf, enterContext, observeHttp, recordError } from '@trailscope/node';
 import { type Observable, catchError, throwError } from 'rxjs';
 
-import { LOGBOX_CLIENT } from './tokens.js';
+import { TRAILSCOPE_CLIENT } from './tokens.js';
 
 /** Express request, Fastify request or the raw Node request, depending on the platform. */
 interface AnyRequest {
@@ -16,11 +16,11 @@ interface AnyRequest {
   routeOptions?: { url?: string };
 }
 
-const BODY = Symbol.for('logbox.nestjs.body');
+const BODY = Symbol.for('trailscope.nestjs.body');
 type Raw = IncomingMessage & { [BODY]?: unknown };
 
-/** The Logbox context of a Nest request, on Express or Fastify. */
-export function contextOfRequest(req: AnyRequest | undefined): LogboxContext | undefined {
+/** The Trailscope context of a Nest request, on Express or Fastify. */
+export function contextOfRequest(req: AnyRequest | undefined): TrailscopeContext | undefined {
   return contextOf(req?.raw ?? req);
 }
 
@@ -30,12 +30,12 @@ function routeOf(req: AnyRequest): string | undefined {
 }
 
 /**
- * Builds the context and records every request. `LogboxModule` applies it to
+ * Builds the context and records every request. `TrailscopeModule` applies it to
  * all routes. It receives the raw Node request on both platforms.
  */
 @Injectable()
-export class LogboxMiddleware implements NestMiddleware {
-  constructor(@Inject(LOGBOX_CLIENT) private readonly client: LogboxClient) {}
+export class TrailscopeMiddleware implements NestMiddleware {
+  constructor(@Inject(TRAILSCOPE_CLIENT) private readonly client: TrailscopeClient) {}
 
   use(req: IncomingMessage, res: ServerResponse, next: (error?: unknown) => void): void {
     const r = req as Raw & AnyRequest;
@@ -52,7 +52,7 @@ export class LogboxMiddleware implements NestMiddleware {
  * parses bodies outside it), and records exceptions thrown by handlers.
  */
 @Injectable()
-export class LogboxInterceptor implements NestInterceptor {
+export class TrailscopeInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== 'http') return next.handle();
     const req = context.switchToHttp().getRequest<AnyRequest>();
@@ -73,10 +73,10 @@ export class LogboxInterceptor implements NestInterceptor {
 /**
  * Records any exception (also from guards, pipes and middleware), then
  * answers exactly like Nest's default handler. Enable it with
- * `LogboxModule.forRoot({ exceptionFilter: true })`, or extend it.
+ * `TrailscopeModule.forRoot({ exceptionFilter: true })`, or extend it.
  */
 @Catch()
-export class LogboxExceptionFilter extends BaseExceptionFilter {
+export class TrailscopeExceptionFilter extends BaseExceptionFilter {
   override catch(exception: unknown, host: ArgumentsHost): void {
     if (host.getType() === 'http') recordError(exception, contextOfRequest(host.switchToHttp().getRequest<AnyRequest>()));
     super.catch(exception, host);

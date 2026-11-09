@@ -1,7 +1,7 @@
 {
-  "name": "@logbox/express",
+  "name": "@trailscope/express",
   "version": "0.1.0",
-  "description": "Logbox middleware for Express: request logging, error capture and context",
+  "description": "Trailscope middleware for Express: request logging, error capture and context",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -17,7 +17,7 @@
   "engines": { "node": ">=18" },
   "sideEffects": false,
   "publishConfig": { "access": "public", "provenance": true },
-  "repository": { "type": "git", "url": "https://github.com/karaa1122/LogBox", "directory": "sdks/node/packages/express" },
+  "repository": { "type": "git", "url": "https://github.com/karaa1122/trailscope", "directory": "sdks/node/packages/express" },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "lint": "eslint src",
@@ -26,7 +26,7 @@
     "bench": "node bench/overhead.mjs"
   },
   "dependencies": {
-    "@logbox/node": "workspace:^"
+    "@trailscope/node": "workspace:^"
   },
   "peerDependencies": {
     "express": "^4.17.0 || ^5.0.0"

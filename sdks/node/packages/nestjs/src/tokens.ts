@@ -1,20 +1,20 @@
-import type { Level, LogboxClient, LogboxOptions } from '@logbox/node';
+import type { Level, TrailscopeClient, TrailscopeOptions } from '@trailscope/node';
 
-/** Injection token for the `LogboxClient`. */
-export const LOGBOX_CLIENT = Symbol.for('logbox.nestjs.client');
-export const LOGBOX_MODULE_OPTIONS = Symbol.for('logbox.nestjs.options');
+/** Injection token for the `TrailscopeClient`. */
+export const TRAILSCOPE_CLIENT = Symbol.for('trailscope.nestjs.client');
+export const TRAILSCOPE_MODULE_OPTIONS = Symbol.for('trailscope.nestjs.options');
 
-export interface LogboxModuleOptions extends LogboxOptions {
+export interface TrailscopeModuleOptions extends TrailscopeOptions {
   /** Use this client instead of creating the process-wide one with `init()`. */
-  client?: LogboxClient;
+  client?: TrailscopeClient;
   /**
-   * Register `LogboxExceptionFilter` globally, so errors thrown in guards,
+   * Register `TrailscopeExceptionFilter` globally, so errors thrown in guards,
    * pipes and middleware are recorded too. It keeps Nest's default error
    * responses. Leave it off if you have your own catch-all filter and call
    * `recordError()` there instead. Default false.
    */
   exceptionFilter?: boolean;
-  /** Lowest level the `LogboxLogger` bridge forwards to Logbox. Default `info`. */
+  /** Lowest level the `TrailscopeLogger` bridge forwards to Trailscope. Default `info`. */
   loggerLevel?: Level;
   /** Logger contexts not forwarded. Default: Nest's startup contexts. */
   loggerIgnoreContexts?: string[];

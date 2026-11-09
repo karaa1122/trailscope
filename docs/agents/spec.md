@@ -1,6 +1,6 @@
-# Logbox build spec (original brief)
+# Build spec (original brief)
 
-This is the brief the project is being built from, kept verbatim so any agent can pick up the work. The follow-up brief for email notifications is in [spec-email-notifications.md](spec-email-notifications.md). Progress and conventions are in [/AGENTS.md](../../AGENTS.md).
+This is the brief the project was built from, kept verbatim so any agent can pick up the work. "Logbox" was the working name; the project is now called Trailscope (decision 062), so read Logbox, `logbox` and `LOGBOX_` below as Trailscope, `trailscope` and `TRAILSCOPE_`. The follow-up brief for email notifications is in [spec-email-notifications.md](spec-email-notifications.md). Progress and conventions are in [/AGENTS.md](../../AGENTS.md).
 
 ---
 

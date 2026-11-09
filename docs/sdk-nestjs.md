@@ -1,61 +1,61 @@
-# NestJS: `@logbox/nestjs`
+# NestJS: `@trailscope/nestjs`
 
-Request logging, error capture, a `Logger` bridge and BullMQ job tracking for NestJS 11 and 12, on the Express or Fastify platform. Built on [`@logbox/node`](sdk-node.md); shared behaviour is in [sdk-spec.md](sdk-spec.md).
+Request logging, error capture, a `Logger` bridge and BullMQ job tracking for NestJS 11 and 12, on the Express or Fastify platform. Built on [`@trailscope/node`](sdk-node.md); shared behaviour is in [sdk-spec.md](sdk-spec.md).
 
 ```bash
-npm install @logbox/nestjs
+npm install @trailscope/nestjs
 ```
 
 ```ts
 // app.module.ts
-@Module({ imports: [LogboxModule.forRoot({ service: 'orders-api' })] })
+@Module({ imports: [TrailscopeModule.forRoot({ service: 'orders-api' })] })
 export class AppModule {}
 
 // main.ts
 const app = await NestFactory.create(AppModule, { bufferLogs: true });
-app.useLogger(app.get(LogboxLogger));   // optional: Logger calls become Logbox events
+app.useLogger(app.get(TrailscopeLogger));   // optional: Logger calls become Trailscope events
 app.enableShutdownHooks();              // flush on SIGTERM
 await app.listen(3000);
 ```
 
 ## Module
 
-`LogboxModule.forRoot(options)` is global. It:
+`TrailscopeModule.forRoot(options)` is global. It:
 
-- applies `LogboxMiddleware` to every route: it builds the context from `X-Request-Id` and `traceparent`, returns the request ID and records each request when the response closes;
-- registers `LogboxInterceptor` globally: it sets the route pattern (`/orders/:id`, including the global prefix), enters the context again after body parsing (needed on Fastify), and records exceptions thrown by handlers;
-- provides the client (`@Inject(LOGBOX_CLIENT) client: LogboxClient`) and `LogboxLogger`;
+- applies `TrailscopeMiddleware` to every route: it builds the context from `X-Request-Id` and `traceparent`, returns the request ID and records each request when the response closes;
+- registers `TrailscopeInterceptor` globally: it sets the route pattern (`/orders/:id`, including the global prefix), enters the context again after body parsing (needed on Fastify), and records exceptions thrown by handlers;
+- provides the client (`@Inject(TRAILSCOPE_CLIENT) client: TrailscopeClient`) and `TrailscopeLogger`;
 - flushes the client on application shutdown.
 
-Options are the [`@logbox/node` options](sdk-node.md#options), plus:
+Options are the [`@trailscope/node` options](sdk-node.md#options), plus:
 
 | Option | Default | |
 |---|---|---|
-| `client` | | Use an existing `LogboxClient` |
-| `exceptionFilter` | `false` | Register `LogboxExceptionFilter` globally (see below) |
-| `loggerLevel` | `'info'` | Lowest level `LogboxLogger` forwards |
+| `client` | | Use an existing `TrailscopeClient` |
+| `exceptionFilter` | `false` | Register `TrailscopeExceptionFilter` globally (see below) |
+| `loggerLevel` | `'info'` | Lowest level `TrailscopeLogger` forwards |
 | `loggerIgnoreContexts` | Nest's startup contexts and `ExceptionsHandler` | Logger contexts not forwarded |
 
-`LogboxModule.forRootAsync({ imports, inject, useFactory, exceptionFilter })` takes the options from other providers, such as `ConfigService`.
+`TrailscopeModule.forRootAsync({ imports, inject, useFactory, exceptionFilter })` takes the options from other providers, such as `ConfigService`.
 
 ## Errors
 
 The interceptor records exceptions thrown by controllers. Exceptions thrown earlier, in guards, pipes or middleware, are seen only by exception filters:
 
-- With `exceptionFilter: true`, `LogboxExceptionFilter` (a `BaseExceptionFilter`) records every exception and then answers exactly like Nest's default handler.
+- With `exceptionFilter: true`, `TrailscopeExceptionFilter` (a `BaseExceptionFilter`) records every exception and then answers exactly like Nest's default handler.
 - If you have your own catch-all filter, call `recordError(exception, contextOfRequest(request))` in it instead.
 
 Error details are kept for 5xx responses only: `NotFoundException`, `ForbiddenException` and other 4xx outcomes are recorded as requests without an error.
 
 ## Logger bridge
 
-`LogboxLogger` is a `ConsoleLogger` that also sends each line at `loggerLevel` or above to Logbox as a `log` event, named after the logger's context, with the current request's IDs, user and correlation keys. `logger.error(message, stack)` keeps the stack and takes the error type from its first line.
+`TrailscopeLogger` is a `ConsoleLogger` that also sends each line at `loggerLevel` or above to Trailscope as a `log` event, named after the logger's context, with the current request's IDs, user and correlation keys. `logger.error(message, stack)` keeps the stack and takes the error type from its first line.
 
 ## BullMQ
 
 ```ts
 // Producer: carry the request's context in the job data.
-await queue.add('invoice.send', withLogboxContext({ invoiceId }));
+await queue.add('invoice.send', withTrailscopeContext({ invoiceId }));
 
 // @nestjs/bullmq processor
 @Processor('invoices')

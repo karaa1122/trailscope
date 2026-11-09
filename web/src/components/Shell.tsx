@@ -50,7 +50,7 @@ export function Shell() {
 
   useHotkeys({
     'mod+k': () => setPalette((o) => !o),
-    '/': () => window.dispatchEvent(new Event('logbox:focus-query')),
+    '/': () => window.dispatchEvent(new Event('trailscope:focus-query')),
     'g l': () => void navigate({ to: '/live' }),
     'g e': () => void navigate({ to: '/explore' }),
     'g j': () => void navigate({ to: '/journeys' }),
@@ -76,7 +76,7 @@ function isActive(pathname: string, to: string): boolean {
 function Rail({ pathname }: { pathname: string }) {
   return (
     <nav aria-label="Main" className="rail">
-      <Link to="/live" aria-label="Logbox home" style={{ marginBottom: 10 }}>
+      <Link to="/live" aria-label="Trailscope home" style={{ marginBottom: 10 }}>
         <Logo />
       </Link>
       {NAV.slice(0, 6).map((n) => (
@@ -114,7 +114,7 @@ function Sidebar({ pathname }: { pathname: string }) {
     <aside className="sidebar">
       <Link to="/live" className="logo">
         <Logo />
-        <span className="logo-word">logbox</span>
+        <span className="logo-word">trailscope</span>
       </Link>
 
       <ProjectSwitcher serviceCount={services.data?.length ?? 0} />

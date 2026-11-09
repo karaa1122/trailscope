@@ -1,5 +1,5 @@
 {
-  "name": "@logbox/example-nestjs",
+  "name": "@trailscope/example-nestjs",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@logbox/nestjs": "workspace:^",
+    "@trailscope/nestjs": "workspace:^",
     "@nestjs/bullmq": "12.0.0",
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",

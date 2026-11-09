@@ -1,4 +1,4 @@
-# The SDK from this repository; use `logbox` from PyPI in your own app.
+# The SDK from this repository; use `trailscope` from PyPI in your own app.
 -e ../../sdks/python
 django==6.1.2
 celery[redis]==5.6.3

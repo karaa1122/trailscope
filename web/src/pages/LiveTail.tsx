@@ -385,7 +385,7 @@ function StreamTable({
         </div>
         {rows.length === 0 ? (
           <Empty title="Waiting for requests">
-            Matching requests stream in here as they happen. Send traffic with an SDK, or run <span className="mono">logbox demo</span>.
+            Matching requests stream in here as they happen. Send traffic with an SDK, or run <span className="mono">trailscope demo</span>.
           </Empty>
         ) : (
           <div ref={parent} style={{ height: Math.min(560, rows.length * 40 + 2), overflowY: 'auto' }}>

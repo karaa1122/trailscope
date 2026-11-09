@@ -1,21 +1,21 @@
 # Examples
 
-Small apps wired to the Logbox SDKs. Each one serves the same few routes under `/projects/:projectId/…`: a list, a create that starts a background job, an endpoint that throws (a 500 with a stack), and a health check that isn't recorded.
+Small apps wired to the Trailscope SDKs. Each one serves the same few routes under `/projects/:projectId/…`: a list, a create that starts a background job, an endpoint that throws (a 500 with a stack), and a health check that isn't recorded.
 
 | Example | Shows |
 |---|---|
 | [express](express) | middleware, error handler, `setUser`/`setCorrelation`, a span, an in-process job |
 | [fastify](fastify) | plugin, context in handlers after body parsing, an in-process job |
-| [nestjs](nestjs) | `LogboxModule`, exception filter, `LogboxLogger`, guards setting the user, BullMQ with `withLogboxContext` and `@TrackJob` (Express or Fastify platform) |
-| [fastapi](fastapi) | ASGI middleware, `LogboxHandler`, a span, an async job |
+| [nestjs](nestjs) | `TrailscopeModule`, exception filter, `TrailscopeLogger`, guards setting the user, BullMQ with `withTrailscopeContext` and `@TrackJob` (Express or Fastify platform) |
+| [fastapi](fastapi) | ASGI middleware, `TrailscopeHandler`, a span, an async job |
 | [django](django) | middleware and settings, `LOGGING`, Celery tasks with retries |
 
 ## Running them
 
-Start Logbox (`docker compose up -d` in `deploy/`), create a project and copy its ingest key, then:
+Start Trailscope (`docker compose up -d` in `deploy/`), create a project and copy its ingest key, then:
 
 ```bash
-export LOGBOX_ENDPOINT=http://localhost:8080 LOGBOX_INGEST_KEY=lbx_ingest_…
+export TRAILSCOPE_ENDPOINT=http://localhost:8080 TRAILSCOPE_INGEST_KEY=trs_ingest_…
 
 # Node examples (from the repository root)
 pnpm install && pnpm --filter "./sdks/node/**" build

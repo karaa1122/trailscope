@@ -1,8 +1,8 @@
 # AGENTS.md: notes for coding agents and contributors
 
-Read this before changing Logbox. It covers what the project is, its conventions, how to run it locally and where things live. Keep it current when the architecture changes.
+Read this before changing Trailscope. It covers what the project is, its conventions, how to run it locally and where things live. Keep it current when the architecture changes.
 
-## What Logbox is
+## What Trailscope is
 
 An open-source, self-hosted API request logging tool: a Rust server with ClickHouse and Postgres, a React UI embedded in the binary, and Node and Python SDKs. It must stay domain-neutral: no industry-specific wording in code, demo data, docs or UI copy.
 
@@ -30,10 +30,10 @@ An open-source, self-hosted API request logging tool: a Rust server with ClickHo
 | M4 Web part 1 | done | shell, palette, setup/login/invite, query bar (3 modes, quick filters, CodeMirror), Live tail, Explore, Inspector; UI embedded via rust-embed |
 | M5 Web part 2 | done | Journeys, Errors list/detail, Routes (full heatmap + per-route series), release markers on every chart, Saved views, Settings |
 | M6 Alerts + email-on-5xx | done | rules (count, 5xx rate, p95, new/spiking error group) with cooldown; webhook/Slack/Telegram/email channels; real-time Email on 5xx with throttle, digest, cap, regression and signed mute links; Postgres outbox = History; SMTP settings with env locking; encrypted secrets; docs/alerts.md. Verified by hand against Mailpit |
-| M7 SDKs | done | `@logbox/express`, `@logbox/fastify`, `@logbox/nestjs`, Python `logbox-sdk` (Django, ASGI, Celery, logging handler); `examples/`; overhead benchmarks (all < 0.05 ms p99 added); docs/sdk-*.md |
+| M7 SDKs | done | `@trailscope/express`, `@trailscope/fastify`, `@trailscope/nestjs`, Python `trailscope` (Django, ASGI, Celery, logging handler); `examples/`; overhead benchmarks (all < 0.05 ms p99 added); docs/sdk-*.md |
 | M8 Harden and ship | done | OTLP/HTTP receiver, OIDC sign-in, performance verified on 102M requests, README and docs, release workflow (GHCR, npm via changesets, PyPI), Dependabot |
 
-Since M8: Explore also reads jobs and log events (decision 058); replay looks only at whether the request body was cut (decision 059); empty `LOGBOX_*` variables count as unset, so the compose files pass the SMTP and OIDC settings through (decision 060).
+Since M8: Explore also reads jobs and log events (decision 058); replay looks only at whether the request body was cut (decision 059); empty `TRAILSCOPE_*` variables count as unset, so the compose files pass the SMTP and OIDC settings through (decision 060). The project was renamed from Logbox, its working name, to Trailscope (decision 062).
 
 ## Running it locally
 
@@ -41,12 +41,12 @@ Needs Rust (the version in `rust-toolchain.toml`), Node 24 with pnpm 9, Python 3
 
 ```bash
 docker compose -f deploy/docker-compose.dev.yml up -d                        # ClickHouse :18123, Postgres :25432, Redis :26379, Mailpit :8025
-source scripts/dev/local.env && cargo run -- all                            # Logbox from source; UI at http://localhost:8090
-docker compose -f deploy/docker-compose.dev.yml --profile app up -d --build  # or Logbox in a container too (stop the one from source first: same port)
+source scripts/dev/local.env && cargo run -- all                            # Trailscope from source; UI at http://localhost:8090
+docker compose -f deploy/docker-compose.dev.yml --profile app up -d --build  # or Trailscope in a container too (stop the one from source first: same port)
 cargo run -- demo --url http://localhost:8090                               # demo traffic with a scripted incident (creates a "Demo" project)
 ```
 
-In development, configure email under Settings → Notifications with host `mailpit` (Logbox in a container) or `127.0.0.1` (from source), port 1025, security none; mail shows at http://localhost:8025.
+In development, configure email under Settings → Notifications with host `mailpit` (Trailscope in a container) or `127.0.0.1` (from source), port 1025, security none; mail shows at http://localhost:8025.
 
 Python SDK: `python -m venv sdks/python/.venv && sdks/python/.venv/bin/pip install -e "sdks/python[dev]"`. Checks: `cd sdks/python && .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy`.
 
@@ -65,30 +65,30 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 
 ## Architecture
 
-- `crates/logbox-core`: `config` (defaults → `logbox.toml` → `LOGBOX_<SECTION>_<KEY>` env, empty values ignored), `wire` (ingest JSON types), `rows` (ClickHouse row structs, `LiveRequest`, `ErrorSignal`), `ch` (writer and reader clients, migration runner, reader user and settings profile, TTL sync), `pg` (pool and sqlx migrations), `live` (`LiveBus`: broadcast, or Redis pub/sub in split mode, with separate `requests` and `errors` topics), `secrets` (token generation and SHA-256), `admin` (create project, create ingest key), `project` (`ProjectSettings` JSONB), `testing` (per-test databases from `LOGBOX_TEST_*`).
-- `crates/logbox-ingest`: `/v1/ingest`, `/v1/releases`, `/v1/config`, OTLP (`otlp.rs`). Modules: `keys` (key cache), `decode` (gzip/zstd with a cap, array/NDJSON split), `normalize` (validation, route templating, truncation), `redact`, `fingerprint`, `pipeline` (queue bounded by rows and bytes; writer with 4 concurrent inserts; publishes live and 5xx signals after each flush).
-- `crates/logbox-demo`: a deterministic generic SaaS traffic generator (`generator.rs`), backfill, live traffic and a scripted incident (release v1.43.0 breaks `GET /projects/:id/tasks`, v1.43.1 fixes it), and `--load` with `--target-eps` for open-loop latency tests.
-- `crates/logbox-server`: the `logbox` binary. `serve.rs` wires the roles; `ops.rs` serves `/healthz`, `/readyz` and `/metrics`; `ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). Uses mimalloc. Shutdown order: stop accepting, then drain the writer.
+- `crates/trailscope-core`: `config` (defaults → `trailscope.toml` → `TRAILSCOPE_<SECTION>_<KEY>` env, empty values ignored), `wire` (ingest JSON types), `rows` (ClickHouse row structs, `LiveRequest`, `ErrorSignal`), `ch` (writer and reader clients, migration runner, reader user and settings profile, TTL sync), `pg` (pool and sqlx migrations), `live` (`LiveBus`: broadcast, or Redis pub/sub in split mode, with separate `requests` and `errors` topics), `secrets` (token generation and SHA-256), `admin` (create project, create ingest key), `project` (`ProjectSettings` JSONB), `testing` (per-test databases from `TRAILSCOPE_TEST_*`).
+- `crates/trailscope-ingest`: `/v1/ingest`, `/v1/releases`, `/v1/config`, OTLP (`otlp.rs`). Modules: `keys` (key cache), `decode` (gzip/zstd with a cap, array/NDJSON split), `normalize` (validation, route templating, truncation), `redact`, `fingerprint`, `pipeline` (queue bounded by rows and bytes; writer with 4 concurrent inserts; publishes live and 5xx signals after each flush).
+- `crates/trailscope-demo`: a deterministic generic SaaS traffic generator (`generator.rs`), backfill, live traffic and a scripted incident (release v1.43.0 breaks `GET /projects/:id/tasks`, v1.43.1 fixes it), and `--load` with `--target-eps` for open-loop latency tests.
+- `crates/trailscope-server`: the `trailscope` binary. `serve.rs` wires the roles; `ops.rs` serves `/healthz`, `/readyz` and `/metrics`; `ui.rs` serves `web/dist` (rust-embed, SPA fallback, CSP). Uses mimalloc. Shutdown order: stop accepting, then drain the writer.
 - `migrations/clickhouse/NNNN_*.sql` (embedded with `include_str!` in `ch.rs`; add new files to its `MIGRATIONS` list) and `migrations/postgres/` (sqlx).
-- `crates/logbox-api`: `AppState` (config, ClickHouse, Postgres, LiveBus, optional ingest KeyCache, login limiter, replay HTTP client, secrets, outbox). Modules: `auth` (session cookie + CSRF or Bearer API token; `require(Role, Scope)`, `can_view_bodies`), `setup`, `users`, `projects`, `query` (`prepare` → `Prepared`; `fetch_json` runs as the reader), `inspector` (incl. cURL and replay), `live`, `views`, `overview`, `errors`, `journeys`, `alerts`, `oidc`, `openapi`. Integration test: `tests/api.rs`.
-- `crates/logbox-alerts`: `crypto` (XChaCha20-Poly1305 for stored secrets, HMAC tokens), `smtp` (stored + configured settings merged per field, `locked_fields`), `channels` (webhook with `X-Logbox-Signature`, Slack, Telegram, email), `outbox` (`notifications` table: queue with lease and backoff, also the history), `rules` (60 s evaluator, ok/firing with cooldown), `throttle` (pure noise-control state), `email5xx` (`Engine` on `LiveBus::subscribe_errors()`), `render`, `mute` (signed links). Started by `serve.rs` for the `all` and `alerts` roles.
-- `crates/logbox-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs`, `compile.rs` (values are always `{pN:Type}` params), `eval.rs` (in-memory evaluator for live filters), `regex.rs`, `search.rs`, `chips.rs`. Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `LOGBOX_DIFF_CASES=4000 LOGBOX_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`).
-- `sdks/node/packages/node`: `@logbox/node` core (queue, transport, redaction, context, sampling, `trackJob`, remote config from `/v1/config`, `recordHttp`/`observeHttp` for integrations, benchmark in `bench/`). `sdks/node/packages/{express,fastify,nestjs}`: thin integrations (NestJS: module, interceptor, opt-in exception filter, Logger bridge, BullMQ helpers).
-- `sdks/python/src/logbox`: `client.py` (Client, transport thread, `record_http`, `track_job`, `span`, remote config, fork handling), `django.py`, `asgi.py`, `celery.py`, `handler.py` (`LogboxHandler`). Benchmark: `sdks/python/bench/overhead.py`.
+- `crates/trailscope-api`: `AppState` (config, ClickHouse, Postgres, LiveBus, optional ingest KeyCache, login limiter, replay HTTP client, secrets, outbox). Modules: `auth` (session cookie + CSRF or Bearer API token; `require(Role, Scope)`, `can_view_bodies`), `setup`, `users`, `projects`, `query` (`prepare` → `Prepared`; `fetch_json` runs as the reader), `inspector` (incl. cURL and replay), `live`, `views`, `overview`, `errors`, `journeys`, `alerts`, `oidc`, `openapi`. Integration test: `tests/api.rs`.
+- `crates/trailscope-alerts`: `crypto` (XChaCha20-Poly1305 for stored secrets, HMAC tokens), `smtp` (stored + configured settings merged per field, `locked_fields`), `channels` (webhook with `X-Trailscope-Signature`, Slack, Telegram, email), `outbox` (`notifications` table: queue with lease and backoff, also the history), `rules` (60 s evaluator, ok/firing with cooldown), `throttle` (pure noise-control state), `email5xx` (`Engine` on `LiveBus::subscribe_errors()`), `render`, `mute` (signed links). Started by `serve.rs` for the `all` and `alerts` roles.
+- `crates/trailscope-query`: `registry.rs` (columns for `requests` and `events`, the single source of truth), `parse.rs` (sqlparser ClickHouse dialect → typed AST; `resolve_column` enforces the sensitive and live rules), `ast.rs`, `compile.rs` (values are always `{pN:Type}` params), `eval.rs` (in-memory evaluator for live filters), `regex.rs`, `search.rs`, `chips.rs`. Tests: `tests/injection.rs`, `tests/props.rs`, `tests/clickhouse.rs` (differential; widen with `TRAILSCOPE_DIFF_CASES=4000 TRAILSCOPE_DIFF_RANDOM=1`), and `fuzz/` (`cargo +nightly fuzz run parse`).
+- `sdks/node/packages/node`: `@trailscope/node` core (queue, transport, redaction, context, sampling, `trackJob`, remote config from `/v1/config`, `recordHttp`/`observeHttp` for integrations, benchmark in `bench/`). `sdks/node/packages/{express,fastify,nestjs}`: thin integrations (NestJS: module, interceptor, opt-in exception filter, Logger bridge, BullMQ helpers).
+- `sdks/python/src/trailscope`: `client.py` (Client, transport thread, `record_http`, `track_job`, `span`, remote config, fork handling), `django.py`, `asgi.py`, `celery.py`, `handler.py` (`TrailscopeHandler`). Benchmark: `sdks/python/bench/overhead.py`.
 - `examples/`: Express, Fastify, NestJS (+BullMQ), FastAPI, Django (+Celery). See examples/README.md.
 - `web/src`: `router.tsx` (code-based TanStack routes, typed search params), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx`, `query.ts`, `live.ts`, `hotkeys.ts`, `format.ts`), `components/` (`Shell`, `CommandPalette`, `QueryBar`, `SqlEditor`, `charts.tsx`, `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Journeys`, `Errors`, `Routes`, `Views`, `Settings`, `SettingsNotifications`, `Alerts`, `Auth`). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
 - `e2e/screenshots.mjs`: Playwright screenshots of a running instance (`BASE_URL=… OUT=… node screenshots.mjs`).
 
-Lessons from building the SDKs: Starlette runs the last-added middleware first (add `LogboxMiddleware` last); BullMQ 6 needs `ioredis` installed by the app; Nest's `ExceptionsHandler` log line would duplicate error groups, so the Logger bridge ignores it; Nest on Fastify needs the `preHandler` hook for guards to see the context.
+Lessons from building the SDKs: Starlette runs the last-added middleware first (add `TrailscopeMiddleware` last); BullMQ 6 needs `ioredis` installed by the app; Nest's `ExceptionsHandler` log line would duplicate error groups, so the Logger bridge ignores it; Nest on Fastify needs the `preHandler` hook for guards to see the context.
 
 ## Open items
 
 Roughly in priority order:
 
-1. **First release:** own the npm scope (or rename the Node packages), add the `NPM_TOKEN` secret, configure PyPI trusted publishing for `logbox-sdk` (environment `pypi`), then push a `v0.1.0` tag.
+1. **First release:** own the npm scope (or rename the Node packages), add the `NPM_TOKEN` secret, configure PyPI trusted publishing for `trailscope` (environment `pypi`), then push a `v0.1.0` tag.
 2. **Missing tests** (decisions 028, 052, 055): Email on 5xx throttle unit tests and the Mailpit integration test, SDK test suites, a Playwright e2e suite against the compose stack.
 3. **Journeys on low-cardinality keys** read every matching row (about 0.7 s over 7 days for a key with a few hundred values on 100M requests); a per-key rollup or a capped, time-ordered read would help.
-4. The ingest benchmark numbers come from an older development machine; rerun `logbox demo --load` to refresh them.
+4. The ingest benchmark numbers come from an older development machine; rerun `trailscope demo --load` to refresh them.
 5. Journey header: when the 2,000-item cap is hit, "Quiet since" refers to the last loaded item, not the real last activity.
 
 ## Getting oriented

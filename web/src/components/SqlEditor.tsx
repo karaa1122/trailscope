@@ -121,9 +121,9 @@ export default function SqlEditor(props: SqlEditorProps) {
     });
     view.current = new EditorView({ state, parent: host.current });
     const focus = () => view.current?.focus();
-    window.addEventListener('logbox:focus-query', focus);
+    window.addEventListener('trailscope:focus-query', focus);
     return () => {
-      window.removeEventListener('logbox:focus-query', focus);
+      window.removeEventListener('trailscope:focus-query', focus);
       view.current?.destroy();
       view.current = null;
     };

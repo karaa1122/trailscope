@@ -4,10 +4,10 @@
 // happen later, off-path. Run after `pnpm build`: node bench/overhead.mjs
 import Fastify from 'fastify';
 
-import { LogboxClient, logbox } from '../dist/index.js';
+import { TrailscopeClient, trailscope } from '../dist/index.js';
 
-const client = new LogboxClient({
-  ingestKey: 'lbx_ingest_bench',
+const client = new TrailscopeClient({
+  ingestKey: 'trs_ingest_bench',
   service: 'bench',
   flushIntervalMs: 3_600_000,
   flushAt: Number.MAX_SAFE_INTEGER,
@@ -16,7 +16,7 @@ const client = new LogboxClient({
 
 async function build(withSdk) {
   const app = Fastify();
-  if (withSdk) await app.register(logbox, { client });
+  if (withSdk) await app.register(trailscope, { client });
   app.post('/projects/:projectId/tasks', async (request, reply) => {
     if (request.query.fail) return reply.code(500).send({ error: 'internal error' });
     return [{ id: 't1', title: 'Write the brief', done: false }];

@@ -1,13 +1,13 @@
-// Minimal Express app wired to Logbox. Start Logbox, then:
-//   LOGBOX_INGEST_KEY=lbx_ingest_… pnpm start
+// Minimal Express app wired to Trailscope. Start Trailscope, then:
+//   TRAILSCOPE_INGEST_KEY=trs_ingest_… pnpm start
 //   curl localhost:3000/projects/p1/tasks
 import express from 'express';
-import { init, logbox, logboxErrorHandler, setCorrelation, setUser } from '@logbox/express';
+import { init, trailscope, trailscopeErrorHandler, setCorrelation, setUser } from '@trailscope/express';
 
-const client = init({ service: 'tasks-api', endpoint: process.env.LOGBOX_ENDPOINT ?? 'http://localhost:8080' });
+const client = init({ service: 'tasks-api', endpoint: process.env.TRAILSCOPE_ENDPOINT ?? 'http://localhost:8080' });
 
 const app = express();
-app.use(logbox(client));
+app.use(trailscope(client));
 app.use(express.json());
 
 // Pretend authentication: attach the caller to everything this request does.
@@ -50,7 +50,7 @@ app.get('/slow', async (_req, res) => {
   res.json({ ok: true });
 });
 
-app.use(logboxErrorHandler());
+app.use(trailscopeErrorHandler());
 app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'internal error' });
 });

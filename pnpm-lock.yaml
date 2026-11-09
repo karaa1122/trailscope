@@ -47,7 +47,7 @@ importers:
 
   examples/express:
     dependencies:
-      '@logbox/express':
+      '@trailscope/express':
         specifier: workspace:^
         version: link:../../sdks/node/packages/express
       express:
@@ -56,7 +56,7 @@ importers:
 
   examples/fastify:
     dependencies:
-      '@logbox/fastify':
+      '@trailscope/fastify':
         specifier: workspace:^
         version: link:../../sdks/node/packages/fastify
       fastify:
@@ -65,9 +65,6 @@ importers:
 
   examples/nestjs:
     dependencies:
-      '@logbox/nestjs':
-        specifier: workspace:^
-        version: link:../../sdks/node/packages/nestjs
       '@nestjs/bullmq':
         specifier: 12.0.0
         version: 12.0.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)(bullmq@6.4.2(ioredis@6.0.0))
@@ -83,6 +80,9 @@ importers:
       '@nestjs/platform-fastify':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0)
+      '@trailscope/nestjs':
+        specifier: workspace:^
+        version: link:../../sdks/node/packages/nestjs
       bullmq:
         specifier: 6.4.2
         version: 6.4.2(ioredis@6.0.0)
@@ -102,7 +102,7 @@ importers:
 
   sdks/node/packages/express:
     dependencies:
-      '@logbox/node':
+      '@trailscope/node':
         specifier: workspace:^
         version: link:../node
     devDependencies:
@@ -118,7 +118,7 @@ importers:
 
   sdks/node/packages/fastify:
     dependencies:
-      '@logbox/node':
+      '@trailscope/node':
         specifier: workspace:^
         version: link:../node
     devDependencies:
@@ -131,7 +131,7 @@ importers:
 
   sdks/node/packages/nestjs:
     dependencies:
-      '@logbox/node':
+      '@trailscope/node':
         specifier: workspace:^
         version: link:../node
     devDependencies:

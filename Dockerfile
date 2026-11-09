@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Multi-stage build for the `logbox` binary with the web UI embedded.
+# Multi-stage build for the `trailscope` binary with the web UI embedded.
 # Multi-arch: docker buildx build --platform linux/amd64,linux/arm64 .
 
 ARG RUST_IMAGE=lukemathwalker/cargo-chef:latest-rust-1.99-trixie
@@ -14,8 +14,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json eslint.c
 COPY web web
 COPY sdks/node sdks/node
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter @logbox/web...
-RUN pnpm --filter @logbox/web build
+    pnpm install --frozen-lockfile --filter @trailscope/web...
+RUN pnpm --filter @trailscope/web build
 
 # ---- rust: dependency recipe ---------------------------------------------
 FROM ${RUST_IMAGE} AS chef
@@ -28,23 +28,23 @@ RUN cargo chef prepare --recipe-path recipe.json
 # ---- rust: build -----------------------------------------------------------
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json --bin logbox
+RUN cargo chef cook --release --recipe-path recipe.json --bin trailscope
 COPY . .
 COPY --from=web /src/web/dist web/dist
-RUN cargo build --release --locked --bin logbox \
-    && cp target/release/logbox /usr/local/bin/logbox
+RUN cargo build --release --locked --bin trailscope \
+    && cp target/release/trailscope /usr/local/bin/trailscope
 
 # ---- runtime ---------------------------------------------------------------
 FROM ${RUNTIME_IMAGE}
-LABEL org.opencontainers.image.title="logbox" \
+LABEL org.opencontainers.image.title="trailscope" \
       org.opencontainers.image.description="Self-hosted API request logging" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/karaa1122/LogBox"
-COPY --from=builder /usr/local/bin/logbox /usr/local/bin/logbox
+      org.opencontainers.image.source="https://github.com/karaa1122/trailscope"
+COPY --from=builder /usr/local/bin/trailscope /usr/local/bin/trailscope
 USER nonroot:nonroot
-ENV LOGBOX_SERVER_LISTEN=0.0.0.0:8080 \
-    LOGBOX_LOG_FORMAT=json
+ENV TRAILSCOPE_SERVER_LISTEN=0.0.0.0:8080 \
+    TRAILSCOPE_LOG_FORMAT=json
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD ["/usr/local/bin/logbox", "healthcheck"]
-ENTRYPOINT ["/usr/local/bin/logbox"]
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD ["/usr/local/bin/trailscope", "healthcheck"]
+ENTRYPOINT ["/usr/local/bin/trailscope"]
 CMD ["all"]

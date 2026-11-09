@@ -4,7 +4,7 @@ import time
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-import logbox
+import trailscope
 
 from .tasks import notify
 
@@ -17,8 +17,8 @@ def health(request: HttpRequest) -> HttpResponse:
 
 def tasks(request: HttpRequest, project_id: str) -> HttpResponse:
     # Pretend authentication: attach the caller to everything this request does.
-    logbox.set_user(request.headers.get("x-user-id"))
-    logbox.set_correlation("project_id", project_id)
+    trailscope.set_user(request.headers.get("x-user-id"))
+    trailscope.set_correlation("project_id", project_id)
     if request.method == "POST":
         body = json.loads(request.body or b"{}")
         task = {"id": f"t{int(time.time() * 1000)}", **body}

@@ -645,7 +645,7 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
     ...(RANK[role] >= RANK.admin ? [{ id: 'admin' as const, label: 'admin' }] : []),
   ];
   return (
-    <Panel title="API tokens" sub="personal tokens for scripts and CI: send as “Authorization: Bearer lbx_api_…”">
+    <Panel title="API tokens" sub="personal tokens for scripts and CI: send as “Authorization: Bearer trs_api_…”">
       {secret && (
         <div style={{ padding: 18 }}>
           <SecretOnce label="New API token." value={secret} onDone={() => setSecret(null)} />
@@ -704,7 +704,7 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
 function RetentionSection() {
   const r = useQuery({ queryKey: ['retention'], queryFn: api.retention });
   return (
-    <Panel title="Retention" sub="set in logbox.toml or with LOGBOX_RETENTION_* environment variables; applied at startup">
+    <Panel title="Retention" sub="set in trailscope.toml or with TRAILSCOPE_RETENTION_* environment variables; applied at startup">
       {r.data ? (
         <>
           <div className="kv">

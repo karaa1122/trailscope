@@ -1,14 +1,14 @@
 # Architecture
 
-Logbox is one Rust binary, a ClickHouse database for telemetry and a Postgres database for everything else. The web UI is compiled into the binary.
+Trailscope is one Rust binary, a ClickHouse database for telemetry and a Postgres database for everything else. The web UI is compiled into the binary.
 
 ```mermaid
 flowchart LR
   subgraph apps[Your services]
-    sdk[Logbox SDKs<br/>Node, Python]
+    sdk[Trailscope SDKs<br/>Node, Python]
     otel[OpenTelemetry SDKs<br/>and Collectors]
   end
-  subgraph logbox[logbox binary]
+  subgraph trailscope[trailscope binary]
     ingest[ingest<br/>/v1/ingest, /v1/otlp]
     api[api<br/>/api/v1, web UI]
     alerts[alerts<br/>rules, Email on 5xx, outbox]
@@ -33,15 +33,15 @@ flowchart LR
 
 ## Roles
 
-`logbox <role>` runs one part, or all of them:
+`trailscope <role>` runs one part, or all of them:
 
 | Command | What runs |
 |---|---|
-| `logbox all` | ingest, API, UI and alerts in one process; the live bus is an in-process broadcast channel. The default, and enough for most installs |
-| `logbox ingest`, `logbox api`, `logbox alerts` | one role each, for scaling ingest and the API separately ("split mode"); the live bus is Redis pub/sub. Run exactly one `alerts` process |
-| `logbox migrate` | applies ClickHouse and Postgres migrations, creates the read-only ClickHouse user and syncs retention TTLs, then exits. `all` does this at startup |
-| `logbox demo` | generic SaaS demo traffic with a scripted incident, or a load test (`--load`) |
-| `logbox healthcheck` | used by the container health check |
+| `trailscope all` | ingest, API, UI and alerts in one process; the live bus is an in-process broadcast channel. The default, and enough for most installs |
+| `trailscope ingest`, `trailscope api`, `trailscope alerts` | one role each, for scaling ingest and the API separately ("split mode"); the live bus is Redis pub/sub. Run exactly one `alerts` process |
+| `trailscope migrate` | applies ClickHouse and Postgres migrations, creates the read-only ClickHouse user and syncs retention TTLs, then exits. `all` does this at startup |
+| `trailscope demo` | generic SaaS demo traffic with a scripted incident, or a load test (`--load`) |
+| `trailscope healthcheck` | used by the container health check |
 
 ## Ingest path
 
@@ -70,7 +70,7 @@ Charts and tiles (overview, route heatmap, error trends) read the rollups. Explo
 
 ## Queries
 
-The query language ([query-language.md](query-language.md)) is parsed with `sqlparser` into Logbox's own AST, checked against a registry of allowed columns, and compiled to a parameterized `WHERE` clause: user values are always bound parameters, never SQL text. The same AST is evaluated in memory for Live tail and Email on 5xx filters, so a filter means the same thing everywhere. Every user-driven query runs as a read-only ClickHouse user whose settings profile caps execution time, rows read, result size and memory.
+The query language ([query-language.md](query-language.md)) is parsed with `sqlparser` into Trailscope's own AST, checked against a registry of allowed columns, and compiled to a parameterized `WHERE` clause: user values are always bound parameters, never SQL text. The same AST is evaluated in memory for Live tail and Email on 5xx filters, so a filter means the same thing everywhere. Every user-driven query runs as a read-only ClickHouse user whose settings profile caps execution time, rows read, result size and memory.
 
 ## Live tail
 
@@ -88,12 +88,12 @@ A React single-page app (TanStack Router, Query and Virtual, CodeMirror for SQL 
 
 | Crate | Role |
 |---|---|
-| `logbox-core` | configuration, wire and row types, ClickHouse and Postgres clients and migrations, the live bus, secrets helpers |
-| `logbox-query` | the query language: parser, column registry, compiler, evaluator, search syntax, filter chips |
-| `logbox-ingest` | ingest endpoints (including OTLP), validation, redaction, fingerprinting, the write pipeline |
-| `logbox-api` | the HTTP API: auth, members, projects, queries, inspector, replay, live tail, journeys, errors, routes, views, alerts, single sign-on, OpenAPI |
-| `logbox-alerts` | rule evaluation, Email on 5xx, channels, encryption of stored secrets, the outbox |
-| `logbox-demo` | demo data and load testing |
-| `logbox-server` | the `logbox` binary: CLI, wiring, health and metrics endpoints, embedded UI |
+| `trailscope-core` | configuration, wire and row types, ClickHouse and Postgres clients and migrations, the live bus, secrets helpers |
+| `trailscope-query` | the query language: parser, column registry, compiler, evaluator, search syntax, filter chips |
+| `trailscope-ingest` | ingest endpoints (including OTLP), validation, redaction, fingerprinting, the write pipeline |
+| `trailscope-api` | the HTTP API: auth, members, projects, queries, inspector, replay, live tail, journeys, errors, routes, views, alerts, single sign-on, OpenAPI |
+| `trailscope-alerts` | rule evaluation, Email on 5xx, channels, encryption of stored secrets, the outbox |
+| `trailscope-demo` | demo data and load testing |
+| `trailscope-server` | the `trailscope` binary: CLI, wiring, health and metrics endpoints, embedded UI |
 
 Judgement calls behind all of this are recorded in [DECISIONS.md](DECISIONS.md).

@@ -13,18 +13,18 @@ import {
 import type { IncomingMessage } from 'node:http';
 
 import { APP_FILTER, APP_INTERCEPTOR, HttpAdapterHost } from '@nestjs/core';
-import { type LogboxClient, contextOf, enterContext, getClient, init } from '@logbox/node';
+import { type TrailscopeClient, contextOf, enterContext, getClient, init } from '@trailscope/node';
 
-import { LogboxExceptionFilter, LogboxInterceptor, LogboxMiddleware } from './http.js';
-import { LogboxLogger } from './logger.js';
-import { LOGBOX_CLIENT, LOGBOX_MODULE_OPTIONS, type LogboxModuleOptions } from './tokens.js';
+import { TrailscopeExceptionFilter, TrailscopeInterceptor, TrailscopeMiddleware } from './http.js';
+import { TrailscopeLogger } from './logger.js';
+import { TRAILSCOPE_CLIENT, TRAILSCOPE_MODULE_OPTIONS, type TrailscopeModuleOptions } from './tokens.js';
 
-export interface LogboxModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+export interface TrailscopeModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
   // Nest's own async module APIs type injection tokens and factory arguments this way.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   inject?: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  useFactory: (...args: any[]) => LogboxModuleOptions | Promise<LogboxModuleOptions>;
+  useFactory: (...args: any[]) => TrailscopeModuleOptions | Promise<TrailscopeModuleOptions>;
 }
 
 /** The part of a Fastify instance the module uses (no dependency on fastify). */
@@ -35,7 +35,7 @@ interface FastifyLike {
   ): unknown;
 }
 
-function createClient(options: LogboxModuleOptions): LogboxClient {
+function createClient(options: TrailscopeModuleOptions): TrailscopeClient {
   // Strip the module-only options before handing the rest to the client.
   const { client, exceptionFilter: _f, loggerLevel: _l, loggerIgnoreContexts: _i, ...clientOptions } = options;
   if (client) return client;
@@ -45,12 +45,12 @@ function createClient(options: LogboxModuleOptions): LogboxClient {
 function providers(optionsProvider: Provider, exceptionFilter: boolean): Provider[] {
   const list: Provider[] = [
     optionsProvider,
-    { provide: LOGBOX_CLIENT, useFactory: createClient, inject: [LOGBOX_MODULE_OPTIONS] },
-    LogboxMiddleware,
-    LogboxLogger,
-    { provide: APP_INTERCEPTOR, useClass: LogboxInterceptor },
+    { provide: TRAILSCOPE_CLIENT, useFactory: createClient, inject: [TRAILSCOPE_MODULE_OPTIONS] },
+    TrailscopeMiddleware,
+    TrailscopeLogger,
+    { provide: APP_INTERCEPTOR, useClass: TrailscopeInterceptor },
   ];
-  if (exceptionFilter) list.push({ provide: APP_FILTER, useClass: LogboxExceptionFilter });
+  if (exceptionFilter) list.push({ provide: APP_FILTER, useClass: TrailscopeExceptionFilter });
   return list;
 }
 
@@ -58,27 +58,27 @@ function providers(optionsProvider: Provider, exceptionFilter: boolean): Provide
  * Request logging for the whole application:
  *
  * ```ts
- * @Module({ imports: [LogboxModule.forRoot({ service: 'orders-api' })] })
+ * @Module({ imports: [TrailscopeModule.forRoot({ service: 'orders-api' })] })
  * export class AppModule {}
  * ```
  *
- * It applies `LogboxMiddleware` to every route, registers `LogboxInterceptor`
- * globally, exports the client (`@Inject(LOGBOX_CLIENT)`) and `LogboxLogger`,
+ * It applies `TrailscopeMiddleware` to every route, registers `TrailscopeInterceptor`
+ * globally, exports the client (`@Inject(TRAILSCOPE_CLIENT)`) and `TrailscopeLogger`,
  * and flushes on application shutdown (with `app.enableShutdownHooks()`).
  */
 @Global()
 @Module({})
-export class LogboxModule implements NestModule, OnApplicationShutdown {
+export class TrailscopeModule implements NestModule, OnApplicationShutdown {
   constructor(
-    @Inject(LOGBOX_CLIENT) private readonly client: LogboxClient,
+    @Inject(TRAILSCOPE_CLIENT) private readonly client: TrailscopeClient,
     @Optional() @Inject(HttpAdapterHost) private readonly adapterHost?: HttpAdapterHost,
   ) {}
 
-  static forRoot(options: LogboxModuleOptions = {}): DynamicModule {
+  static forRoot(options: TrailscopeModuleOptions = {}): DynamicModule {
     return {
-      module: LogboxModule,
-      providers: providers({ provide: LOGBOX_MODULE_OPTIONS, useValue: options }, !!options.exceptionFilter),
-      exports: [LOGBOX_CLIENT, LogboxLogger],
+      module: TrailscopeModule,
+      providers: providers({ provide: TRAILSCOPE_MODULE_OPTIONS, useValue: options }, !!options.exceptionFilter),
+      exports: [TRAILSCOPE_CLIENT, TrailscopeLogger],
     };
   }
 
@@ -86,20 +86,20 @@ export class LogboxModule implements NestModule, OnApplicationShutdown {
    * Options from other providers, e.g. `ConfigService`. Set `exceptionFilter`
    * here (not in the factory), since providers are fixed before it runs.
    */
-  static forRootAsync(options: LogboxModuleAsyncOptions & { exceptionFilter?: boolean }): DynamicModule {
+  static forRootAsync(options: TrailscopeModuleAsyncOptions & { exceptionFilter?: boolean }): DynamicModule {
     return {
-      module: LogboxModule,
+      module: TrailscopeModule,
       imports: options.imports ?? [],
       providers: providers(
-        { provide: LOGBOX_MODULE_OPTIONS, useFactory: options.useFactory, inject: options.inject ?? [] },
+        { provide: TRAILSCOPE_MODULE_OPTIONS, useFactory: options.useFactory, inject: options.inject ?? [] },
         !!options.exceptionFilter,
       ),
-      exports: [LOGBOX_CLIENT, LogboxLogger],
+      exports: [TRAILSCOPE_CLIENT, TrailscopeLogger],
     };
   }
 
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(LogboxMiddleware).forRoutes('{*path}');
+    consumer.apply(TrailscopeMiddleware).forRoutes('{*path}');
     // Fastify parses bodies outside the request's async context, and guards
     // run before interceptors: enter the context again before guards run.
     const adapter = this.adapterHost?.httpAdapter;

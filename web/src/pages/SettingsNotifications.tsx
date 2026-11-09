@@ -8,13 +8,13 @@ import type { SendResult, SmtpSettings } from '../lib/types';
 
 /** Environment variables that lock each field when set. */
 const SMTP_ENV: Record<string, string> = {
-  host: 'LOGBOX_SMTP_HOST',
-  port: 'LOGBOX_SMTP_PORT',
-  security: 'LOGBOX_SMTP_SECURITY',
-  username: 'LOGBOX_SMTP_USERNAME',
-  password: 'LOGBOX_SMTP_PASSWORD',
-  from: 'LOGBOX_SMTP_FROM',
-  from_name: 'LOGBOX_SMTP_FROM_NAME',
+  host: 'TRAILSCOPE_SMTP_HOST',
+  port: 'TRAILSCOPE_SMTP_PORT',
+  security: 'TRAILSCOPE_SMTP_SECURITY',
+  username: 'TRAILSCOPE_SMTP_USERNAME',
+  password: 'TRAILSCOPE_SMTP_PASSWORD',
+  from: 'TRAILSCOPE_SMTP_FROM',
+  from_name: 'TRAILSCOPE_SMTP_FROM_NAME',
 };
 
 const errText = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong');
@@ -106,7 +106,7 @@ export function NotificationsSection({ toast }: { toast: (msg: string) => void }
       <Panel title="Email (SMTP)" sub={s.configured ? <span className="ok-text">configured</span> : 'not configured: no emails are sent'}>
         {!s.secretKeyConfigured && (
           <div role="note" style={{ margin: '18px 18px 0', padding: '10px 12px', borderRadius: 8, background: 'var(--warn-soft)', fontSize: 12.5 }}>
-            LOGBOX_SECRET_KEY is not set, so the password is encrypted with a key stored in the database. Set LOGBOX_SECRET_KEY in production.
+            TRAILSCOPE_SECRET_KEY is not set, so the password is encrypted with a key stored in the database. Set TRAILSCOPE_SECRET_KEY in production.
           </div>
         )}
         <form
@@ -172,10 +172,10 @@ export function NotificationsSection({ toast }: { toast: (msg: string) => void }
               )}
             </Field>
             <Field label="From address" hint={lockHint('from')}>
-              <input className="input mono" value={form.from} disabled={locked('from')} onChange={(e) => setForm({ ...form, from: e.target.value })} placeholder="logbox@example.com" />
+              <input className="input mono" value={form.from} disabled={locked('from')} onChange={(e) => setForm({ ...form, from: e.target.value })} placeholder="trailscope@example.com" />
             </Field>
             <Field label="From name" hint={lockHint('from_name')}>
-              <input className="input" value={form.fromName} disabled={locked('from_name')} onChange={(e) => setForm({ ...form, fromName: e.target.value })} placeholder="Logbox" />
+              <input className="input" value={form.fromName} disabled={locked('from_name')} onChange={(e) => setForm({ ...form, fromName: e.target.value })} placeholder="Trailscope" />
             </Field>
           </div>
           <div className="row" style={{ padding: '0 18px 18px' }}>

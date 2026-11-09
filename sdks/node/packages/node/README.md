@@ -1,23 +1,23 @@
-# @logbox/node
+# @trailscope/node
 
-The core [Logbox](https://github.com/karaa1122/LogBox) client for Node.js. It batches requests, spans, job runs and log lines in memory and ships them in the background. It never blocks your request path.
+The core [Trailscope](https://github.com/karaa1122/trailscope) client for Node.js. It batches requests, spans, job runs and log lines in memory and ships them in the background. It never blocks your request path.
 
-Most apps use a framework integration built on this package: [`@logbox/express`](../express), [`@logbox/fastify`](../fastify) or [`@logbox/nestjs`](../nestjs). Use `@logbox/node` directly for workers, scripts, or frameworks without an integration.
+Most apps use a framework integration built on this package: [`@trailscope/express`](../express), [`@trailscope/fastify`](../fastify) or [`@trailscope/nestjs`](../nestjs). Use `@trailscope/node` directly for workers, scripts, or frameworks without an integration.
 
 ## Quickstart
 
 ```ts
-import { init } from '@logbox/node';
+import { init } from '@trailscope/node';
 
-const logbox = init({
+const trailscope = init({
   endpoint: 'http://localhost:8080',
-  ingestKey: process.env.LOGBOX_INGEST_KEY,
+  ingestKey: process.env.TRAILSCOPE_INGEST_KEY,
   service: 'worker',
 });
 
-await logbox.trackJob('report.generate', () => buildReport(), { attempt: 1 });
-logbox.log('info', 'nightly run finished');
-process.on('SIGTERM', () => void logbox.shutdown());
+await trailscope.trackJob('report.generate', () => buildReport(), { attempt: 1 });
+trailscope.log('info', 'nightly run finished');
+process.on('SIGTERM', () => void trailscope.shutdown());
 ```
 
 ## What it does
@@ -33,12 +33,12 @@ Every option has an environment variable fallback.
 
 | Option | Env | Default |
 |---|---|---|
-| `endpoint` | `LOGBOX_ENDPOINT` | `http://localhost:8080` |
-| `ingestKey` | `LOGBOX_INGEST_KEY` | none (nothing is sent) |
-| `service` | `LOGBOX_SERVICE` | `unknown-service` |
-| `environment` | `LOGBOX_ENVIRONMENT`, `NODE_ENV` | `production` |
-| `release` | `LOGBOX_RELEASE` | |
-| `enabled` | `LOGBOX_ENABLED=0` disables | `true` |
+| `endpoint` | `TRAILSCOPE_ENDPOINT` | `http://localhost:8080` |
+| `ingestKey` | `TRAILSCOPE_INGEST_KEY` | none (nothing is sent) |
+| `service` | `TRAILSCOPE_SERVICE` | `unknown-service` |
+| `environment` | `TRAILSCOPE_ENVIRONMENT`, `NODE_ENV` | `production` |
+| `release` | `TRAILSCOPE_RELEASE` | |
+| `enabled` | `TRAILSCOPE_ENABLED=0` disables | `true` |
 | `maxQueueSize` | | `10000` |
 | `flushIntervalMs` / `flushAt` / `maxBatchSize` | | `1000` / `500` / `1000` |
 | `sampleRate` / `routeSampleRates` | | `1` / `{}` |
@@ -49,7 +49,7 @@ Every option has an environment variable fallback.
 | `redact` | | `{ headers, keys, patterns, maskIp: true }` |
 | `remoteConfig` | | `true` (`false` with a custom `fetch`): load sampling and capture settings from `/v1/config` |
 | `beforeSend` | | edit or drop items (return `null`) |
-| `debug` | `LOGBOX_DEBUG=1` | `false` |
+| `debug` | `TRAILSCOPE_DEBUG=1` | `false` |
 
 Sampling and capture options set in code win over the project's settings from the server.
 

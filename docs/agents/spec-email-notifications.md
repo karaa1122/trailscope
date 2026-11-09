@@ -1,6 +1,6 @@
 # Follow-up brief: SMTP email notifications for 5xx errors
 
-Received during M1, kept verbatim. Scheduled as part of M6 (alerts), with the ingest hook built in M1. See [/AGENTS.md](../../AGENTS.md) for how it fits the plan.
+Received during M1, kept verbatim. "Logbox" was the working name of what is now Trailscope (decision 062). Scheduled as part of M6 (alerts), with the ingest hook built in M1. See [/AGENTS.md](../../AGENTS.md) for how it fits the plan.
 
 ---
 

@@ -1,6 +1,6 @@
 # Alerts and email notifications
 
-Logbox has two ways to tell you something is wrong:
+Trailscope has two ways to tell you something is wrong:
 
 - **Alert rules**: a query, a condition and a time window, checked every minute. Each state change (firing, resolved) sends one notification to the rule's channels.
 - **Email on 5xx**: a built-in rule per project that emails the people you choose within seconds of a server error, with noise control so one bug doesn't send 500 emails.
@@ -65,8 +65,8 @@ Webhook URLs, Slack URLs and bot tokens are stored encrypted (see [Secret key](#
 
 A webhook channel gets a signing secret (`whsec_…`), shown once when the channel is created. Each request carries:
 
-- `X-Logbox-Timestamp`: unix seconds.
-- `X-Logbox-Signature`: `sha256=` followed by the hex HMAC-SHA256 of `timestamp + "." + body`, keyed with the signing secret.
+- `X-Trailscope-Timestamp`: unix seconds.
+- `X-Trailscope-Signature`: `sha256=` followed by the hex HMAC-SHA256 of `timestamp + "." + body`, keyed with the signing secret.
 
 Verify the signature over the raw body with a constant-time comparison, and reject timestamps more than a few minutes old to prevent replays. In Node:
 
@@ -86,7 +86,7 @@ Every project has a built-in **Email on 5xx** rule (Alerts → Email on 5xx). It
 
 - **Recipients:** any members (by account, so a changed address follows the account; disabled accounts are skipped) and any other addresses. Only the people listed here receive these emails. **Send a test email to them** sends a sample error email.
 - **Filter:** a query-language expression over the error's fields, by default `status >= 500 AND environment = 'production'`. Usable columns: `status`, `environment`, `service`, `release`, `method`, `route`, `duration_ms`, `user_id`, `error_type`, `error_message`, `attributes[…]` and `correlation[…]`. Bodies, headers and IPs are not available here.
-- **Real time:** after each successful write, ingest hands the 5xx rows to the alert engine (in process in `logbox all`, over Redis in split mode), so the email usually goes out within a few seconds of the error. Changes to the rule or the SMTP settings take effect within 30 seconds.
+- **Real time:** after each successful write, ingest hands the 5xx rows to the alert engine (in process in `trailscope all`, over Redis in split mode), so the email usually goes out within a few seconds of the error. Changes to the rule or the SMTP settings take effect within 30 seconds.
 
 ### Noise control
 
@@ -104,7 +104,7 @@ One email to several recipients counts once toward the hourly cap.
 
 ### What an email contains
 
-- Subject: `[Logbox] 500 POST /orders/:id/checkout — PaymentTimeoutError · orders-svc`. Always the route pattern, never a raw path with IDs. Digests add "(N more)"; regressions start with "Regression:".
+- Subject: `[Trailscope] 500 POST /orders/:id/checkout — PaymentTimeoutError · orders-svc`. Always the route pattern, never a raw path with IDs. Digests add "(N more)"; regressions start with "Regression:".
 - Body (HTML and plain text, dark text on a light background, one column for phones): time, environment, service, release, method and route, status, duration, request ID, user ID, error type and message, the top 5 stack frames, occurrences and users affected so far, a button to the request inspector and a link to the error group.
 - **Never** request or response bodies, headers or IP addresses: the engine only receives a reduced copy of the request without them.
 
@@ -116,16 +116,16 @@ Each email links to "Mute this error for 1 hour / 24 hours / forever". The links
 
 Admins configure SMTP under **Settings → Notifications**: host, port, security (STARTTLS, implicit TLS or none), username, password, from address and from name. **Send test email** reports the exact SMTP error on failure (for example `permanent error (535): 5.7.8 authentication failed`).
 
-The same settings can be set with environment variables or in `logbox.toml` (see [configuration.md](configuration.md#smtp)):
+The same settings can be set with environment variables or in `trailscope.toml` (see [configuration.md](configuration.md#smtp)):
 
 ```bash
-LOGBOX_SMTP_HOST=smtp.example.com
-LOGBOX_SMTP_PORT=587
-LOGBOX_SMTP_SECURITY=starttls   # starttls, tls or none
-LOGBOX_SMTP_USERNAME=logbox
-LOGBOX_SMTP_PASSWORD=…
-LOGBOX_SMTP_FROM=logbox@example.com
-LOGBOX_SMTP_FROM_NAME=Logbox
+TRAILSCOPE_SMTP_HOST=smtp.example.com
+TRAILSCOPE_SMTP_PORT=587
+TRAILSCOPE_SMTP_SECURITY=starttls   # starttls, tls or none
+TRAILSCOPE_SMTP_USERNAME=trailscope
+TRAILSCOPE_SMTP_PASSWORD=…
+TRAILSCOPE_SMTP_FROM=trailscope@example.com
+TRAILSCOPE_SMTP_FROM_NAME=Trailscope
 ```
 
 A value set in configuration wins over the UI value for that field, and the UI shows the field as locked. The password entered in the UI is stored encrypted and never returned by the API, which only reports whether one is set. SMTP is considered configured when a host and a from address are set.
@@ -134,21 +134,21 @@ A value set in configuration wins over the UI value for that field, and the UI s
 
 Notifications are written to a queue in Postgres and sent by a worker. A failed send is retried with exponential backoff (after 30 s, 1, 2 and 4 minutes) up to 5 attempts, then marked failed. Alerts → History shows every notification with its time, recipient or channel, rule, reason (`first`, `digest`, `regression`, `paused`, `firing`, `resolved` or `test`), error group, status, attempts and the server's answer or error. Test emails from Settings → Notifications aren't tied to a project, so they appear only in the result shown on that page.
 
-Metrics on `/metrics`: `logbox_notifications_sent_total{kind}`, `logbox_notifications_failed_total{kind}` and `logbox_alert_eval_seconds`.
+Metrics on `/metrics`: `trailscope_notifications_sent_total{kind}`, `trailscope_notifications_failed_total{kind}` and `trailscope_alert_eval_seconds`.
 
 ## Secret key
 
-`LOGBOX_SECRET_KEY` (or `secret_key` at the top of `logbox.toml`) encrypts the stored SMTP password and channel secrets (XChaCha20-Poly1305) and signs mute links (HMAC-SHA256). Use a long random value:
+`TRAILSCOPE_SECRET_KEY` (or `secret_key` at the top of `trailscope.toml`) encrypts the stored SMTP password and channel secrets (XChaCha20-Poly1305) and signs mute links (HMAC-SHA256). Use a long random value:
 
 ```bash
 openssl rand -base64 48
 ```
 
-If it isn't set, Logbox generates a key on first start and keeps it in Postgres. That works, but anyone with a database dump can then decrypt the stored secrets, so set the variable in production; the UI and the logs warn while it's missing. Changing the key makes stored secrets unreadable (re-enter the SMTP password and recreate channels) and invalidates mute links already sent.
+If it isn't set, Trailscope generates a key on first start and keeps it in Postgres. That works, but anyone with a database dump can then decrypt the stored secrets, so set the variable in production; the UI and the logs warn while it's missing. Changing the key makes stored secrets unreadable (re-enter the SMTP password and recreate channels) and invalidates mute links already sent.
 
 ## Running in split mode
 
-In split mode (`logbox ingest`, `logbox api`, `logbox alerts`), run **exactly one** `alerts` process. It evaluates every rule and receives every 5xx through Redis, so a second one would send everything twice. The API process only queues and test-sends; it doesn't deliver queued notifications.
+In split mode (`trailscope ingest`, `trailscope api`, `trailscope alerts`), run **exactly one** `alerts` process. It evaluates every rule and receives every 5xx through Redis, so a second one would send everything twice. The API process only queues and test-sends; it doesn't deliver queued notifications.
 
 ## Local testing with Mailpit
 

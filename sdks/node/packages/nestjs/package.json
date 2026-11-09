@@ -1,7 +1,7 @@
 {
-  "name": "@logbox/nestjs",
+  "name": "@trailscope/nestjs",
   "version": "0.1.0",
-  "description": "Logbox for NestJS: request logging module, error capture, Logger bridge and BullMQ job tracking",
+  "description": "Trailscope for NestJS: request logging module, error capture, Logger bridge and BullMQ job tracking",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -33,7 +33,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/karaa1122/LogBox",
+    "url": "https://github.com/karaa1122/trailscope",
     "directory": "sdks/node/packages/nestjs"
   },
   "scripts": {
@@ -43,7 +43,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@logbox/node": "workspace:^"
+    "@trailscope/node": "workspace:^"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.0.0 || ^12.0.0",

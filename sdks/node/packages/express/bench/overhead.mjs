@@ -6,16 +6,16 @@
 // Run after `pnpm build`: node bench/overhead.mjs
 import { EventEmitter } from 'node:events';
 
-import { LogboxClient, logbox } from '../dist/index.js';
+import { TrailscopeClient, trailscope } from '../dist/index.js';
 
-const client = new LogboxClient({
-  ingestKey: 'lbx_ingest_bench',
+const client = new TrailscopeClient({
+  ingestKey: 'trs_ingest_bench',
   service: 'bench',
   flushIntervalMs: 3_600_000,
   flushAt: Number.MAX_SAFE_INTEGER,
   fetch: async () => new Response('{"accepted":0,"rejected":0}'),
 });
-const middleware = logbox(client);
+const middleware = trailscope(client);
 
 class FakeResponse extends EventEmitter {
   statusCode = 200;

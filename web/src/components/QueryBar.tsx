@@ -238,8 +238,8 @@ function SearchInput({
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const focus = () => ref.current?.focus();
-    window.addEventListener('logbox:focus-query', focus);
-    return () => window.removeEventListener('logbox:focus-query', focus);
+    window.addEventListener('trailscope:focus-query', focus);
+    return () => window.removeEventListener('trailscope:focus-query', focus);
   }, []);
   return (
     <div className={`search-box${invalid ? ' invalid' : ''}`}>

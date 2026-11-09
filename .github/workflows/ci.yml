@@ -21,8 +21,8 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:26.8
         env:
-          CLICKHOUSE_USER: logbox
-          CLICKHOUSE_PASSWORD: logbox
+          CLICKHOUSE_USER: trailscope
+          CLICKHOUSE_PASSWORD: trailscope
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
         ports: ["8123:8123"]
         options: >-
@@ -32,17 +32,17 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: logbox
-          POSTGRES_PASSWORD: logbox
-          POSTGRES_DB: logbox
+          POSTGRES_USER: trailscope
+          POSTGRES_PASSWORD: trailscope
+          POSTGRES_DB: trailscope
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U logbox" --health-interval 5s --health-timeout 3s --health-retries 20
+          --health-cmd "pg_isready -U trailscope" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
-      LOGBOX_TEST_CLICKHOUSE_URL: http://localhost:8123
-      LOGBOX_TEST_CLICKHOUSE_USER: logbox
-      LOGBOX_TEST_CLICKHOUSE_PASSWORD: logbox
-      LOGBOX_TEST_POSTGRES_URL: postgres://logbox:logbox@localhost:5432/logbox
+      TRAILSCOPE_TEST_CLICKHOUSE_URL: http://localhost:8123
+      TRAILSCOPE_TEST_CLICKHOUSE_USER: trailscope
+      TRAILSCOPE_TEST_CLICKHOUSE_PASSWORD: trailscope
+      TRAILSCOPE_TEST_POSTGRES_URL: postgres://trailscope:trailscope@localhost:5432/trailscope
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
@@ -74,10 +74,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @logbox/web lint
-      - run: pnpm --filter @logbox/web typecheck
-      - run: pnpm --filter @logbox/web test
-      - run: pnpm --filter @logbox/web build
+      - run: pnpm --filter @trailscope/web lint
+      - run: pnpm --filter @trailscope/web typecheck
+      - run: pnpm --filter @trailscope/web test
+      - run: pnpm --filter @trailscope/web build
 
   node-sdk:
     name: Node SDKs

@@ -5,7 +5,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 001. Development toolchain runs in containers
 
 - **Context:** The development machine has Node and Docker but no Rust or Python toolchain.
-- **Choice:** Rust (`rust:1-bookworm`) and Python (`python:3.13-slim`) run in long-lived dev containers with the repo bind-mounted. ClickHouse and Postgres for integration tests run as containers on a `logbox-dev` network. CI uses native toolchains and service containers.
+- **Choice:** Rust (`rust:1-bookworm`) and Python (`python:3.13-slim`) run in long-lived dev containers with the repo bind-mounted. ClickHouse and Postgres for integration tests run as containers on a `trailscope-dev` network. CI uses native toolchains and service containers.
 - **Alternatives:** Installing rustup with the MSVC or GNU toolchain on Windows (needs Visual Studio Build Tools, and diverges from the Linux production target).
 
 ## 002. Pinned versions
@@ -22,20 +22,20 @@ One entry per decision that the spec left open. Newest at the bottom.
 
 ## 004. Environment variable naming
 
-- **Context:** Configuration comes from `logbox.toml` and env vars.
-- **Choice:** `LOGBOX_<SECTION>_<KEY>` maps to `<section>.<key>`, e.g. `LOGBOX_CLICKHOUSE_READER_PASSWORD`. Section names have no underscores, so the first underscore after the section is unambiguous. String fields that hold secrets accept bare numbers (`LOGBOX_CLICKHOUSE_PASSWORD=123456`).
-- **Alternatives:** figment's `__` separator (`LOGBOX_CLICKHOUSE__URL`), which is easy to get wrong.
+- **Context:** Configuration comes from `trailscope.toml` and env vars.
+- **Choice:** `TRAILSCOPE_<SECTION>_<KEY>` maps to `<section>.<key>`, e.g. `TRAILSCOPE_CLICKHOUSE_READER_PASSWORD`. Section names have no underscores, so the first underscore after the section is unambiguous. String fields that hold secrets accept bare numbers (`TRAILSCOPE_CLICKHOUSE_PASSWORD=123456`).
+- **Alternatives:** figment's `__` separator (`TRAILSCOPE_CLICKHOUSE__URL`), which is easy to get wrong.
 
 ## 005. Repository URL and image name
 
 - **Context:** The project needs a canonical URL for package metadata and image labels.
-- **Choice:** `https://github.com/karaa1122/LogBox`. CI publishes to `ghcr.io/${{ github.repository }}`, so forks work without edits. Compose builds `logbox:local` from source by default; `LOGBOX_IMAGE` selects a published image.
+- **Choice:** `https://github.com/karaa1122/trailscope`. CI publishes to `ghcr.io/${{ github.repository }}`, so forks work without edits. Compose builds `trailscope:local` from source by default; `TRAILSCOPE_IMAGE` selects a published image.
 - **Alternatives:** A placeholder organisation.
 
 ## 006. Distroless runtime image and built-in healthcheck
 
 - **Context:** The final image should be slim and non-root, and compose needs a healthcheck.
-- **Choice:** `gcr.io/distroless/cc-debian13:nonroot`. It has no shell or curl, so the binary has a hidden `logbox healthcheck` subcommand that probes `/healthz` on the local listener.
+- **Choice:** `gcr.io/distroless/cc-debian13:nonroot`. It has no shell or curl, so the binary has a hidden `trailscope healthcheck` subcommand that probes `/healthz` on the local listener.
 - **Alternatives:** `debian:trixie-slim` with curl (larger image, more CVE surface).
 
 ## 007. Split-mode ports
@@ -71,7 +71,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 012. Failed flushes are retried indefinitely while running
 
 - **Context:** ClickHouse can be briefly unavailable.
-- **Choice:** A failing flush retries with backoff (200 ms up to 10 s) for as long as the process runs. The rows stay counted against the queue, so ingest answers 429 rather than dropping data. During shutdown, retries stop after `server.shutdown_timeout_secs`; anything still unwritten is counted in `logbox_ingest_dropped_rows_total` and logged.
+- **Choice:** A failing flush retries with backoff (200 ms up to 10 s) for as long as the process runs. The rows stay counted against the queue, so ingest answers 429 rather than dropping data. During shutdown, retries stop after `server.shutdown_timeout_secs`; anything still unwritten is counted in `trailscope_ingest_dropped_rows_total` and logged.
 - **Alternatives:** Dropping after N attempts (silent data loss while the server reports success).
 
 ## 013. Separate live and error channels
@@ -94,7 +94,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 
 ## 016. `IS NULL` means "empty"
 
-- **Context:** Logbox stores no SQL `NULL`s; missing values are empty strings, absent map keys or zeros.
+- **Context:** Trailscope stores no SQL `NULL`s; missing values are empty strings, absent map keys or zeros.
 - **Choice:** `x IS NULL` compiles to `empty(x)` for strings and map values, `x = 0` for numbers and IDs, and epoch 0 for timestamps. The evaluator uses the same rule.
 - **Alternatives:** Nullable columns (slower in ClickHouse, and every SDK would need to tell "absent" from "empty").
 
@@ -137,7 +137,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 023. Install-wide roles
 
 - **Context:** The spec defines owner, admin, member and viewer roles without saying whether they're per project.
-- **Choice:** Roles and *can view bodies* are install-wide; every member sees every project. A small team running one Logbox rarely needs per-project ACLs. API tokens can be bound to one project for narrower access.
+- **Choice:** Roles and *can view bodies* are install-wide; every member sees every project. A small team running one Trailscope rarely needs per-project ACLs. API tokens can be bound to one project for narrower access.
 - **Alternatives:** Per-project membership tables (more UI and more checks for a rare need; can be added later without breaking the API).
 
 ## 024. Sessions, CSRF and login throttling
@@ -214,14 +214,14 @@ One entry per decision that the spec left open. Newest at the bottom.
 
 ## 036. One secret key, with a database fallback
 
-- **Context:** The email brief asks for the SMTP password to be encrypted with `LOGBOX_SECRET_KEY` (AES-256-GCM or XChaCha20-Poly1305) and for signed mute links. Channel secrets (webhook and Slack URLs, bot tokens) need the same protection.
-- **Choice:** XChaCha20-Poly1305 with a random 24-byte nonce per value (`nonce || ciphertext`), and HMAC-SHA256 for mute links and webhook signatures. Two subkeys are derived from the one secret with SHA-256 and distinct labels. When `LOGBOX_SECRET_KEY` is unset, a random key is generated once and stored in the Postgres `settings` table, and the UI and the logs warn about it, so `docker compose up` works without extra setup.
+- **Context:** The email brief asks for the SMTP password to be encrypted with `TRAILSCOPE_SECRET_KEY` (AES-256-GCM or XChaCha20-Poly1305) and for signed mute links. Channel secrets (webhook and Slack URLs, bot tokens) need the same protection.
+- **Choice:** XChaCha20-Poly1305 with a random 24-byte nonce per value (`nonce || ciphertext`), and HMAC-SHA256 for mute links and webhook signatures. Two subkeys are derived from the one secret with SHA-256 and distinct labels. When `TRAILSCOPE_SECRET_KEY` is unset, a random key is generated once and stored in the Postgres `settings` table, and the UI and the logs warn about it, so `docker compose up` works without extra setup.
 - **Alternatives:** Refusing to start without the key (a worse first run), AES-256-GCM (random 96-bit nonces are uncomfortable for long-lived keys), or a KDF like HKDF (unnecessary for a high-entropy secret).
 
 ## 037. SMTP settings: configuration wins per field
 
-- **Context:** SMTP can be set in the UI or through `LOGBOX_SMTP_*`, and "env wins over UI values, and the UI shows those fields as locked".
-- **Choice:** A field is locked when its env var is present or `logbox.toml` sets it to something other than the default. Locked fields come from configuration and the rest from the stored UI values. The UI password is encrypted, never returned (only `passwordSet`), kept when the form sends `null`, and cleared with an empty string. SMTP counts as configured with a host and a from address. Every send opens its own connection with a 20-second timeout.
+- **Context:** SMTP can be set in the UI or through `TRAILSCOPE_SMTP_*`, and "env wins over UI values, and the UI shows those fields as locked".
+- **Choice:** A field is locked when its env var is present or `trailscope.toml` sets it to something other than the default. Locked fields come from configuration and the rest from the stored UI values. The UI password is encrypted, never returned (only `passwordSet`), kept when the form sends `null`, and cleared with an empty string. SMTP counts as configured with a host and a from address. Every send opens its own connection with a 20-second timeout.
 - **Alternatives:** All-or-nothing (env set → UI read-only), which breaks the common case of setting only the password through a secret store.
 
 ## 038. Email on 5xx runs on the error signal stream
@@ -251,13 +251,13 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 042. Alert rules: state, cooldown and links
 
 - **Context:** "A rule is a query, a condition and a window … States ok/firing/resolved with dedupe and a cooldown, so each state change sends one notification … Messages link back to the UI with the query pre-filled."
-- **Choice:** Rules are stored with the same `QueryInput` as Explore and compiled with `logbox_query::where_clause`, so filters are parameterized and run as the read-only user. Bodies and headers can't be used in rule filters. The stored states are `ok` and `firing`; "resolved" is the firing → ok transition. A firing notification is skipped if the previous notification was less than the cooldown ago, and a resolved notification is sent only if the firing was announced. Editing the definition resets the state. Error rate and p95 count requests as stored, while counts are weighted by `1 / sample_rate`. Links open Explore with the query and the evaluated window as absolute `from`/`to`. Channels are per project and created by admins. Rules can be edited by members.
+- **Choice:** Rules are stored with the same `QueryInput` as Explore and compiled with `trailscope_query::where_clause`, so filters are parameterized and run as the read-only user. Bodies and headers can't be used in rule filters. The stored states are `ok` and `firing`; "resolved" is the firing → ok transition. A firing notification is skipped if the previous notification was less than the cooldown ago, and a resolved notification is sent only if the firing was announced. Editing the definition resets the state. Error rate and p95 count requests as stored, while counts are weighted by `1 / sample_rate`. Links open Explore with the query and the evaluated window as absolute `from`/`to`. Channels are per project and created by admins. Rules can be edited by members.
 - **Alternatives:** Pending states with "for N minutes" (more to explain; the window already smooths spikes), or weighting error rate by sampling (the ratio is the same when sampling is uniform).
 
 ## 043. A single alerts process in split mode
 
 - **Context:** In split mode every subscriber receives every Redis message, and the rule loop has no leader election.
-- **Choice:** Run exactly one `logbox alerts` process (documented in docs/alerts.md). The outbox itself is safe with several workers, but the 5xx engine and the rule loop would each send twice.
+- **Choice:** Run exactly one `trailscope alerts` process (documented in docs/alerts.md). The outbox itself is safe with several workers, but the 5xx engine and the rule loop would each send twice.
 - **Alternatives:** Leader election with a Postgres advisory lock (worth adding if someone needs alert high availability).
 
 ## 044. One HTTP recorder per SDK, shared by its integrations
@@ -281,7 +281,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 047. Jobs belong to the request that started them
 
 - **Context:** A job started in a request handler (`trackJob` without a `context`) got fresh IDs, so it didn't show up in the request's journey.
-- **Choice:** `trackJob` / `track_job` default to the current context: the job's events carry the request's ID, trace, user and correlation keys, with a new span ID. Jobs in other processes restore a serialized context (BullMQ job data `__logbox`, a Celery message header `logbox`).
+- **Choice:** `trackJob` / `track_job` default to the current context: the job's events carry the request's ID, trace, user and correlation keys, with a new span ID. Jobs in other processes restore a serialized context (BullMQ job data `__trailscope`, a Celery message header `trailscope`).
 - **Alternatives:** Always new IDs, linking only through correlation keys (journeys would miss jobs that don't repeat the keys).
 
 ## 048. Fastify without fastify-plugin, context re-entered before handlers
@@ -293,7 +293,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 049. NestJS: middleware, interceptor and an opt-in filter
 
 - **Context:** The brief asks for a module, an interceptor and an exception filter that captures errors, plus a `Logger` bridge.
-- **Choice:** `LogboxModule.forRoot()` applies the middleware to every route (`{*path}`, the Nest 11+ wildcard, so the peer range is Nest 11 and 12) and registers the interceptor globally; the interceptor records handler exceptions and sets the route. `LogboxExceptionFilter` (a `BaseExceptionFilter`, so responses are unchanged) is registered only with `exceptionFilter: true`, because a global catch-all filter could shadow or be shadowed by the application's own. `LogboxLogger` extends `ConsoleLogger` and skips Nest's startup contexts and `ExceptionsHandler`, whose unhandled-exception lines would create a second error group for the error the request already carries. The package is built with tsup and uses explicit `@Inject()` tokens, since esbuild doesn't emit decorator metadata.
+- **Choice:** `TrailscopeModule.forRoot()` applies the middleware to every route (`{*path}`, the Nest 11+ wildcard, so the peer range is Nest 11 and 12) and registers the interceptor globally; the interceptor records handler exceptions and sets the route. `TrailscopeExceptionFilter` (a `BaseExceptionFilter`, so responses are unchanged) is registered only with `exceptionFilter: true`, because a global catch-all filter could shadow or be shadowed by the application's own. `TrailscopeLogger` extends `ConsoleLogger` and skips Nest's startup contexts and `ExceptionsHandler`, whose unhandled-exception lines would create a second error group for the error the request already carries. The package is built with tsup and uses explicit `@Inject()` tokens, since esbuild doesn't emit decorator metadata.
 - **Alternatives:** Always registering the filter (conflicts), or a filter only (misses the route pattern).
 
 ## 050. Python SDK: standard library only
@@ -311,14 +311,14 @@ One entry per decision that the spec left open. Newest at the bottom.
 ## 052. Examples instead of new SDK tests
 
 - **Context:** The brief asks for tests in every package; the user asked to skip new tests from M4 on (decision 028).
-- **Choice:** No new test suites. New Node packages run `vitest run --passWithNoTests` so CI stays green, and the core keeps its existing tests. Every integration was verified against a running Logbox with the apps in `examples/` (Express, Fastify, NestJS on both platforms with BullMQ, FastAPI, Django with a prefork Celery worker): routes, request IDs, `traceparent`, users, correlation keys, 5xx errors, job linking and attempts, log lines, spans and remote settings.
+- **Choice:** No new test suites. New Node packages run `vitest run --passWithNoTests` so CI stays green, and the core keeps its existing tests. Every integration was verified against a running Trailscope with the apps in `examples/` (Express, Fastify, NestJS on both platforms with BullMQ, FastAPI, Django with a prefork Celery worker): routes, request IDs, `traceparent`, users, correlation keys, 5xx errors, job linking and attempts, log lines, spans and remote settings.
 - **Alternatives:** Writing the brief's test suites now (against the user's instruction).
 
 ## 053. OTLP/HTTP receiver: hand-written messages, server spans become requests
 
 - **Context:** M8 asks for an OTLP receiver at `/v1/otlp/v1/traces` and `/v1/otlp/v1/logs`, mapped into spans and events.
 - **Choice:** OTLP/HTTP with protobuf or JSON (gzip allowed), authenticated with an ingest key. The dozen OTLP messages the mapping reads are declared in `otlp.rs` with prost derives (unknown fields skipped), and the same structs derive serde for OTLP/JSON (hex IDs, 64-bit integers as strings or numbers). Spans become spans; a server span with an HTTP method also becomes a request (request ID = span ID; route, path, status, user and client from semantic conventions; the first `exception` event as the error), so OpenTelemetry-instrumented services show up in Live tail, Explore, Errors, alerts and Email on 5xx. Route syntaxes (`{id}`, `<int:id>`) are rewritten to `:id`. Log records become `log` events. Everything then goes through the same normalization, redaction, limits and queue as `/v1/ingest`, and rejected items are reported in `partialSuccess`. Metrics and OTLP/gRPC are out of scope.
-- **Alternatives:** The `opentelemetry-proto` crate (its `trace` and `logs` features pull in the OpenTelemetry SDK), spans only (Logbox's views are built on requests), or a separate `/v1/traces` path (the spec names `/v1/otlp`).
+- **Alternatives:** The `opentelemetry-proto` crate (its `trace` and `logs` features pull in the OpenTelemetry SDK), spans only (Trailscope's views are built on requests), or a separate `/v1/traces` path (the spec names `/v1/otlp`).
 
 ## 054. OIDC sign-in: code flow with PKCE, link by subject then email
 
@@ -332,7 +332,7 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Choice:** No e2e test suite or CI job. Playwright is used for the README screenshots (`e2e/screenshots.mjs`) and for the manual checks behind docs/benchmarks.md.
 - **Alternatives:** Writing the suite now (against the user's instruction); it can be added later on top of `e2e/`.
 
-## 056. The Python SDK is published as `logbox-sdk`
+## 056. The Python SDK is published as `logbox-sdk` (superseded by 062)
 
 - **Context:** The name `logbox` on PyPI belongs to an unrelated project (a terminal output toolbox), so the release workflow couldn't publish under it. The npm names `@logbox/*` are unclaimed.
 - **Choice:** The distribution is `logbox-sdk` (`pip install logbox-sdk`); the import name stays `logbox`, so code and docs keep `import logbox`. Whoever publishes the first release must also own the `@logbox` npm scope (or rename the Node packages) and set up PyPI trusted publishing for `logbox-sdk`.
@@ -356,10 +356,10 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Choice:** A `req_body_truncated` column (ClickHouse migration 0003) and an optional `reqBodyTruncated` wire field. The server sets it when it cuts the request body itself; the SDKs send it next to `bodyTruncated`. When an older SDK sends only `bodyTruncated`, it counts for the request body too, and rows written before the migration inherit `body_truncated` through the column default, so replay stays cautious where it can't know. Replay refuses only on `req_body_truncated`; the column is also queryable.
 - **Alternatives:** Guessing from the stored body's length (wrong whenever an SDK's limit is lower than the server's), or replacing `body_truncated` with two new flags (breaks existing queries, saved views and older SDKs).
 
-## 060. Empty LOGBOX_* variables count as unset
+## 060. Empty TRAILSCOPE_* variables count as unset
 
-- **Context:** The compose files didn't pass `LOGBOX_SMTP_*` or `LOGBOX_OIDC_*` to the container, so setting them in `deploy/.env` did nothing (and OIDC can only be configured this way). Passing them as `${LOGBOX_SMTP_PORT:-}` would set empty values, which failed to parse for numbers and locked the SMTP fields in the UI to empty.
-- **Choice:** The config loader skips `LOGBOX_*` variables whose value is empty, and SMTP field locking uses the same rule. Both compose files now pass the SMTP and OIDC settings (and, in split mode, the secret key and retention) through; `.env.example` lists them.
+- **Context:** The compose files didn't pass `TRAILSCOPE_SMTP_*` or `TRAILSCOPE_OIDC_*` to the container, so setting them in `deploy/.env` did nothing (and OIDC can only be configured this way). Passing them as `${TRAILSCOPE_SMTP_PORT:-}` would set empty values, which failed to parse for numbers and locked the SMTP fields in the UI to empty.
+- **Choice:** The config loader skips `TRAILSCOPE_*` variables whose value is empty, and SMTP field locking uses the same rule. Both compose files now pass the SMTP and OIDC settings (and, in split mode, the secret key and retention) through; `.env.example` lists them.
 - **Alternatives:** A separate env file per optional feature (more files to explain), or documenting that people must edit the compose file (the bug this fixes).
 
 ## 061. "Send test email" saves unsaved settings first
@@ -367,3 +367,9 @@ One entry per decision that the spec left open. Newest at the bottom.
 - **Context:** The test endpoint uses the stored SMTP settings, so after editing the form without saving, the test reported on the old settings (for example, a test "sent" to a local catch-all while the form showed a real provider).
 - **Choice:** When the form has unsaved changes, the button reads "Save and send test email", saves, then sends; a line under it says so.
 - **Alternatives:** Letting the test endpoint accept unsaved settings (a second code path for credentials, and the password would have to be sent again), or disabling the button until saved (one more step for the common case).
+
+## 062. The project is called Trailscope
+
+- **Context:** "Logbox" was the working name. Before publishing, it clashed with React Native's built-in error screen (LogBox), and `logbox` on PyPI belongs to another project (decision 056).
+- **Choice:** Trailscope: following the trail of each request across services and jobs is what the tool is for. On the day of the rename, `trailscope` was free on PyPI and crates.io and as a GitHub user name, `@trailscope/*` was unpublished on npm, and no product of that name turned up in a search. Everything was renamed at once, before the first release: crates (`trailscope-*`), the binary and config file (`trailscope`, `trailscope.toml`), settings (`TRAILSCOPE_*`), the ClickHouse database and reader user, metrics (`trailscope_*`), headers (`X-Trailscope-*`), token prefixes (`trs_ingest_`, `trs_api_`), the SDKs (`@trailscope/*` on npm, `trailscope` on PyPI, now one name for install and import) and the key-derivation labels. Stored secrets encrypted under the old labels must be entered again.
+- **Alternatives:** Keeping Logbox (crowded searches and a split PyPI name), Hopscope (catchier, less clear), or accepting the old token prefixes and key labels too (compatibility nobody needs before a first release, kept forever).

@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { TrackJob } from '@logbox/nestjs';
+import { TrackJob } from '@trailscope/nestjs';
 import type { Job } from 'bullmq';
 
 @Processor('notifications')

@@ -18,16 +18,16 @@ export interface RedactOptions {
   disableDefaults?: boolean;
 }
 
-export interface LogboxOptions {
-  /** Logbox base URL. Default `$LOGBOX_ENDPOINT` or `http://localhost:8080`. */
+export interface TrailscopeOptions {
+  /** Trailscope base URL. Default `$TRAILSCOPE_ENDPOINT` or `http://localhost:8080`. */
   endpoint?: string;
-  /** Ingest key (`lbx_ingest_…`). Default `$LOGBOX_INGEST_KEY`. */
+  /** Ingest key (`trs_ingest_…`). Default `$TRAILSCOPE_INGEST_KEY`. */
   ingestKey?: string;
-  /** Service name. Default `$LOGBOX_SERVICE`. */
+  /** Service name. Default `$TRAILSCOPE_SERVICE`. */
   service?: string;
-  /** Default `$LOGBOX_ENVIRONMENT`, then `$NODE_ENV`, then `production`. */
+  /** Default `$TRAILSCOPE_ENVIRONMENT`, then `$NODE_ENV`, then `production`. */
   environment?: string;
-  /** Release or version. Default `$LOGBOX_RELEASE`. */
+  /** Release or version. Default `$TRAILSCOPE_RELEASE`. */
   release?: string;
   /** Disable to make every call a no-op (e.g. in unit tests). Default true. */
   enabled?: boolean;
@@ -116,21 +116,21 @@ function clampRate(r: number | undefined, fallback: number): number {
   return Math.min(1, Math.max(0, r));
 }
 
-export function resolveOptions(o: LogboxOptions = {}): ResolvedOptions {
-  const debug = o.debug ?? env('LOGBOX_DEBUG') === '1';
+export function resolveOptions(o: TrailscopeOptions = {}): ResolvedOptions {
+  const debug = o.debug ?? env('TRAILSCOPE_DEBUG') === '1';
   const log =
     typeof debug === 'function'
       ? debug
       : debug
-        ? (m: string) => console.debug(`[logbox] ${m}`)
+        ? (m: string) => console.debug(`[trailscope] ${m}`)
         : () => undefined;
   return {
-    endpoint: (o.endpoint ?? env('LOGBOX_ENDPOINT') ?? 'http://localhost:8080').replace(/\/+$/, ''),
-    ingestKey: o.ingestKey ?? env('LOGBOX_INGEST_KEY') ?? '',
-    service: o.service ?? env('LOGBOX_SERVICE') ?? 'unknown-service',
-    environment: o.environment ?? env('LOGBOX_ENVIRONMENT') ?? env('NODE_ENV') ?? 'production',
-    release: o.release ?? env('LOGBOX_RELEASE') ?? '',
-    enabled: o.enabled ?? env('LOGBOX_ENABLED') !== '0',
+    endpoint: (o.endpoint ?? env('TRAILSCOPE_ENDPOINT') ?? 'http://localhost:8080').replace(/\/+$/, ''),
+    ingestKey: o.ingestKey ?? env('TRAILSCOPE_INGEST_KEY') ?? '',
+    service: o.service ?? env('TRAILSCOPE_SERVICE') ?? 'unknown-service',
+    environment: o.environment ?? env('TRAILSCOPE_ENVIRONMENT') ?? env('NODE_ENV') ?? 'production',
+    release: o.release ?? env('TRAILSCOPE_RELEASE') ?? '',
+    enabled: o.enabled ?? env('TRAILSCOPE_ENABLED') !== '0',
     maxQueueSize: Math.max(1, o.maxQueueSize ?? 10_000),
     flushIntervalMs: Math.max(10, o.flushIntervalMs ?? 1000),
     flushAt: Math.max(1, o.flushAt ?? 500),

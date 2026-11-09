@@ -1,5 +1,5 @@
 name: Feature request
-description: An idea for Logbox or one of the SDKs
+description: An idea for Trailscope or one of the SDKs
 labels: [enhancement]
 body:
   - type: textarea

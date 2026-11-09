@@ -1790,182 +1790,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
-name = "logbox-alerts"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "chacha20poly1305",
- "clickhouse",
- "hex",
- "hmac",
- "lettre",
- "logbox-core",
- "logbox-query",
- "metrics",
- "rand 0.10.3",
- "reqwest",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "thiserror",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "logbox-api"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argon2",
- "async-stream",
- "axum",
- "axum-extra",
- "base64 0.23.1",
- "clickhouse",
- "futures",
- "http-body-util",
- "jsonwebtoken",
- "logbox-alerts",
- "logbox-core",
- "logbox-ingest",
- "logbox-query",
- "metrics",
- "rand 0.10.3",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "time",
- "tokio",
- "tokio-util",
- "tower",
- "tracing",
- "url",
- "utoipa",
- "utoipa-axum",
- "utoipa-scalar",
- "uuid",
-]
-
-[[package]]
-name = "logbox-core"
-version = "0.1.0"
-dependencies = [
- "clickhouse",
- "figment",
- "futures",
- "hex",
- "metrics",
- "rand 0.10.3",
- "redis",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "thiserror",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "logbox-demo"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "flate2",
- "logbox-core",
- "rand 0.10.3",
- "reqwest",
- "serde",
- "serde_json",
- "time",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "logbox-ingest"
-version = "0.1.0"
-dependencies = [
- "axum",
- "base64 0.23.1",
- "bytes",
- "clickhouse",
- "flate2",
- "hex",
- "http-body-util",
- "logbox-core",
- "metrics",
- "prost",
- "regex",
- "serde",
- "serde_json",
- "sqlx",
- "time",
- "tokio",
- "tokio-util",
- "tower",
- "tracing",
- "url",
- "uuid",
- "xxhash-rust",
- "zstd",
-]
-
-[[package]]
-name = "logbox-query"
-version = "0.1.0"
-dependencies = [
- "clickhouse",
- "logbox-core",
- "proptest",
- "regex",
- "regex-syntax",
- "serde",
- "serde_json",
- "sqlparser",
- "time",
- "tokio",
-]
-
-[[package]]
-name = "logbox-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "logbox-alerts",
- "logbox-api",
- "logbox-core",
- "logbox-demo",
- "logbox-ingest",
- "metrics-exporter-prometheus",
- "mimalloc",
- "rust-embed",
- "serde_json",
- "sqlx",
- "tokio",
- "tokio-util",
- "tower-http 0.7.1",
- "tracing",
-]
-
-[[package]]
 name = "loom"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3824,6 +3648,182 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "trailscope-alerts"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "chacha20poly1305",
+ "clickhouse",
+ "hex",
+ "hmac",
+ "lettre",
+ "metrics",
+ "rand 0.10.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "thiserror",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "trailscope-core",
+ "trailscope-query",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "trailscope-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "async-stream",
+ "axum",
+ "axum-extra",
+ "base64 0.23.1",
+ "clickhouse",
+ "futures",
+ "http-body-util",
+ "jsonwebtoken",
+ "metrics",
+ "rand 0.10.3",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tracing",
+ "trailscope-alerts",
+ "trailscope-core",
+ "trailscope-ingest",
+ "trailscope-query",
+ "url",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-scalar",
+ "uuid",
+]
+
+[[package]]
+name = "trailscope-core"
+version = "0.1.0"
+dependencies = [
+ "clickhouse",
+ "figment",
+ "futures",
+ "hex",
+ "metrics",
+ "rand 0.10.3",
+ "redis",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "thiserror",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "trailscope-demo"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "flate2",
+ "rand 0.10.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "trailscope-core",
+]
+
+[[package]]
+name = "trailscope-ingest"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.23.1",
+ "bytes",
+ "clickhouse",
+ "flate2",
+ "hex",
+ "http-body-util",
+ "metrics",
+ "prost",
+ "regex",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tracing",
+ "trailscope-core",
+ "url",
+ "uuid",
+ "xxhash-rust",
+ "zstd",
+]
+
+[[package]]
+name = "trailscope-query"
+version = "0.1.0"
+dependencies = [
+ "clickhouse",
+ "proptest",
+ "regex",
+ "regex-syntax",
+ "serde",
+ "serde_json",
+ "sqlparser",
+ "time",
+ "tokio",
+ "trailscope-core",
+]
+
+[[package]]
+name = "trailscope-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "metrics-exporter-prometheus",
+ "mimalloc",
+ "rust-embed",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tokio-util",
+ "tower-http 0.7.1",
+ "tracing",
+ "trailscope-alerts",
+ "trailscope-api",
+ "trailscope-core",
+ "trailscope-demo",
+ "trailscope-ingest",
 ]
 
 [[package]]

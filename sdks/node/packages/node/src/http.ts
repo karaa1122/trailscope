@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import type { LogboxClient } from './client.js';
-import { type LogboxContext, runWithContext } from './context.js';
+import type { TrailscopeClient } from './client.js';
+import { type TrailscopeContext, runWithContext } from './context.js';
 
 type HeaderBag = Record<string, string | string[] | number | undefined>;
 
@@ -36,15 +36,15 @@ export interface ObserveOptions {
   ip?: () => string | undefined;
 }
 
-const CONTEXT = Symbol.for('logbox.context');
+const CONTEXT = Symbol.for('trailscope.context');
 
-/** The Logbox context an integration attached to a request object. */
-export function contextOf(req: object | undefined): LogboxContext | undefined {
-  return req ? (req as { [CONTEXT]?: LogboxContext })[CONTEXT] : undefined;
+/** The Trailscope context an integration attached to a request object. */
+export function contextOf(req: object | undefined): TrailscopeContext | undefined {
+  return req ? (req as { [CONTEXT]?: TrailscopeContext })[CONTEXT] : undefined;
 }
 
-export function attachContext(req: object, ctx: LogboxContext): void {
-  (req as { [CONTEXT]?: LogboxContext })[CONTEXT] = ctx;
+export function attachContext(req: object, ctx: TrailscopeContext): void {
+  (req as { [CONTEXT]?: TrailscopeContext })[CONTEXT] = ctx;
 }
 
 function first(v: string | string[] | undefined): string | undefined {
@@ -67,7 +67,7 @@ export function clientIp(req: IncomingMessage): string | undefined {
  * recorded with status 499.
  */
 export function observeHttp(
-  client: LogboxClient,
+  client: TrailscopeClient,
   req: IncomingMessage,
   res: ServerResponse,
   next: () => void,

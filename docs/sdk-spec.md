@@ -1,14 +1,14 @@
 # SDK behaviour
 
-What every official Logbox SDK does, so that a request logged from Express looks the same as one logged from Django. [ingest-protocol.md](ingest-protocol.md) is the wire contract; this page is how the SDKs use it. A new SDK should follow it point by point.
+What every official Trailscope SDK does, so that a request logged from Express looks the same as one logged from Django. [ingest-protocol.md](ingest-protocol.md) is the wire contract; this page is how the SDKs use it. A new SDK should follow it point by point.
 
 | Package | Language | Integrations |
 |---|---|---|
-| [`@logbox/node`](sdk-node.md) | Node.js 18+ | core client, used directly by workers and scripts |
-| [`@logbox/express`](sdk-express.md) | Node.js 18+ | Express 4 and 5 |
-| [`@logbox/fastify`](sdk-fastify.md) | Node.js 20+ | Fastify 5 |
-| [`@logbox/nestjs`](sdk-nestjs.md) | Node.js 20+ | NestJS 11 and 12 (Express or Fastify platform), Logger bridge, BullMQ |
-| [`logbox-sdk`](sdk-python.md) (import `logbox`) | Python 3.10+ | Django, ASGI (FastAPI, Starlette), Celery, `logging` |
+| [`@trailscope/node`](sdk-node.md) | Node.js 18+ | core client, used directly by workers and scripts |
+| [`@trailscope/express`](sdk-express.md) | Node.js 18+ | Express 4 and 5 |
+| [`@trailscope/fastify`](sdk-fastify.md) | Node.js 20+ | Fastify 5 |
+| [`@trailscope/nestjs`](sdk-nestjs.md) | Node.js 20+ | NestJS 11 and 12 (Express or Fastify platform), Logger bridge, BullMQ |
+| [`trailscope`](sdk-python.md) | Python 3.10+ | Django, ASGI (FastAPI, Starlette), Celery, `logging` |
 
 ## 1. Never block the request path
 
@@ -16,9 +16,9 @@ What every official Logbox SDK does, so that a request logged from Express looks
 - A **background flush** (a timer in Node, a daemon thread in Python) runs every second, or early once 500 items are queued. A flush sends batches of up to 1,000 items as **gzipped NDJSON** to `POST /v1/ingest`.
 - **Redaction, `beforeSend`, serialization and compression happen in the flush**, not when the item is captured.
 - **Retries:** network errors, `429` and `5xx` put the batch back at the front of the queue (dropping the oldest items if there is no room) and pause flushing with exponential backoff and jitter (1 s doubling to 60 s, randomized between half and the full value). A `Retry-After` header sets the minimum pause. Other `4xx` responses drop the batch; `401`/`403` print one warning about the ingest key.
-- **Shutdown** flushes what is left, waiting at most 5 seconds. Node: `client.shutdown()` (also on `beforeExit`, and by `LogboxModule` on application shutdown). Python: `client.shutdown()`, registered with `atexit` by `init()`.
+- **Shutdown** flushes what is left, waiting at most 5 seconds. Node: `client.shutdown()` (also on `beforeExit`, and by `TrailscopeModule` on application shutdown). Python: `client.shutdown()`, registered with `atexit` by `init()`.
 - **Forks (Python):** after `os.fork()` the child starts with an empty queue, fresh locks and a new flush thread, so preforking servers (gunicorn, Celery prefork) don't share or duplicate items.
-- An SDK must never raise into the application because of Logbox: transport, serialization and recording errors are caught and reported only through the SDK's debug log (`LOGBOX_DEBUG=1`).
+- An SDK must never raise into the application because of Trailscope: transport, serialization and recording errors are caught and reported only through the SDK's debug log (`TRAILSCOPE_DEBUG=1`).
 
 ## 2. Configuration
 
@@ -26,13 +26,13 @@ Each option can be passed in code; the ones below also read an environment varia
 
 | Option | Env | Default |
 |---|---|---|
-| endpoint | `LOGBOX_ENDPOINT` | `http://localhost:8080` |
-| ingest key | `LOGBOX_INGEST_KEY` | none: nothing is sent |
-| service | `LOGBOX_SERVICE` | `unknown-service` |
-| environment | `LOGBOX_ENVIRONMENT` (Node also `NODE_ENV`) | `production` |
-| release | `LOGBOX_RELEASE` | empty |
-| enabled | `LOGBOX_ENABLED=0` disables | on |
-| debug log | `LOGBOX_DEBUG=1` | off |
+| endpoint | `TRAILSCOPE_ENDPOINT` | `http://localhost:8080` |
+| ingest key | `TRAILSCOPE_INGEST_KEY` | none: nothing is sent |
+| service | `TRAILSCOPE_SERVICE` | `unknown-service` |
+| environment | `TRAILSCOPE_ENVIRONMENT` (Node also `NODE_ENV`) | `production` |
+| release | `TRAILSCOPE_RELEASE` | empty |
+| enabled | `TRAILSCOPE_ENABLED=0` disables | on |
+| debug log | `TRAILSCOPE_DEBUG=1` | off |
 
 The others (queue size, flush interval and size, sampling, body capture, ignored routes, redaction, `beforeSend`) are code options, named in the language's style (`sampleRate` / `sample_rate`).
 
@@ -82,13 +82,13 @@ On by default, applied in the flush before anything leaves the process. The serv
 
 ## 6. Jobs
 
-- A job started inside a request belongs to it by default. To carry the context to another process, serialize it into the job (`serializeContext()` / `serialize_context()`; the BullMQ helper uses `job.data.__logbox`, the Celery integration a `logbox` message header) and restore it in the worker.
+- A job started inside a request belongs to it by default. To carry the context to another process, serialize it into the job (`serializeContext()` / `serialize_context()`; the BullMQ helper uses `job.data.__trailscope`, the Celery integration a `trailscope` message header) and restore it in the worker.
 - Each run is an `event` with `kind: "job"`, the job name, `status` `ok` or `error`, the duration, the **1-based attempt number**, the error's type, message and stack on failure, and the restored request ID, trace ID, user and correlation keys. Celery retries are recorded as `error` events with level `warn`.
 - Log lines written during the job carry the job's context.
 
 ## 7. Logs, events and spans
 
-- **Logs:** `log(level, message)` and the logger bridges (Nest `LogboxLogger`, Python `LogboxHandler`) send `event` items with `kind: "log"`, the logger name or context as the event name, and the current context. Bridges skip the SDK's own logs and, by default, framework startup noise and Nest's `ExceptionsHandler` lines (the request already carries that error).
+- **Logs:** `log(level, message)` and the logger bridges (Nest `TrailscopeLogger`, Python `TrailscopeHandler`) send `event` items with `kind: "log"`, the logger name or context as the event name, and the current context. Bridges skip the SDK's own logs and, by default, framework startup noise and Nest's `ExceptionsHandler` lines (the request already carries that error).
 - **Events:** `captureEvent` / `capture_event` for custom events (`kind: "custom"`).
 - **Spans:** `span(kind, name, fn)` (Node) and `with client.span(kind, name)` (Python) time a block as a child of the current request's span.
 

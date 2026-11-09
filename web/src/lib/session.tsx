@@ -62,9 +62,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   });
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
-  const [projectId, setProjectId] = useState<string | null>(() => stored('logbox.project'));
-  const [environment, setEnv] = useState<string | null>(() => stored('logbox.environment'));
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => (stored('logbox.theme') === 'light' ? 'light' : 'dark'));
+  const [projectId, setProjectId] = useState<string | null>(() => stored('trailscope.project'));
+  const [environment, setEnv] = useState<string | null>(() => stored('trailscope.environment'));
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => (stored('trailscope.theme') === 'light' ? 'light' : 'dark'));
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -74,14 +74,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setProject = useCallback((id: string) => {
     setProjectId(id);
-    store('logbox.project', id);
+    store('trailscope.project', id);
     setEnv(null);
-    store('logbox.environment', null);
+    store('trailscope.environment', null);
   }, []);
 
   const setEnvironment = useCallback((env: string | null) => {
     setEnv(env);
-    store('logbox.environment', env);
+    store('trailscope.environment', env);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -110,7 +110,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
       const next = t === 'dark' ? 'light' : 'dark';
-      store('logbox.theme', next);
+      store('trailscope.theme', next);
       return next;
     });
   }, []);

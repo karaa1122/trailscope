@@ -13,7 +13,7 @@ function AuthCard({ title, subtitle, children }: { title: string; subtitle?: Rea
       <div className="panel auth-card">
         <div className="logo" style={{ padding: 0 }}>
           <Logo />
-          <span className="logo-word">logbox</span>
+          <span className="logo-word">trailscope</span>
         </div>
         <div>
           <h1 style={{ margin: '4px 0 6px', fontSize: 20 }}>{title}</h1>
@@ -106,7 +106,7 @@ export function InviteAccept({ token }: { token: string }) {
     }
   };
   return (
-    <AuthCard title="Join Logbox" subtitle="You've been invited. Choose a name and a password to finish.">
+    <AuthCard title="Join Trailscope" subtitle="You've been invited. Choose a name and a password to finish.">
       <form onSubmit={(e) => void submit(e)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <label className="field">
           Name
@@ -128,18 +128,18 @@ export function InviteAccept({ token }: { token: string }) {
 type Framework = 'express' | 'fastify' | 'nestjs' | 'fastapi' | 'django' | 'http';
 
 function snippet(fw: Framework, endpoint: string, key: string): string {
-  const env = `LOGBOX_ENDPOINT=${endpoint}\nLOGBOX_INGEST_KEY=${key}\nLOGBOX_SERVICE=api`;
+  const env = `TRAILSCOPE_ENDPOINT=${endpoint}\nTRAILSCOPE_INGEST_KEY=${key}\nTRAILSCOPE_SERVICE=api`;
   switch (fw) {
     case 'express':
-      return `# npm install @logbox/express\n# ${env.replace(/\n/g, '\n# ')}\nimport express from 'express';\nimport { logbox } from '@logbox/express';\n\nconst app = express();\napp.use(logbox());   // first; reads LOGBOX_* from the environment\napp.use(express.json());\napp.get('/users/:id', (req, res) => res.json({ id: req.params.id }));\napp.listen(3000);`;
+      return `# npm install @trailscope/express\n# ${env.replace(/\n/g, '\n# ')}\nimport express from 'express';\nimport { trailscope } from '@trailscope/express';\n\nconst app = express();\napp.use(trailscope());   // first; reads TRAILSCOPE_* from the environment\napp.use(express.json());\napp.get('/users/:id', (req, res) => res.json({ id: req.params.id }));\napp.listen(3000);`;
     case 'fastify':
-      return `# npm install @logbox/fastify\nimport Fastify from 'fastify';\nimport logbox from '@logbox/fastify';\n\nconst app = Fastify();\nawait app.register(logbox, { endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' });\napp.get('/users/:id', async (req) => ({ id: req.params.id }));\nawait app.listen({ port: 3000 });`;
+      return `# npm install @trailscope/fastify\nimport Fastify from 'fastify';\nimport trailscope from '@trailscope/fastify';\n\nconst app = Fastify();\nawait app.register(trailscope, { endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' });\napp.get('/users/:id', async (req) => ({ id: req.params.id }));\nawait app.listen({ port: 3000 });`;
     case 'nestjs':
-      return `// npm install @logbox/nestjs\nimport { Module } from '@nestjs/common';\nimport { LogboxModule } from '@logbox/nestjs';\n\n@Module({\n  imports: [LogboxModule.forRoot({ endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' })],\n})\nexport class AppModule {}`;
+      return `// npm install @trailscope/nestjs\nimport { Module } from '@nestjs/common';\nimport { TrailscopeModule } from '@trailscope/nestjs';\n\n@Module({\n  imports: [TrailscopeModule.forRoot({ endpoint: '${endpoint}', ingestKey: '${key}', service: 'api' })],\n})\nexport class AppModule {}`;
     case 'fastapi':
-      return `# pip install "logbox-sdk[fastapi]"\nfrom fastapi import FastAPI\nimport logbox\nfrom logbox.asgi import LogboxMiddleware\n\nlogbox.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(LogboxMiddleware)  # add it last, so it runs first`;
+      return `# pip install "trailscope[fastapi]"\nfrom fastapi import FastAPI\nimport trailscope\nfrom trailscope.asgi import TrailscopeMiddleware\n\ntrailscope.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(TrailscopeMiddleware)  # add it last, so it runs first`;
     case 'django':
-      return `# pip install "logbox-sdk[django]"\n# settings.py\nLOGBOX = {"endpoint": "${endpoint}", "ingest_key": "${key}", "service": "api"}\nMIDDLEWARE = ["logbox.django.LogboxMiddleware", *MIDDLEWARE]`;
+      return `# pip install "trailscope[django]"\n# settings.py\nTRAILSCOPE = {"endpoint": "${endpoint}", "ingest_key": "${key}", "service": "api"}\nMIDDLEWARE = ["trailscope.django.TrailscopeMiddleware", *MIDDLEWARE]`;
     case 'http':
       return `curl -X POST ${endpoint}/v1/ingest \\\n  -H 'Authorization: Bearer ${key}' \\\n  -H 'Content-Type: application/x-ndjson' \\\n  --data-binary '{"type":"request","service":"api","method":"GET","path":"/hello","status":200,"durationMs":12}'`;
   }
@@ -195,7 +195,7 @@ export function Setup() {
 
   if (step === 0) {
     return (
-      <AuthCard title="Set up Logbox" subtitle="Create the owner account and your first project. You can invite your team afterwards.">
+      <AuthCard title="Set up Trailscope" subtitle="Create the owner account and your first project. You can invite your team afterwards.">
         {steps}
         <form onSubmit={(e) => void create(e)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <label className="field">
@@ -277,13 +277,13 @@ export function Setup() {
     <AuthCard title={received ? 'First event received' : 'Waiting for the first event…'}>
       {steps}
       {received ? (
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--accent)' }}>✓ Logbox is receiving data from your service.</p>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--accent)' }}>✓ Trailscope is receiving data from your service.</p>
       ) : (
         <p className="muted" style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
           Start your service with the SDK installed and make a request. No app handy? Generate demo traffic:
           <br />
           <code className="mono" style={{ color: 'var(--text)' }}>
-            logbox demo --url {endpoint} --key {result?.key.slice(0, 18)}…
+            trailscope demo --url {endpoint} --key {result?.key.slice(0, 18)}…
           </code>
         </p>
       )}

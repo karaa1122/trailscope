@@ -1,7 +1,7 @@
 import { ConsoleLogger, Inject, Injectable } from '@nestjs/common';
-import type { Level, LogboxClient } from '@logbox/node';
+import type { Level, TrailscopeClient } from '@trailscope/node';
 
-import { LOGBOX_CLIENT, LOGBOX_MODULE_OPTIONS, type LogboxModuleOptions } from './tokens.js';
+import { TRAILSCOPE_CLIENT, TRAILSCOPE_MODULE_OPTIONS, type TrailscopeModuleOptions } from './tokens.js';
 
 const RANK: Record<Level, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
@@ -20,22 +20,22 @@ export const DEFAULT_IGNORED_LOGGER_CONTEXTS = [
 ];
 
 /**
- * A `ConsoleLogger` that also sends each line to Logbox as a `log` event,
+ * A `ConsoleLogger` that also sends each line to Trailscope as a `log` event,
  * with the current request's IDs, user and correlation keys:
  *
  * ```ts
  * const app = await NestFactory.create(AppModule, { bufferLogs: true });
- * app.useLogger(app.get(LogboxLogger));
+ * app.useLogger(app.get(TrailscopeLogger));
  * ```
  */
 @Injectable()
-export class LogboxLogger extends ConsoleLogger {
+export class TrailscopeLogger extends ConsoleLogger {
   private readonly minRank: number;
   private readonly ignored: Set<string>;
 
   constructor(
-    @Inject(LOGBOX_CLIENT) private readonly client: LogboxClient,
-    @Inject(LOGBOX_MODULE_OPTIONS) options: LogboxModuleOptions,
+    @Inject(TRAILSCOPE_CLIENT) private readonly client: TrailscopeClient,
+    @Inject(TRAILSCOPE_MODULE_OPTIONS) options: TrailscopeModuleOptions,
   ) {
     super();
     this.minRank = RANK[options.loggerLevel ?? 'info'];

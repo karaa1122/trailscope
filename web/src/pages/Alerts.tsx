@@ -703,7 +703,7 @@ function ChannelsTab({ toast }: { toast: Toaster }) {
       <Panel title="Channels" sub="where rule notifications go; webhooks are signed with HMAC-SHA256">
         {secret && (
           <div style={{ padding: 18 }}>
-            <SecretOnce label="Webhook signing secret. Verify X-Logbox-Signature: sha256=HMAC(secret, timestamp + '.' + body)." value={secret} onDone={() => setSecret(null)} />
+            <SecretOnce label="Webhook signing secret. Verify X-Trailscope-Signature: sha256=HMAC(secret, timestamp + '.' + body)." value={secret} onDone={() => setSecret(null)} />
           </div>
         )}
         {channels.isLoading && <Skeleton h={80} />}

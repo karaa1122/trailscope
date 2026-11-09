@@ -1,7 +1,7 @@
-import { type LogboxClient, deserializeContext, getClient, serializeContext } from '@logbox/node';
+import { type TrailscopeClient, deserializeContext, getClient, serializeContext } from '@trailscope/node';
 
 /** Key under which the request context travels in job data. */
-export const LOGBOX_JOB_KEY = '__logbox';
+export const TRAILSCOPE_JOB_KEY = '__trailscope';
 
 /** The parts of a BullMQ `Job` the helpers use. */
 export interface JobLike {
@@ -18,8 +18,8 @@ export interface JobLike {
 export interface TrackJobOptions {
   /** Event name. Default: the job's name. */
   name?: string;
-  /** Default: the process-wide client from `init()` or `LogboxModule`. */
-  client?: LogboxClient;
+  /** Default: the process-wide client from `init()` or `TrailscopeModule`. */
+  client?: TrailscopeClient;
 }
 
 /**
@@ -27,12 +27,12 @@ export interface TrackJobOptions {
  * the request that queued it:
  *
  * ```ts
- * await queue.add('invoice.send', withLogboxContext({ invoiceId }));
+ * await queue.add('invoice.send', withTrailscopeContext({ invoiceId }));
  * ```
  */
-export function withLogboxContext<T extends object>(data: T): T {
+export function withTrailscopeContext<T extends object>(data: T): T {
   const ctx = serializeContext();
-  return ctx ? { ...data, [LOGBOX_JOB_KEY]: ctx } : data;
+  return ctx ? { ...data, [TRAILSCOPE_JOB_KEY]: ctx } : data;
 }
 
 /**
@@ -51,7 +51,7 @@ export function trackJob<J extends JobLike, R>(
     const client = opts.client ?? getClient();
     if (!client) return processor(job);
     const data: unknown = job.data;
-    const carried = data && typeof data === 'object' ? (data as Record<string, unknown>)[LOGBOX_JOB_KEY] : undefined;
+    const carried = data && typeof data === 'object' ? (data as Record<string, unknown>)[TRAILSCOPE_JOB_KEY] : undefined;
     const attributes: Record<string, string> = {};
     if (job.queueName) attributes.queue = job.queueName;
     if (job.id) attributes.job_id = job.id;

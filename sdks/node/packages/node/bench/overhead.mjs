@@ -1,10 +1,10 @@
 // Measures what the SDK adds to the request path: building the event and
 // enqueueing it (redaction, serialization and gzip happen later, off-path).
 // Run after `pnpm build`: node bench/overhead.mjs
-import { LogboxClient, serializeBody, shouldCaptureBodies } from '../dist/index.js';
+import { TrailscopeClient, serializeBody, shouldCaptureBodies } from '../dist/index.js';
 
-const client = new LogboxClient({
-  ingestKey: 'lbx_ingest_bench',
+const client = new TrailscopeClient({
+  ingestKey: 'trs_ingest_bench',
   service: 'bench',
   flushIntervalMs: 3_600_000,
   maxQueueSize: 10_000,

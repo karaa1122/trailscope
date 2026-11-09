@@ -12,6 +12,6 @@ Security fixes go into the latest release. Self-hosters should keep up with rele
 
 ## Scope
 
-In scope: the Logbox server (ingest, API, alerts, UI), the official SDKs, the Docker image and the deployment files in this repository. Out of scope: vulnerabilities that need an already-compromised server or database, and findings in dependencies that have no impact on Logbox (please report those upstream).
+In scope: the Trailscope server (ingest, API, alerts, UI), the official SDKs, the Docker image and the deployment files in this repository. Out of scope: vulnerabilities that need an already-compromised server or database, and findings in dependencies that have no impact on Trailscope (please report those upstream).
 
-How Logbox is hardened, and what operators should configure, is described in [docs/security.md](docs/security.md).
+How Trailscope is hardened, and what operators should configure, is described in [docs/security.md](docs/security.md).

@@ -138,7 +138,7 @@ export function chipLabel(c: Chip): { field: string; op: string; value: string }
   return { field: sqlField(c), op: opText[c.op], value };
 }
 
-const HISTORY_KEY = 'logbox.queryHistory';
+const HISTORY_KEY = 'trailscope.queryHistory';
 
 export function loadHistory(): QueryValue[] {
   try {

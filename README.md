@@ -1,12 +1,12 @@
-# Logbox
+# Trailscope
 
 **Self-hosted API request logging: see every request your services handle, query them with SQL, and follow one customer's journey across services and background jobs.**
 
 ![Live tail with tiles, the route heatmap and new errors](docs/images/live-tail.png)
 
-Logbox records each HTTP request (route, timing, status, user, journey keys, and bodies when something goes wrong), plus spans, background jobs and log lines. Tiny SDKs send it in the background without slowing your app down; one Rust binary stores it in ClickHouse and serves a fast, keyboard-first UI. It runs on a single small server and is Apache-2.0 licensed.
+Trailscope records each HTTP request (route, timing, status, user, journey keys, and bodies when something goes wrong), plus spans, background jobs and log lines. Tiny SDKs send it in the background without slowing your app down; one Rust binary stores it in ClickHouse and serves a fast, keyboard-first UI. It runs on a single small server and is Apache-2.0 licensed.
 
-> **Status: early release (0.x).** Logbox works end to end and has been load-tested, but it hasn't run in many production setups yet, and the alerting, SDK and single sign-on code has fewer automated tests than the ingest and query core. Expect rough edges and breaking changes before 1.0, and please [open an issue](https://github.com/karaa1122/LogBox/issues) when something doesn't work.
+> **Status: early release (0.x).** Trailscope works end to end and has been load-tested, but it hasn't run in many production setups yet, and the alerting, SDK and single sign-on code has fewer automated tests than the ingest and query core. Expect rough edges and breaking changes before 1.0, and please [open an issue](https://github.com/karaa1122/trailscope/issues) when something doesn't work.
 
 ## Features
 
@@ -24,14 +24,14 @@ Logbox records each HTTP request (route, timing, status, user, journey keys, and
 ## Quickstart (about a minute)
 
 ```bash
-git clone https://github.com/karaa1122/LogBox && cd LogBox/deploy
-docker compose up -d        # builds the image the first time; set LOGBOX_IMAGE to use a published one
+git clone https://github.com/karaa1122/trailscope && cd Trailscope/deploy
+docker compose up -d        # builds the image the first time; set TRAILSCOPE_IMAGE to use a published one
 ```
 
 Open http://localhost:8080. The setup wizard creates your account and first project and shows its ingest key. Want data right away? Run the demo traffic generator, which includes a scripted incident:
 
 ```bash
-docker compose exec logbox logbox demo --url http://localhost:8080
+docker compose exec trailscope trailscope demo --url http://localhost:8080
 ```
 
 For production, copy `deploy/.env.example` to `deploy/.env` and read [self-hosting.md](docs/self-hosting.md) (sizing, TLS, backups).
@@ -42,45 +42,45 @@ For production, copy `deploy/.env.example` to `deploy/.env` and read [self-hosti
 
 ```ts
 import express from 'express';
-import { init, logbox, logboxErrorHandler } from '@logbox/express';
+import { init, trailscope, trailscopeErrorHandler } from '@trailscope/express';
 
-init({ service: 'orders-api' }); // LOGBOX_ENDPOINT and LOGBOX_INGEST_KEY from the environment
+init({ service: 'orders-api' }); // TRAILSCOPE_ENDPOINT and TRAILSCOPE_INGEST_KEY from the environment
 const app = express();
-app.use(logbox());
+app.use(trailscope());
 // ... your routes
-app.use(logboxErrorHandler());
+app.use(trailscopeErrorHandler());
 ```
 
 **NestJS**
 
 ```ts
-@Module({ imports: [LogboxModule.forRoot({ service: 'orders-api' })] })
+@Module({ imports: [TrailscopeModule.forRoot({ service: 'orders-api' })] })
 export class AppModule {}
 ```
 
 **FastAPI / Starlette**
 
 ```python
-import logbox
-from logbox.asgi import LogboxMiddleware
+import trailscope
+from trailscope.asgi import TrailscopeMiddleware
 
-logbox.init(service="orders-api")
+trailscope.init(service="orders-api")
 app = FastAPI()
-app.add_middleware(LogboxMiddleware)
+app.add_middleware(TrailscopeMiddleware)
 ```
 
 **Django**
 
 ```python
-MIDDLEWARE = ["logbox.django.LogboxMiddleware", ...]
-LOGBOX = {"service": "orders-api"}
+MIDDLEWARE = ["trailscope.django.TrailscopeMiddleware", ...]
+TRAILSCOPE = {"service": "orders-api"}
 ```
 
 **OpenTelemetry**
 
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:8080/v1/otlp
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20lbx_ingest_…
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20trs_ingest_…
 ```
 
 Attach the user and journey keys anywhere in a request (`setUser(id)`, `setCorrelation('order_id', id)`), and background jobs and log lines started from it are linked automatically. Fastify, Celery, BullMQ, logging bridges and all options: [SDK docs](docs/sdk-spec.md) and [examples/](examples).
@@ -98,8 +98,8 @@ Attach the user and journey keys anywhere in a request (`setUser(id)`, `setCorre
 
 ```mermaid
 flowchart LR
-  apps[Your services<br/>Logbox SDKs or OpenTelemetry] -- batches --> ingest
-  subgraph logbox[logbox binary]
+  apps[Your services<br/>Trailscope SDKs or OpenTelemetry] -- batches --> ingest
+  subgraph trailscope[trailscope binary]
     ingest[ingest] --> queue[bounded queue]
     api[API + web UI]
     alerts[alerts]
@@ -113,7 +113,7 @@ flowchart LR
   queue -. 5xx .-> alerts
 ```
 
-One process (`logbox all`) handles everything for most installs; ingest, API and alerts can also run separately with Redis for live tail. Details in [architecture.md](docs/architecture.md).
+One process (`trailscope all`) handles everything for most installs; ingest, API and alerts can also run separately with Redis for live tail. Details in [architecture.md](docs/architecture.md).
 
 ## Documentation
 

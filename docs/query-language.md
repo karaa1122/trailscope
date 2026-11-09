@@ -1,6 +1,6 @@
 # Query language
 
-Logbox filters are written as a SQL `WHERE` expression, the way Jira users write JQL, but in SQL. The same filter works in Explore, the live tail, Routes, saved views and alert rules.
+Trailscope filters are written as a SQL `WHERE` expression, the way Jira users write JQL, but in SQL. The same filter works in Explore, the live tail, Routes, saved views and alert rules.
 
 ```sql
 WHERE status >= 500 AND route LIKE '/checkout/%' AND duration_ms > 800
@@ -66,7 +66,7 @@ Keywords and function names are case-insensitive. Column names are case-insensit
 - Every comparison needs a column on at least one side: `1 = 1` is rejected.
 - Values must match the column type. `status = '500'` is an error that tells you to remove the quotes; `route = 5` is an error that tells you to add them.
 - Strings use single quotes. Write a quote inside a string as `''` or `\'`, and a backslash as `\\`.
-- `IS NULL` means "empty": an empty string, a missing map key, or `0` for numbers. Logbox never stores SQL `NULL`.
+- `IS NULL` means "empty": an empty string, a missing map key, or `0` for numbers. Trailscope never stores SQL `NULL`.
 - Timestamps compare with `now() ± INTERVAL n UNIT`, or with a string such as `'2026-01-02'`, `'2026-01-02 10:00:00'` or `'2026-01-02T10:00:00+02:00'`. Strings without an offset are UTC.
 - `error_fingerprint` is a 64-bit ID. Compare it with a number or a quoted string of digits.
 - The time range from the time picker always applies. Conditions on `timestamp` in the filter can only narrow it.
@@ -216,16 +216,16 @@ Live tail filters use the same language and are evaluated in memory against each
 User text never reaches ClickHouse as SQL.
 
 1. **Parse, don't splice.** The text is tokenized and parsed with `sqlparser` (ClickHouse dialect) into a syntax tree. Comments, extra statements, stray characters and look-alike quotes (`‘ ’ “ ” ＇` and others) are rejected at the token level, before parsing.
-2. **Whitelist conversion.** The syntax tree is converted into Logbox's own small AST. Only the constructs listed above are accepted: anything else (subqueries, `UNION`, casts, unknown functions, qualified names, `system.*`, table functions) is an error. Node and depth limits bound the work.
+2. **Whitelist conversion.** The syntax tree is converted into Trailscope's own small AST. Only the constructs listed above are accepted: anything else (subqueries, `UNION`, casts, unknown functions, qualified names, `system.*`, table functions) is an error. Node and depth limits bound the work.
 3. **Type-check against the registry.** Columns are resolved in a single Rust registry, which also enforces the per-member *can view bodies* permission and the live-tail column set.
 4. **Compile with parameters.** Column names in the generated SQL come only from the registry; function names and keywords come from a fixed list. Every value (strings, numbers, map keys, LIKE patterns, regexes, interval amounts) becomes a typed ClickHouse query parameter (`{p1:String}`). The generated SQL contains no quote characters at all, which property tests and a fuzz target check on every case.
 5. **Always scoped.** The server wraps every filter as `project_id = {pid} AND timestamp BETWEEN {from} AND {to} AND (<filter>)` and always applies a `LIMIT`.
-6. **Least privilege.** Queries run as the `logbox_reader` ClickHouse user: `SELECT` on the Logbox database only, a read-only settings profile, and hard caps on execution time, rows read, result rows and memory, which a query can't raise.
+6. **Least privilege.** Queries run as the `trailscope_reader` ClickHouse user: `SELECT` on the Trailscope database only, a read-only settings profile, and hard caps on execution time, rows read, result rows and memory, which a query can't raise.
 
 ### How it's tested
 
 - Unit tests for every operator, function and error message.
-- An injection suite (`crates/logbox-query/tests/injection.rs`): stacked statements, `UNION SELECT … system.users`, comments, quote and backslash escapes, homoglyph quotes, nested subqueries, `attr['x'']) OR 1=1 --`, table functions, `SETTINGS`/`FORMAT`/`INTO OUTFILE`, and nesting up to 2,000 levels.
+- An injection suite (`crates/trailscope-query/tests/injection.rs`): stacked statements, `UNION SELECT … system.users`, comments, quote and backslash escapes, homoglyph quotes, nested subqueries, `attr['x'']) OR 1=1 --`, table functions, `SETTINGS`/`FORMAT`/`INTO OUTFILE`, and nesting up to 2,000 levels.
 - Property tests: random well-typed queries print and re-parse to the same AST; compiled SQL is always safe and has one parameter per value; arbitrary input never panics; chips and search convert back and forth.
 - A differential test against a real ClickHouse that requires the compiled SQL and the in-memory evaluator to return identical rows.
-- A `cargo-fuzz` target (`crates/logbox-query/fuzz`): `cargo +nightly fuzz run parse`.
+- A `cargo-fuzz` target (`crates/trailscope-query/fuzz`): `cargo +nightly fuzz run parse`.

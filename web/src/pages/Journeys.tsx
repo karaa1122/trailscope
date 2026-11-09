@@ -119,7 +119,7 @@ export function Journeys({ search }: { search: JourneySearch }) {
 
       {!parsed && (
         <Empty title="Follow one thing across every service">
-          Search for a correlation key such as <code className="mono">account_id:acc_117</code>, a user ID, a request ID or a trace ID. Logbox
+          Search for a correlation key such as <code className="mono">account_id:acc_117</code>, a user ID, a request ID or a trace ID. Trailscope
           lines up every request, job and event that carries it.
         </Empty>
       )}

@@ -1,6 +1,6 @@
 # Ingest protocol
 
-SDKs (or anything that speaks HTTP) send telemetry to Logbox in batches. This page is the contract; [sdk-spec.md](sdk-spec.md) describes how the official SDKs use it.
+SDKs (or anything that speaks HTTP) send telemetry to Trailscope in batches. This page is the contract; [sdk-spec.md](sdk-spec.md) describes how the official SDKs use it.
 
 ## Endpoints
 
@@ -14,16 +14,16 @@ SDKs (or anything that speaks HTTP) send telemetry to Logbox in batches. This pa
 All of them authenticate with an **ingest key**:
 
 ```
-Authorization: Bearer lbx_ingest_…
+Authorization: Bearer trs_ingest_…
 ```
 
-Ingest keys are per project and write-only. They can't read anything back. Logbox stores only their SHA-256 hash; the plaintext is shown once, when the key is created.
+Ingest keys are per project and write-only. They can't read anything back. Trailscope stores only their SHA-256 hash; the plaintext is shown once, when the key is created.
 
 ## `POST /v1/ingest`
 
 ### Body
 
-Either a JSON array of items, or NDJSON (one item per line). Logbox detects which one from the first non-whitespace character.
+Either a JSON array of items, or NDJSON (one item per line). Trailscope detects which one from the first non-whitespace character.
 
 ```
 Content-Type: application/x-ndjson        (or application/json)
@@ -166,8 +166,8 @@ On `SIGTERM` the server stops accepting connections, finishes in-flight requests
 A deploy script can call it like this:
 
 ```bash
-curl -fsS -X POST "$LOGBOX_ENDPOINT/v1/releases" \
-  -H "Authorization: Bearer $LOGBOX_INGEST_KEY" \
+curl -fsS -X POST "$TRAILSCOPE_ENDPOINT/v1/releases" \
+  -H "Authorization: Bearer $TRAILSCOPE_INGEST_KEY" \
   -H 'Content-Type: application/json' \
   -d "{\"service\":\"api\",\"version\":\"$VERSION\",\"commit\":\"$GIT_SHA\"}"
 ```
@@ -190,21 +190,21 @@ Returns the project's SDK defaults, so they can be tuned from the UI:
 
 ## OpenTelemetry (OTLP/HTTP)
 
-Services instrumented with OpenTelemetry can send to Logbox without a Logbox SDK. Logbox accepts OTLP/HTTP with protobuf (`application/x-protobuf`) or JSON (`application/json`) bodies, optionally gzip-compressed. Metrics and OTLP/gRPC aren't supported.
+Services instrumented with OpenTelemetry can send to Trailscope without a Trailscope SDK. Trailscope accepts OTLP/HTTP with protobuf (`application/x-protobuf`) or JSON (`application/json`) bodies, optionally gzip-compressed. Metrics and OTLP/gRPC aren't supported.
 
 Point any OpenTelemetry SDK or Collector at it:
 
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=https://logs.example.com/v1/otlp
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20lbx_ingest_…
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20trs_ingest_…
 ```
 
 The exporter appends `/v1/traces` and `/v1/logs`. In a Collector, use the `otlphttp` exporter with `endpoint: https://logs.example.com/v1/otlp` and the `Authorization` header.
 
 How the data is mapped:
 
-| OpenTelemetry | Logbox |
+| OpenTelemetry | Trailscope |
 |---|---|
 | Resource `service.name` | `service` (default `unknown_service`) |
 | Resource `deployment.environment.name` (or `deployment.environment`) | `environment` |

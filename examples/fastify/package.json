@@ -1,12 +1,12 @@
 {
-  "name": "@logbox/example-fastify",
+  "name": "@trailscope/example-fastify",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node src/server.js"
   },
   "dependencies": {
-    "@logbox/fastify": "workspace:^",
+    "@trailscope/fastify": "workspace:^",
     "fastify": "5.12.7"
   }
 }

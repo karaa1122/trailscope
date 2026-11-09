@@ -1,52 +1,52 @@
-# Logbox all-in-one: `docker compose up -d`, then open http://localhost:8080
+# Trailscope all-in-one: `docker compose up -d`, then open http://localhost:8080
 # Local email testing: `docker compose --profile dev up -d` adds Mailpit at http://localhost:8025
 # (in Settings → Notifications → Email use host `mailpit`, port 1025, security none).
-name: logbox
+name: trailscope
 
 services:
-  logbox:
-    image: ${LOGBOX_IMAGE:-logbox:local}
+  trailscope:
+    image: ${TRAILSCOPE_IMAGE:-trailscope:local}
     build:
       context: ..
       dockerfile: Dockerfile
     command: ["all"]
     restart: unless-stopped
     ports:
-      - "${LOGBOX_PORT:-8080}:8080"
+      - "${TRAILSCOPE_PORT:-8080}:8080"
     environment:
-      LOGBOX_SERVER_PUBLIC_URL: ${LOGBOX_PUBLIC_URL:-http://localhost:8080}
-      LOGBOX_CLICKHOUSE_URL: http://clickhouse:8123
-      LOGBOX_CLICKHOUSE_USER: logbox
-      LOGBOX_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-logbox}
-      LOGBOX_CLICKHOUSE_READER_PASSWORD: ${CLICKHOUSE_READER_PASSWORD:-logbox_reader}
-      LOGBOX_POSTGRES_URL: postgres://logbox:${POSTGRES_PASSWORD:-logbox}@postgres:5432/logbox
-      LOGBOX_RETENTION_DAYS: ${LOGBOX_RETENTION_DAYS:-30}
-      LOGBOX_RETENTION_BODY_DAYS: ${LOGBOX_RETENTION_BODY_DAYS:-7}
-      LOGBOX_LOG_FORMAT: json
+      TRAILSCOPE_SERVER_PUBLIC_URL: ${TRAILSCOPE_PUBLIC_URL:-http://localhost:8080}
+      TRAILSCOPE_CLICKHOUSE_URL: http://clickhouse:8123
+      TRAILSCOPE_CLICKHOUSE_USER: trailscope
+      TRAILSCOPE_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-trailscope}
+      TRAILSCOPE_CLICKHOUSE_READER_PASSWORD: ${CLICKHOUSE_READER_PASSWORD:-trailscope_reader}
+      TRAILSCOPE_POSTGRES_URL: postgres://trailscope:${POSTGRES_PASSWORD:-trailscope}@postgres:5432/trailscope
+      TRAILSCOPE_RETENTION_DAYS: ${TRAILSCOPE_RETENTION_DAYS:-30}
+      TRAILSCOPE_RETENTION_BODY_DAYS: ${TRAILSCOPE_RETENTION_BODY_DAYS:-7}
+      TRAILSCOPE_LOG_FORMAT: json
       # Encrypts stored secrets and signs mute links. Set a long random value in production.
-      LOGBOX_SECRET_KEY: ${LOGBOX_SECRET_KEY:-}
+      TRAILSCOPE_SECRET_KEY: ${TRAILSCOPE_SECRET_KEY:-}
       # Optional: email for alerts. Unset or empty values are ignored, and the field
       # can then be set in Settings → Notifications instead; a value set here locks it.
-      LOGBOX_SMTP_HOST: ${LOGBOX_SMTP_HOST:-}
-      LOGBOX_SMTP_PORT: ${LOGBOX_SMTP_PORT:-}
-      LOGBOX_SMTP_SECURITY: ${LOGBOX_SMTP_SECURITY:-}
-      LOGBOX_SMTP_USERNAME: ${LOGBOX_SMTP_USERNAME:-}
-      LOGBOX_SMTP_PASSWORD: ${LOGBOX_SMTP_PASSWORD:-}
-      LOGBOX_SMTP_FROM: ${LOGBOX_SMTP_FROM:-}
-      LOGBOX_SMTP_FROM_NAME: ${LOGBOX_SMTP_FROM_NAME:-}
+      TRAILSCOPE_SMTP_HOST: ${TRAILSCOPE_SMTP_HOST:-}
+      TRAILSCOPE_SMTP_PORT: ${TRAILSCOPE_SMTP_PORT:-}
+      TRAILSCOPE_SMTP_SECURITY: ${TRAILSCOPE_SMTP_SECURITY:-}
+      TRAILSCOPE_SMTP_USERNAME: ${TRAILSCOPE_SMTP_USERNAME:-}
+      TRAILSCOPE_SMTP_PASSWORD: ${TRAILSCOPE_SMTP_PASSWORD:-}
+      TRAILSCOPE_SMTP_FROM: ${TRAILSCOPE_SMTP_FROM:-}
+      TRAILSCOPE_SMTP_FROM_NAME: ${TRAILSCOPE_SMTP_FROM_NAME:-}
       # Optional: single sign-on with an OpenID Connect provider (docs/configuration.md#oidc).
-      LOGBOX_OIDC_ISSUER: ${LOGBOX_OIDC_ISSUER:-}
-      LOGBOX_OIDC_CLIENT_ID: ${LOGBOX_OIDC_CLIENT_ID:-}
-      LOGBOX_OIDC_CLIENT_SECRET: ${LOGBOX_OIDC_CLIENT_SECRET:-}
-      LOGBOX_OIDC_DISPLAY_NAME: ${LOGBOX_OIDC_DISPLAY_NAME:-}
-      LOGBOX_OIDC_AUTO_CREATE_DOMAINS: ${LOGBOX_OIDC_AUTO_CREATE_DOMAINS:-}
+      TRAILSCOPE_OIDC_ISSUER: ${TRAILSCOPE_OIDC_ISSUER:-}
+      TRAILSCOPE_OIDC_CLIENT_ID: ${TRAILSCOPE_OIDC_CLIENT_ID:-}
+      TRAILSCOPE_OIDC_CLIENT_SECRET: ${TRAILSCOPE_OIDC_CLIENT_SECRET:-}
+      TRAILSCOPE_OIDC_DISPLAY_NAME: ${TRAILSCOPE_OIDC_DISPLAY_NAME:-}
+      TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS: ${TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS:-}
     depends_on:
       clickhouse:
         condition: service_healthy
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/usr/local/bin/logbox", "healthcheck"]
+      test: ["CMD", "/usr/local/bin/trailscope", "healthcheck"]
       interval: 10s
       timeout: 3s
       retries: 6
@@ -56,9 +56,9 @@ services:
     image: clickhouse/clickhouse-server:26.8
     restart: unless-stopped
     environment:
-      CLICKHOUSE_DB: logbox
-      CLICKHOUSE_USER: logbox
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-logbox}
+      CLICKHOUSE_DB: trailscope
+      CLICKHOUSE_USER: trailscope
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-trailscope}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -78,13 +78,13 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: logbox
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-logbox}
-      POSTGRES_DB: logbox
+      POSTGRES_USER: trailscope
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trailscope}
+      POSTGRES_DB: trailscope
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U logbox -d logbox"]
+      test: ["CMD-SHELL", "pg_isready -U trailscope -d trailscope"]
       interval: 5s
       timeout: 3s
       retries: 20

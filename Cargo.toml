@@ -1,24 +1,24 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-exclude = ["crates/logbox-query/fuzz"]
+exclude = ["crates/trailscope-query/fuzz"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
-repository = "https://github.com/karaa1122/LogBox"
-homepage = "https://github.com/karaa1122/LogBox"
+repository = "https://github.com/karaa1122/trailscope"
+homepage = "https://github.com/karaa1122/trailscope"
 publish = false
 
 [workspace.dependencies]
-logbox-core = { path = "crates/logbox-core" }
-logbox-query = { path = "crates/logbox-query" }
-logbox-ingest = { path = "crates/logbox-ingest" }
-logbox-api = { path = "crates/logbox-api" }
-logbox-alerts = { path = "crates/logbox-alerts" }
-logbox-demo = { path = "crates/logbox-demo" }
+trailscope-core = { path = "crates/trailscope-core" }
+trailscope-query = { path = "crates/trailscope-query" }
+trailscope-ingest = { path = "crates/trailscope-ingest" }
+trailscope-api = { path = "crates/trailscope-api" }
+trailscope-alerts = { path = "crates/trailscope-alerts" }
+trailscope-demo = { path = "crates/trailscope-demo" }
 
 anyhow = "1.0.104"
 argon2 = "0.6.0"

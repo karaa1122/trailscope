@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   BoundedQueue,
-  LogboxClient,
+  TrailscopeClient,
   REDACTED,
   Redactor,
   currentContext,
@@ -19,7 +19,7 @@ import {
   setUser,
   shouldCaptureBodies,
   type Item,
-  type LogboxContext,
+  type TrailscopeContext,
 } from '../src/index.js';
 
 interface Call {
@@ -41,10 +41,10 @@ function fakeFetch(responses: Array<{ status: number; headers?: Record<string, s
   return { fn: fn as unknown as typeof fetch, calls };
 }
 
-function client(fetchImpl: typeof fetch, extra: Partial<ConstructorParameters<typeof LogboxClient>[0]> = {}) {
-  return new LogboxClient({
-    endpoint: 'http://logbox.test/',
-    ingestKey: 'lbx_ingest_test',
+function client(fetchImpl: typeof fetch, extra: Partial<ConstructorParameters<typeof TrailscopeClient>[0]> = {}) {
+  return new TrailscopeClient({
+    endpoint: 'http://trailscope.test/',
+    ingestKey: 'trs_ingest_test',
     service: 'api',
     environment: 'test',
     release: 'v1',
@@ -175,7 +175,7 @@ describe('capture helpers', () => {
   });
 });
 
-describe('LogboxClient', () => {
+describe('TrailscopeClient', () => {
   it('batches, gzips, redacts at flush and stamps environment/release', async () => {
     const f = fakeFetch();
     const c = client(f.fn);
@@ -190,8 +190,8 @@ describe('LogboxClient', () => {
     expect(f.calls).toHaveLength(1);
     const call = f.calls[0];
     if (!call) throw new Error("no request sent");
-    expect(call.url).toBe('http://logbox.test/v1/ingest');
-    expect(call.headers.authorization).toBe('Bearer lbx_ingest_test');
+    expect(call.url).toBe('http://trailscope.test/v1/ingest');
+    expect(call.headers.authorization).toBe('Bearer trs_ingest_test');
     expect(call.headers['content-encoding']).toBe('gzip');
     const [r, e] = call.items;
     expect(r).toMatchObject({
@@ -279,7 +279,7 @@ describe('LogboxClient', () => {
   it('tracks jobs with context, attempts and errors', async () => {
     const f = fakeFetch();
     const c = client(f.fn);
-    const parent: Partial<LogboxContext> = { requestId: 'req-9', traceId: 't'.repeat(32), correlation: { account_id: 'a1' } };
+    const parent: Partial<TrailscopeContext> = { requestId: 'req-9', traceId: 't'.repeat(32), correlation: { account_id: 'a1' } };
     await c.trackJob('email.send', async () => {
       c.log('info', 'sending');
     }, { attempt: 1, context: parent });

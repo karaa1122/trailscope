@@ -1,5 +1,5 @@
 {
-  "name": "logbox-monorepo",
+  "name": "trailscope-monorepo",
   "private": true,
   "license": "Apache-2.0",
   "packageManager": "pnpm@9.15.9",

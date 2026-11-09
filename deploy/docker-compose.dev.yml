@@ -1,19 +1,19 @@
-# Services for developing Logbox on your machine:
+# Services for developing Trailscope on your machine:
 #   docker compose -f deploy/docker-compose.dev.yml up -d
-#   source scripts/dev/local.env && cargo run -- all          (Logbox from source on :8090)
-# Or run Logbox itself as a container too (image built from this repo, UI on :8090):
+#   source scripts/dev/local.env && cargo run -- all          (Trailscope from source on :8090)
+# Or run Trailscope itself as a container too (image built from this repo, UI on :8090):
 #   docker compose -f deploy/docker-compose.dev.yml --profile app up -d --build
 # Ports are offset so they don't clash with other local databases.
-name: logbox-dev
+name: trailscope-dev
 
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:26.8
-    container_name: logbox-dev-ch
+    container_name: trailscope-dev-ch
     restart: unless-stopped
     environment:
-      CLICKHOUSE_USER: logbox
-      CLICKHOUSE_PASSWORD: logbox
+      CLICKHOUSE_USER: trailscope
+      CLICKHOUSE_PASSWORD: trailscope
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ports: ["18123:8123", "19000:9000"]
     volumes: [clickhouse:/var/lib/clickhouse]
@@ -27,16 +27,16 @@ services:
 
   postgres:
     image: postgres:18-alpine
-    container_name: logbox-dev-pg
+    container_name: trailscope-dev-pg
     restart: unless-stopped
     environment:
-      POSTGRES_USER: logbox
-      POSTGRES_PASSWORD: logbox
-      POSTGRES_DB: logbox
+      POSTGRES_USER: trailscope
+      POSTGRES_PASSWORD: trailscope
+      POSTGRES_DB: trailscope
     ports: ["25432:5432"]
     volumes: [postgres:/var/lib/postgresql]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U logbox -d logbox"]
+      test: ["CMD-SHELL", "pg_isready -U trailscope -d trailscope"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -44,37 +44,37 @@ services:
   # Catches every email: SMTP on 1025 (host `mailpit` from the app container), web UI on http://localhost:8025
   mailpit:
     image: axllent/mailpit:v1.32.0
-    container_name: logbox-dev-mailpit
+    container_name: trailscope-dev-mailpit
     restart: unless-stopped
     ports: ["1025:1025", "8025:8025"]
 
   # Split mode and the BullMQ/Celery examples
   redis:
     image: redis:8-alpine
-    container_name: logbox-dev-redis
+    container_name: trailscope-dev-redis
     restart: unless-stopped
     ports: ["26379:6379"]
 
-  # Logbox itself (profile "app"). Apps in other containers reach it at
+  # Trailscope itself (profile "app"). Apps in other containers reach it at
   # http://host.docker.internal:8090 (add `extra_hosts: ["host.docker.internal:host-gateway"]`).
-  logbox:
+  trailscope:
     profiles: ["app"]
-    image: logbox:local
+    image: trailscope:local
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: logbox-dev-app
+    container_name: trailscope-dev-app
     command: ["all"]
     restart: unless-stopped
     ports: ["8090:8080"]
     environment:
-      LOGBOX_SERVER_PUBLIC_URL: http://localhost:8090
-      LOGBOX_CLICKHOUSE_URL: http://clickhouse:8123
-      LOGBOX_CLICKHOUSE_USER: logbox
-      LOGBOX_CLICKHOUSE_PASSWORD: logbox
-      LOGBOX_POSTGRES_URL: postgres://logbox:logbox@postgres:5432/logbox
-      LOGBOX_SECRET_KEY: dev-secret-key-for-local-testing-only
-      LOGBOX_LOG_FORMAT: pretty
+      TRAILSCOPE_SERVER_PUBLIC_URL: http://localhost:8090
+      TRAILSCOPE_CLICKHOUSE_URL: http://clickhouse:8123
+      TRAILSCOPE_CLICKHOUSE_USER: trailscope
+      TRAILSCOPE_CLICKHOUSE_PASSWORD: trailscope
+      TRAILSCOPE_POSTGRES_URL: postgres://trailscope:trailscope@postgres:5432/trailscope
+      TRAILSCOPE_SECRET_KEY: dev-secret-key-for-local-testing-only
+      TRAILSCOPE_LOG_FORMAT: pretty
     depends_on:
       clickhouse: { condition: service_healthy }
       postgres: { condition: service_healthy }
@@ -82,6 +82,6 @@ services:
 volumes:
   # Same names as the `docker run` setup in AGENTS.md, so existing data is kept.
   clickhouse:
-    name: logbox-dev-ch
+    name: trailscope-dev-ch
   postgres:
-    name: logbox-dev-pg
+    name: trailscope-dev-pg

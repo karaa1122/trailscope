@@ -11,8 +11,8 @@ Ingest (`/v1/ingest`, `/v1/releases`, `/v1/config`) is separate and uses ingest 
 
 | Method | How | Use for |
 |---|---|---|
-| Session | `POST /api/v1/auth/login` sets an HttpOnly `logbox_session` cookie (SameSite=Lax, Secure on https) and returns a `csrfToken` | The web UI |
-| API token | `Authorization: Bearer lbx_api_…` | Scripts, CI, dashboards |
+| Session | `POST /api/v1/auth/login` sets an HttpOnly `trailscope_session` cookie (SameSite=Lax, Secure on https) and returns a `csrfToken` | The web UI |
+| API token | `Authorization: Bearer trs_api_…` | Scripts, CI, dashboards |
 
 With a session, every `POST`, `PUT`, `PATCH` and `DELETE` must send the CSRF token in `X-CSRF-Token`. `GET /api/v1/auth/me` returns it again after a page reload. API tokens don't need it.
 

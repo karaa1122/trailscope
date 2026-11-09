@@ -1,16 +1,16 @@
-// Captures UI screenshots from a running Logbox with demo data (live traffic
-// from `logbox demo` makes Live tail and the heatmap come alive).
+// Captures UI screenshots from a running Trailscope with demo data (live traffic
+// from `trailscope demo` makes Live tail and the heatmap come alive).
 //   BASE_URL=http://localhost:8080 OUT=../docs/images node screenshots.mjs
 // Optional: PROJECT_ID (project to show), THEME (dark|light), CHROMIUM_PATH,
-// JOURNEY (key:value) and JOURNEY_RANGE, LOGBOX_EMAIL / LOGBOX_PASSWORD.
+// JOURNEY (key:value) and JOURNEY_RANGE, TRAILSCOPE_EMAIL / TRAILSCOPE_PASSWORD.
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:8080';
 const OUT = process.env.OUT ?? '../docs/images';
-const EMAIL = process.env.LOGBOX_EMAIL ?? 'owner@example.com';
-const PASSWORD = process.env.LOGBOX_PASSWORD ?? 'correct horse battery';
+const EMAIL = process.env.TRAILSCOPE_EMAIL ?? 'owner@example.com';
+const PASSWORD = process.env.TRAILSCOPE_PASSWORD ?? 'correct horse battery';
 const THEME = process.env.THEME ?? 'dark';
 const PROJECT = process.env.PROJECT_ID;
 
@@ -23,8 +23,8 @@ page.on('pageerror', (e) => console.error('[pageerror]', e.message));
 await page.goto(`${BASE}/login`);
 await page.evaluate(
   ([theme, project]) => {
-    localStorage.setItem('logbox.theme', theme);
-    if (project) localStorage.setItem('logbox.project', project);
+    localStorage.setItem('trailscope.theme', theme);
+    if (project) localStorage.setItem('trailscope.project', project);
   },
   [THEME, PROJECT],
 );
@@ -34,7 +34,7 @@ await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 await page.waitForURL('**/live**');
 if (PROJECT) {
   // The session reads the stored project when the app loads.
-  await page.evaluate((p) => localStorage.setItem('logbox.project', p), PROJECT);
+  await page.evaluate((p) => localStorage.setItem('trailscope.project', p), PROJECT);
   await page.goto(`${BASE}/live`);
 }
 

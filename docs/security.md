@@ -1,6 +1,6 @@
 # Security
 
-Logbox stores what your APIs receive and send, so it is built to keep as little sensitive data as possible, to show it only to people allowed to see it, and to make the database hard to misuse even from the query bar. This page describes the controls and what operators should configure. To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+Trailscope stores what your APIs receive and send, so it is built to keep as little sensitive data as possible, to show it only to people allowed to see it, and to make the database hard to misuse even from the query bar. This page describes the controls and what operators should configure. To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 ## Collecting less
 
@@ -27,7 +27,7 @@ Logbox stores what your APIs receive and send, so it is built to keep as little 
 
 ## Queries can't escape
 
-- The query language is parsed into Logbox's own syntax tree and compiled to SQL with every value as a bound parameter. Only registered columns and functions are allowed; there are no subqueries, casts, joins or table names ([query-language.md](query-language.md)).
+- The query language is parsed into Trailscope's own syntax tree and compiled to SQL with every value as a bound parameter. Only registered columns and functions are allowed; there are no subqueries, casts, joins or table names ([query-language.md](query-language.md)).
 - Every user-driven query runs as a dedicated **read-only ClickHouse user** limited by a settings profile (execution time, rows read, result rows, memory), and is always scoped to one project.
 
 ## Outbound requests
@@ -37,7 +37,7 @@ Logbox stores what your APIs receive and send, so it is built to keep as little 
 
 ## Secrets at rest
 
-The SMTP password and channel secrets are encrypted with XChaCha20-Poly1305 using `LOGBOX_SECRET_KEY`, which also signs the mute links in emails. Without that variable, Logbox generates a key and stores it in Postgres, which protects much less: anyone with a database dump could decrypt the secrets.
+The SMTP password and channel secrets are encrypted with XChaCha20-Poly1305 using `TRAILSCOPE_SECRET_KEY`, which also signs the mute links in emails. Without that variable, Trailscope generates a key and stores it in Postgres, which protects much less: anyone with a database dump could decrypt the secrets.
 
 ## The web UI
 
@@ -45,10 +45,10 @@ The UI is served from the binary with a strict Content-Security-Policy (only sam
 
 ## Operator checklist
 
-- Put Logbox behind TLS (a reverse proxy; see [self-hosting.md](self-hosting.md)) and set `LOGBOX_SERVER_PUBLIC_URL` to the https URL, so cookies are `Secure`.
-- Set `LOGBOX_SECRET_KEY` to a long random value (`openssl rand -base64 48`) and keep it with your backups.
-- Change the default database passwords: `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_READER_PASSWORD` (`LOGBOX_CLICKHOUSE_READER_PASSWORD`) and `POSTGRES_PASSWORD`.
-- Don't publish the ClickHouse, Postgres or Redis ports; only Logbox's port needs to be reachable (and only the ingest paths from your services, if you split them).
+- Put Trailscope behind TLS (a reverse proxy; see [self-hosting.md](self-hosting.md)) and set `TRAILSCOPE_SERVER_PUBLIC_URL` to the https URL, so cookies are `Secure`.
+- Set `TRAILSCOPE_SECRET_KEY` to a long random value (`openssl rand -base64 48`) and keep it with your backups.
+- Change the default database passwords: `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_READER_PASSWORD` (`TRAILSCOPE_CLICKHOUSE_READER_PASSWORD`) and `POSTGRES_PASSWORD`.
+- Don't publish the ClickHouse, Postgres or Redis ports; only Trailscope's port needs to be reachable (and only the ingest paths from your services, if you split them).
 - Turn on `server.trust_proxy` only when a proxy you control sets `X-Forwarded-For`.
 - Give "can view bodies" only to people who need it, and prefer project-bound, read-scoped API tokens for automation.
 - Add redaction rules for any field specific to your data before sending production traffic.

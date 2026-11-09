@@ -1,8 +1,8 @@
 import type { ErrorRequestHandler, Request, RequestHandler } from 'express';
-import { LogboxClient, type LogboxOptions, contextOf, getClient, init, observeHttp, recordError } from '@logbox/node';
+import { TrailscopeClient, type TrailscopeOptions, contextOf, getClient, init, observeHttp, recordError } from '@trailscope/node';
 
 export {
-  LogboxClient,
+  TrailscopeClient,
   contextOf,
   currentContext,
   getClient,
@@ -11,11 +11,11 @@ export {
   setAttribute,
   setCorrelation,
   setUser,
-} from '@logbox/node';
-export type { LogboxContext, LogboxOptions } from '@logbox/node';
+} from '@trailscope/node';
+export type { TrailscopeContext, TrailscopeOptions } from '@trailscope/node';
 
-function clientFor(clientOrOptions: LogboxClient | LogboxOptions | undefined): LogboxClient {
-  if (clientOrOptions instanceof LogboxClient) return clientOrOptions;
+function clientFor(clientOrOptions: TrailscopeClient | TrailscopeOptions | undefined): TrailscopeClient {
+  if (clientOrOptions instanceof TrailscopeClient) return clientOrOptions;
   if (!clientOrOptions) return getClient() ?? init();
   return init(clientOrOptions);
 }
@@ -31,14 +31,14 @@ function routeOf(req: Request): string | undefined {
  * Request logging middleware. Register it before your routes:
  *
  * ```ts
- * app.use(logbox({ service: 'orders-api' }));
+ * app.use(trailscope({ service: 'orders-api' }));
  * ```
  *
- * Pass a `LogboxClient`, or options to create the process-wide client with
+ * Pass a `TrailscopeClient`, or options to create the process-wide client with
  * `init()`. Without arguments it uses the client from an earlier `init()`,
- * or creates one from the `LOGBOX_*` environment variables.
+ * or creates one from the `TRAILSCOPE_*` environment variables.
  */
-export function logbox(clientOrOptions?: LogboxClient | LogboxOptions): RequestHandler {
+export function trailscope(clientOrOptions?: TrailscopeClient | TrailscopeOptions): RequestHandler {
   const client = clientFor(clientOrOptions);
   return (req, res, next) => {
     observeHttp(client, req, res, next, {
@@ -54,7 +54,7 @@ export function logbox(clientOrOptions?: LogboxClient | LogboxOptions): RequestH
  * when the response is a 5xx) and passes it on. Register it after your
  * routes and before your own error handlers.
  */
-export function logboxErrorHandler(): ErrorRequestHandler {
+export function trailscopeErrorHandler(): ErrorRequestHandler {
   return (err: unknown, req, _res, next) => {
     recordError(err, contextOf(req));
     next(err);

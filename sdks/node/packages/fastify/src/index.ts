@@ -1,7 +1,7 @@
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify';
 import {
-  LogboxClient,
-  type LogboxOptions,
+  TrailscopeClient,
+  type TrailscopeOptions,
   attachContext,
   contextOf,
   enterContext,
@@ -9,10 +9,10 @@ import {
   init,
   recordError,
   runWithContext,
-} from '@logbox/node';
+} from '@trailscope/node';
 
 export {
-  LogboxClient,
+  TrailscopeClient,
   contextOf,
   currentContext,
   getClient,
@@ -21,12 +21,12 @@ export {
   setAttribute,
   setCorrelation,
   setUser,
-} from '@logbox/node';
-export type { LogboxContext, LogboxOptions } from '@logbox/node';
+} from '@trailscope/node';
+export type { TrailscopeContext, TrailscopeOptions } from '@trailscope/node';
 
-export interface LogboxFastifyOptions extends LogboxOptions {
+export interface TrailscopeFastifyOptions extends TrailscopeOptions {
   /** Use this client instead of creating the process-wide one with `init()`. */
-  client?: LogboxClient;
+  client?: TrailscopeClient;
 }
 
 interface Timing {
@@ -36,20 +36,20 @@ interface Timing {
   recorded?: boolean;
 }
 
-const TIMING = Symbol('logbox.timing');
+const TIMING = Symbol('trailscope.timing');
 type Tracked = FastifyRequest & { [TIMING]?: Timing };
 
 function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-function clientFor(opts: LogboxFastifyOptions): LogboxClient {
+function clientFor(opts: TrailscopeFastifyOptions): TrailscopeClient {
   const { client, ...options } = opts;
   if (client) return client;
   return Object.keys(options).length ? init(options) : (getClient() ?? init());
 }
 
-function record(client: LogboxClient, request: Tracked, status: number, reply?: FastifyReply): void {
+function record(client: TrailscopeClient, request: Tracked, status: number, reply?: FastifyReply): void {
   const ctx = contextOf(request);
   const timing = request[TIMING];
   if (!ctx || !timing || timing.recorded) return;
@@ -76,14 +76,14 @@ function record(client: LogboxClient, request: Tracked, status: number, reply?: 
  * Request logging for Fastify. Register it before your routes:
  *
  * ```ts
- * await app.register(logbox, { service: 'orders-api' });
+ * await app.register(trailscope, { service: 'orders-api' });
  * ```
  *
  * It applies to the whole instance (not only the plugin's scope), echoes the
  * request ID, restores the context after body parsing so handlers, log lines
  * and jobs see it, and records 5xx errors with their stack.
  */
-const plugin: FastifyPluginCallback<LogboxFastifyOptions> = (app, opts, done) => {
+const plugin: FastifyPluginCallback<TrailscopeFastifyOptions> = (app, opts, done) => {
   const client = clientFor(opts);
   if (!client.options.enabled) {
     done();
@@ -137,9 +137,9 @@ const plugin: FastifyPluginCallback<LogboxFastifyOptions> = (app, opts, done) =>
 // What fastify-plugin does: share hooks with the parent instead of an encapsulated child.
 Object.assign(plugin, {
   [Symbol.for('skip-override')]: true,
-  [Symbol.for('fastify.display-name')]: '@logbox/fastify',
-  [Symbol.for('plugin-meta')]: { name: '@logbox/fastify', fastify: '5.x' },
+  [Symbol.for('fastify.display-name')]: '@trailscope/fastify',
+  [Symbol.for('plugin-meta')]: { name: '@trailscope/fastify', fastify: '5.x' },
 });
 
-export const logbox = plugin;
+export const trailscope = plugin;
 export default plugin;

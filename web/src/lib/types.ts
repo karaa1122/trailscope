@@ -1,4 +1,4 @@
-// Types mirroring the Logbox API (see /api/openapi.json).
+// Types mirroring the Trailscope API (see /api/openapi.json).
 
 export type Role = 'viewer' | 'member' | 'admin' | 'owner';
 

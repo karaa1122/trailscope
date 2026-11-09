@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 /** Request-scoped context carried through async calls via AsyncLocalStorage. */
-export interface LogboxContext {
+export interface TrailscopeContext {
   requestId: string;
   traceId: string;
   spanId: string;
@@ -16,18 +16,18 @@ export interface LogboxContext {
   error?: unknown;
 }
 
-const storage = new AsyncLocalStorage<LogboxContext>();
+const storage = new AsyncLocalStorage<TrailscopeContext>();
 
-export function runWithContext<T>(ctx: LogboxContext, fn: () => T): T {
+export function runWithContext<T>(ctx: TrailscopeContext, fn: () => T): T {
   return storage.run(ctx, fn);
 }
 
 /** Enters a context for the rest of the current synchronous execution and its async continuations. */
-export function enterContext(ctx: LogboxContext): void {
+export function enterContext(ctx: TrailscopeContext): void {
   storage.enterWith(ctx);
 }
 
-export function currentContext(): LogboxContext | undefined {
+export function currentContext(): TrailscopeContext | undefined {
   return storage.getStore();
 }
 
@@ -53,6 +53,6 @@ export function setAttribute(key: string, value: string | number | boolean): voi
  * Attaches the exception that failed the current request, so its type,
  * message and stack are recorded with it (when the response is a 5xx).
  */
-export function recordError(error: unknown, ctx: LogboxContext | undefined = storage.getStore()): void {
+export function recordError(error: unknown, ctx: TrailscopeContext | undefined = storage.getStore()): void {
   if (ctx && error !== undefined && ctx.error === undefined) ctx.error = error;
 }

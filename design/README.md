@@ -1,6 +1,6 @@
 # Design reference
 
-Visual reference for the Logbox UI. Match the layout, spacing, typography, colour tokens and component styling shown here.
+Visual reference for the Trailscope UI. Match the layout, spacing, typography, colour tokens and component styling shown here.
 
 - `01-live-tail.html`: query bar (Search / Filters / SQL WHERE + quick filters), overview tiles, route heatmap, new & spiking errors, live stream table
 - `02-request-inspector.html`: nearby requests, request header + actions, error card, body/response/headers/cURL tabs, details panel, timing waterfall

@@ -1,0 +1,35 @@
+[package]
+name = "trailscope-server"
+description = "The trailscope binary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "trailscope"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+trailscope-alerts.workspace = true
+trailscope-core.workspace = true
+trailscope-demo.workspace = true
+trailscope-ingest.workspace = true
+trailscope-api.workspace = true
+metrics-exporter-prometheus.workspace = true
+mimalloc.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+rust-embed.workspace = true
+
+[lints]
+workspace = true

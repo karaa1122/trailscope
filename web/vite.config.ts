@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// The Logbox server the dev server proxies to (see scripts/dev/local.env).
-const api = process.env.LOGBOX_API_URL ?? 'http://localhost:8090';
+// The Trailscope server the dev server proxies to (see scripts/dev/local.env).
+const api = process.env.TRAILSCOPE_API_URL ?? 'http://localhost:8090';
 
 export default defineConfig({
   plugins: [react()],

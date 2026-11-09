@@ -1,5 +1,5 @@
--- Logbox ClickHouse schema.
--- Placeholders are substituted by `logbox migrate`:
+-- Trailscope ClickHouse schema.
+-- Placeholders are substituted by `trailscope migrate`:
 --   {{db}}           database name (clickhouse.database)
 --   {{days}}         raw row retention in days (retention.days)
 --   {{body_days}}    body and header retention in days (retention.body_days)

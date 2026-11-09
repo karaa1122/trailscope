@@ -17,10 +17,10 @@ Development workstation: a 12-core Windows 11 host running Docker Desktop, whose
 
 | Container | Limits |
 |---|---|
-| `logbox all` (release build) | `--cpus 4 --memory 1g` |
+| `trailscope all` (release build) | `--cpus 4 --memory 1g` |
 | ClickHouse 26.8 | none (shares the remaining VM CPUs) |
 | Postgres 18 | none |
-| Load generator (`logbox demo --load`) | none (shares the remaining VM CPUs) |
+| Load generator (`trailscope demo --load`) | none (shares the remaining VM CPUs) |
 
 ## Ingest
 
@@ -31,7 +31,7 @@ Payload: demo-generated `request` items (generic SaaS API traffic with headers, 
 ### Sustained 50k events/s (open loop)
 
 ```bash
-logbox demo --url http://logbox-bench:8080 --load \
+trailscope demo --url http://trailscope-bench:8080 --load \
   --concurrency 32 --batch-size 500 --seconds 60 --target-eps 50000
 ```
 
@@ -46,7 +46,7 @@ logbox demo --url http://logbox-bench:8080 --load \
 ### Overload (closed loop, as fast as possible)
 
 ```bash
-logbox demo --url http://logbox-bench:8080 --load --concurrency 64 --batch-size 1000 --seconds 30
+trailscope demo --url http://trailscope-bench:8080 --load --concurrency 64 --batch-size 1000 --seconds 30
 ```
 
 | Metric | Result |
@@ -74,7 +74,7 @@ Every benchmark measures the work the SDK adds in the request's own thread or ev
 
 Integration numbers were measured on a Linux workstation (Intel Core i7-12650H, Ubuntu 24.04, Node 24.21, Python 3.12.3), not on the ingest test machine above.
 
-### `@logbox/node` core
+### `@trailscope/node` core
 
 `sdks/node/packages/node/bench/overhead.mjs` times building and enqueueing one request event (headers, correlation, body capture on 2% of requests) for 200,000 iterations.
 
@@ -87,9 +87,9 @@ Integration numbers were measured on a Linux workstation (Intel Core i7-12650H, 
 
 | Integration | How | Added p50 | Added p99 |
 |---|---|---|---|
-| `@logbox/express` | `bench/overhead.mjs`: the middleware around a route handler, with synthetic request and response objects, 200,000 iterations, against the bare handler | 0.0043 ms | **0.0089 ms** |
-| `@logbox/fastify` | `bench/overhead.mjs`: two identical apps through `app.inject()` (in process, no sockets), 50,000 requests each | 0.0088 ms | **0.0021 ms** (within noise) |
-| `@logbox/nestjs` | Not measured separately: the same Node HTTP instrumentation as Express, plus one interceptor call per request | — | — |
+| `@trailscope/express` | `bench/overhead.mjs`: the middleware around a route handler, with synthetic request and response objects, 200,000 iterations, against the bare handler | 0.0043 ms | **0.0089 ms** |
+| `@trailscope/fastify` | `bench/overhead.mjs`: two identical apps through `app.inject()` (in process, no sockets), 50,000 requests each | 0.0088 ms | **0.0021 ms** (within noise) |
+| `@trailscope/nestjs` | Not measured separately: the same Node HTTP instrumentation as Express, plus one interceptor call per request | — | — |
 | Python, ASGI (FastAPI, Starlette) | `sdks/python/bench/overhead.py`: the middleware around an ASGI app, 50,000 requests, against the bare app | 0.0167 ms | **0.0331 ms** |
 | Python, Django | Same script: the middleware around a view with `RequestFactory` requests | 0.0291 ms | **0.0495 ms** |
 
@@ -102,11 +102,11 @@ cd sdks/python && python bench/overhead.py
 
 ## Query, live tail and web
 
-Measured on the Linux workstation (Intel Core i7-12650H, 10 cores / 16 threads, 16 GB RAM, NVMe) with the release build of `logbox all` and ClickHouse 26.8 in Docker without resource limits, both on the same machine.
+Measured on the Linux workstation (Intel Core i7-12650H, 10 cores / 16 threads, 16 GB RAM, NVMe) with the release build of `trailscope all` and ClickHouse 26.8 in Docker without resource limits, both on the same machine.
 
 ### Dataset
 
-**102 million requests over 15 days** in one project, plus 13.6M spans and 1.6M events. `logbox demo --backfill-hours 24 --backfill-rate 120` produced 6.8M requests through the ingest API (generic SaaS traffic with a daily curve, an incident and a release); ClickHouse `INSERT … SELECT` then copied those requests 14 times, each one day further back with new request IDs, so the rollups were built by the materialized views as for real ingest.
+**102 million requests over 15 days** in one project, plus 13.6M spans and 1.6M events. `trailscope demo --backfill-hours 24 --backfill-rate 120` produced 6.8M requests through the ingest API (generic SaaS traffic with a daily curve, an incident and a release); ClickHouse `INSERT … SELECT` then copied those requests 14 times, each one day further back with new request IDs, so the rollups were built by the materialized views as for real ingest.
 
 | Table | Rows | On disk | Bytes per row |
 |---|---|---|---|
@@ -154,4 +154,4 @@ Most of it is the ingest writer's one-second flush interval (`ingest.flush_inter
 | Initial JavaScript (gzipped) | 200 KB (CodeMirror, 124 KB, loads only with SQL mode) | < 300 KB |
 | Live tail with **10,000 rows** while 200 requests/s keep streaming in, scrolling 150 px per frame for 5 s | 60 fps, p95 frame 16.8 ms, no frame over 50 ms, 26 rows in the DOM (virtualized) | stays smooth |
 
-The frame-time check is a Playwright script on Chromium, filling Live tail from `logbox demo --rate 400` (the stream is capped at 200 events/s per client, `live.max_events_per_sec`).
+The frame-time check is a Playwright script on Chromium, filling Live tail from `trailscope demo --rate 400` (the stream is capped at 200 events/s per client, `live.max_events_per_sec`).

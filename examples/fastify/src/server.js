@@ -1,13 +1,13 @@
-// Minimal Fastify app wired to Logbox. Start Logbox, then:
-//   LOGBOX_INGEST_KEY=lbx_ingest_… pnpm start
+// Minimal Fastify app wired to Trailscope. Start Trailscope, then:
+//   TRAILSCOPE_INGEST_KEY=trs_ingest_… pnpm start
 //   curl localhost:3000/projects/p1/tasks
 import Fastify from 'fastify';
-import { init, logbox, setCorrelation, setUser } from '@logbox/fastify';
+import { init, trailscope, setCorrelation, setUser } from '@trailscope/fastify';
 
-const client = init({ service: 'tasks-api-fastify', endpoint: process.env.LOGBOX_ENDPOINT ?? 'http://localhost:8080' });
+const client = init({ service: 'tasks-api-fastify', endpoint: process.env.TRAILSCOPE_ENDPOINT ?? 'http://localhost:8080' });
 
 const app = Fastify();
-await app.register(logbox, { client });
+await app.register(trailscope, { client });
 
 // Pretend authentication: attach the caller to everything this request does.
 app.addHook('preHandler', async (request) => {

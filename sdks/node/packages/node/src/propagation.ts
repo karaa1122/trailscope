@@ -1,4 +1,4 @@
-import { type LogboxContext, currentContext } from './context.js';
+import { type TrailscopeContext, currentContext } from './context.js';
 
 /** The part of a context that travels with a background job. */
 export interface SerializedContext {
@@ -13,7 +13,7 @@ export interface SerializedContext {
  * Captures the current context so it can be stored in job data and restored
  * by the worker (`client.trackJob(name, fn, { context: deserializeContext(data) })`).
  */
-export function serializeContext(ctx: LogboxContext | undefined = currentContext()): SerializedContext | undefined {
+export function serializeContext(ctx: TrailscopeContext | undefined = currentContext()): SerializedContext | undefined {
   if (!ctx) return undefined;
   return {
     requestId: ctx.requestId,
@@ -24,7 +24,7 @@ export function serializeContext(ctx: LogboxContext | undefined = currentContext
   };
 }
 
-export function deserializeContext(value: unknown): Partial<LogboxContext> | undefined {
+export function deserializeContext(value: unknown): Partial<TrailscopeContext> | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const v = value as Record<string, unknown>;
   const str = (x: unknown) => (typeof x === 'string' && x.length <= 128 ? x : undefined);

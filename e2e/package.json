@@ -1,5 +1,5 @@
 {
-  "name": "@logbox/e2e",
+  "name": "@trailscope/e2e",
   "private": true,
   "version": "0.1.0",
   "type": "module",

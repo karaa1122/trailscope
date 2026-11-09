@@ -11,7 +11,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { setCorrelation, setUser, withLogboxContext } from '@logbox/nestjs';
+import { setCorrelation, setUser, withTrailscopeContext } from '@trailscope/nestjs';
 import type { Queue } from 'bullmq';
 
 /** Pretend authentication: attach the caller to everything this request does. */
@@ -49,7 +49,7 @@ export class TasksController {
     const task = { id: `t${Date.now()}`, title: body.title ?? 'Untitled' };
     // The job carries this request's context, so its run is linked to it.
     // A task titled "flaky" fails its first notification attempt, to show retries.
-    const data = withLogboxContext({ taskId: task.id, flaky: task.title === 'flaky' });
+    const data = withTrailscopeContext({ taskId: task.id, flaky: task.title === 'flaky' });
     await this.notifications.add('task.notify', data, { attempts: 2 });
     return task;
   }

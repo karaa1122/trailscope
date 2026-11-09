@@ -4,8 +4,8 @@ dist/
 *.tsbuildinfo
 .env
 .env.local
-logbox.toml
-!deploy/**/logbox.toml
+trailscope.toml
+!deploy/**/trailscope.toml
 __pycache__/
 *.py[cod]
 .venv/
@@ -17,11 +17,11 @@ build/
 coverage/
 test-results/
 playwright-report/
-crates/logbox-query/fuzz/target/
-crates/logbox-query/fuzz/corpus/parse/*
-!crates/logbox-query/fuzz/corpus/parse/seed*
+crates/trailscope-query/fuzz/target/
+crates/trailscope-query/fuzz/corpus/parse/*
+!crates/trailscope-query/fuzz/corpus/parse/seed*
 
-crates/logbox-query/fuzz/artifacts/
+crates/trailscope-query/fuzz/artifacts/
 .DS_Store
 
 # Personal Claude Code notes (machine paths, working instructions)

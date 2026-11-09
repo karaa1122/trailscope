@@ -1,4 +1,4 @@
--- Logbox metadata schema. Telemetry lives in ClickHouse; this holds users,
+-- Trailscope metadata schema. Telemetry lives in ClickHouse; this holds users,
 -- projects, keys, views and configuration.
 
 CREATE TABLE users (

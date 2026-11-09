@@ -15,12 +15,12 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-import logbox
-from logbox.asgi import LogboxMiddleware as AsgiMiddleware
+import trailscope
+from trailscope.asgi import TrailscopeMiddleware as AsgiMiddleware
 
 N = 50_000
-client = logbox.Client(
-    ingest_key="lbx_ingest_bench",
+client = trailscope.Client(
+    ingest_key="trs_ingest_bench",
     service="bench",
     endpoint="http://127.0.0.1:9",  # never reached: flushing is paused below
     flush_interval=3600,
@@ -106,14 +106,14 @@ def bench_django(wrapped: bool) -> list[float]:
     from django.http import HttpResponse
     from django.test import RequestFactory
 
-    import logbox.django as lbd
+    import trailscope.django as lbd
 
     def view(request: Any) -> HttpResponse:
         status = 500 if request.path.endswith("/fail") else 200
         return HttpResponse(PAYLOAD, status=status, content_type="application/json")
 
-    logbox.init(  # the Django middleware uses the process-wide client
-        ingest_key="lbx_ingest_bench",
+    trailscope.init(  # the Django middleware uses the process-wide client
+        ingest_key="trs_ingest_bench",
         service="bench",
         endpoint="http://127.0.0.1:9",
         flush_interval=3600,
@@ -121,7 +121,7 @@ def bench_django(wrapped: bool) -> list[float]:
         max_queue_size=N * 3,
         remote_config=False,
     )
-    target: Callable[[Any], Any] = lbd.LogboxMiddleware(view) if wrapped else view
+    target: Callable[[Any], Any] = lbd.TrailscopeMiddleware(view) if wrapped else view
     factory = RequestFactory()
     samples = []
     for i in range(N):

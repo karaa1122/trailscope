@@ -2,10 +2,10 @@ import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 
 import { flattenHeaders, serializeBody, shouldCaptureBodies, splitUrl } from './capture.js';
-import { type LogboxContext, currentContext, runWithContext } from './context.js';
+import { type TrailscopeContext, currentContext, runWithContext } from './context.js';
 import type { HttpExchange } from './http.js';
 import { acceptRequestId, newRequestId, newSpanId, newTraceId, parseTraceparent } from './ids.js';
-import { type BodyCapture, type LogboxOptions, type ResolvedOptions, resolveOptions } from './options.js';
+import { type BodyCapture, type TrailscopeOptions, type ResolvedOptions, resolveOptions } from './options.js';
 import { BoundedQueue } from './queue.js';
 import { Redactor } from './redact.js';
 import type {
@@ -59,20 +59,20 @@ export interface JobOptions {
    * Context to restore (e.g. one serialized into job data with
    * `serializeContext`). Default: the current request's context, if any.
    */
-  context?: Partial<LogboxContext>;
+  context?: Partial<TrailscopeContext>;
   attributes?: Attributes;
 }
 
 /**
- * The Logbox client. Every capture method is synchronous and O(1): items are
+ * The Trailscope client. Every capture method is synchronous and O(1): items are
  * appended to a bounded in-memory queue and a background timer ships them.
  * Redaction, serialization and compression happen during the flush, off the
  * request path.
  */
-export class LogboxClient {
+export class TrailscopeClient {
   readonly options: ResolvedOptions;
   redactor: Redactor;
-  private readonly explicit: LogboxOptions;
+  private readonly explicit: TrailscopeOptions;
   private readonly queue: BoundedQueue<Item>;
   private timer: ReturnType<typeof setInterval> | undefined;
   private configTimer: ReturnType<typeof setInterval> | undefined;
@@ -84,14 +84,14 @@ export class LogboxClient {
   private warnedAuth = false;
   private readonly counters = { sent: 0, rejected: 0, failedBatches: 0 };
 
-  constructor(options: LogboxOptions = {}) {
+  constructor(options: TrailscopeOptions = {}) {
     this.explicit = options;
     this.options = resolveOptions(options);
     this.redactor = new Redactor(this.options.redact);
     this.queue = new BoundedQueue<Item>(this.options.maxQueueSize);
     if (this.options.enabled) {
       if (!this.options.ingestKey) {
-        this.options.log('no ingest key configured (LOGBOX_INGEST_KEY); events will not be sent');
+        this.options.log('no ingest key configured (TRAILSCOPE_INGEST_KEY); events will not be sent');
       }
       this.timer = setInterval(() => void this.flush(), this.options.flushIntervalMs);
       this.timer.unref?.();
@@ -186,13 +186,13 @@ export class LogboxClient {
   }
 
   /**
-   * Runs a background job inside a Logbox context and records it as a
+   * Runs a background job inside a Trailscope context and records it as a
    * `kind=job` event with its duration, outcome and attempt number.
    */
   async trackJob<T>(name: string, fn: () => Promise<T> | T, opts: JobOptions = {}): Promise<T> {
     // A job started inside a request belongs to it, unless a context is given.
     const parent = opts.context ?? currentContext();
-    const ctx: LogboxContext = {
+    const ctx: TrailscopeContext = {
       requestId: parent?.requestId ?? newRequestId(),
       traceId: parent?.traceId ?? newTraceId(),
       spanId: newSpanId(),
@@ -246,7 +246,7 @@ export class LogboxClient {
   // ---- helpers for framework integrations -------------------------------------
 
   /** Builds the context for an incoming request from its headers. */
-  contextFromHeaders(get: (name: string) => string | undefined): LogboxContext {
+  contextFromHeaders(get: (name: string) => string | undefined): TrailscopeContext {
     const tp = parseTraceparent(get('traceparent'));
     return {
       requestId: acceptRequestId(get(this.options.requestIdHeader)) ?? newRequestId(),
@@ -263,7 +263,7 @@ export class LogboxClient {
    * the body capture policy, then queues the request. Error details are kept
    * only for 5xx responses; a handled 4xx is an expected outcome.
    */
-  recordHttp(ctx: LogboxContext, ex: HttpExchange): void {
+  recordHttp(ctx: TrailscopeContext, ex: HttpExchange): void {
     if (!this.options.enabled || this.closed) return;
     const { path, query } = splitUrl(ex.url);
     const route = ex.route ?? ctx.route;
@@ -383,7 +383,7 @@ export class LogboxClient {
   async refreshConfig(): Promise<void> {
     try {
       const res = await this.options.fetch(`${this.options.endpoint}/v1/config`, {
-        headers: { authorization: `Bearer ${this.options.ingestKey}`, 'user-agent': `logbox-node/${SDK_VERSION}` },
+        headers: { authorization: `Bearer ${this.options.ingestKey}`, 'user-agent': `trailscope-node/${SDK_VERSION}` },
         signal: AbortSignal.timeout(this.options.requestTimeoutMs),
       });
       if (!res.ok) {
@@ -519,7 +519,7 @@ export class LogboxClient {
           authorization: `Bearer ${this.options.ingestKey}`,
           'content-type': 'application/x-ndjson',
           'content-encoding': 'gzip',
-          'user-agent': `logbox-node/${SDK_VERSION}`,
+          'user-agent': `trailscope-node/${SDK_VERSION}`,
         },
         body: new Uint8Array(body),
         signal: AbortSignal.timeout(this.options.requestTimeoutMs),
@@ -544,7 +544,7 @@ export class LogboxClient {
     }
     if ((res.status === 401 || res.status === 403) && !this.warnedAuth) {
       this.warnedAuth = true;
-      console.warn('[logbox] ingest key rejected (401); check LOGBOX_INGEST_KEY');
+      console.warn('[trailscope] ingest key rejected (401); check TRAILSCOPE_INGEST_KEY');
     }
     this.counters.rejected += items.length;
     this.options.log(`batch dropped: HTTP ${res.status}`);
@@ -561,17 +561,17 @@ function round(ms: number): number {
   return Math.round(ms * 100) / 100;
 }
 
-let globalClient: LogboxClient | undefined;
+let globalClient: TrailscopeClient | undefined;
 
 /** Creates the process-wide client used by the framework integrations. */
-export function init(options: LogboxOptions = {}): LogboxClient {
+export function init(options: TrailscopeOptions = {}): TrailscopeClient {
   if (globalClient) void globalClient.shutdown();
-  globalClient = new LogboxClient(options);
+  globalClient = new TrailscopeClient(options);
   const client = globalClient;
   process.once('beforeExit', () => void client.shutdown());
   return client;
 }
 
-export function getClient(): LogboxClient | undefined {
+export function getClient(): TrailscopeClient | undefined {
   return globalClient;
 }

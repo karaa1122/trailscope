@@ -1,41 +1,41 @@
 # Split mode: separate ingest, api and alerts processes, live tail over Redis.
 #   docker compose -f docker-compose.split.yml up -d
 # UI and API: http://localhost:8080   Ingest (point SDKs here): http://localhost:8081
-name: logbox-split
+name: trailscope-split
 
-x-logbox-env: &logbox-env
-  LOGBOX_SERVER_PUBLIC_URL: ${LOGBOX_PUBLIC_URL:-http://localhost:8080}
-  LOGBOX_CLICKHOUSE_URL: http://clickhouse:8123
-  LOGBOX_CLICKHOUSE_USER: logbox
-  LOGBOX_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-logbox}
-  LOGBOX_CLICKHOUSE_READER_PASSWORD: ${CLICKHOUSE_READER_PASSWORD:-logbox_reader}
-  LOGBOX_POSTGRES_URL: postgres://logbox:${POSTGRES_PASSWORD:-logbox}@postgres:5432/logbox
-  LOGBOX_REDIS_URL: redis://redis:6379
-  LOGBOX_LOG_FORMAT: json
-  LOGBOX_RETENTION_DAYS: ${LOGBOX_RETENTION_DAYS:-30}
-  LOGBOX_RETENTION_BODY_DAYS: ${LOGBOX_RETENTION_BODY_DAYS:-7}
+x-trailscope-env: &trailscope-env
+  TRAILSCOPE_SERVER_PUBLIC_URL: ${TRAILSCOPE_PUBLIC_URL:-http://localhost:8080}
+  TRAILSCOPE_CLICKHOUSE_URL: http://clickhouse:8123
+  TRAILSCOPE_CLICKHOUSE_USER: trailscope
+  TRAILSCOPE_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-trailscope}
+  TRAILSCOPE_CLICKHOUSE_READER_PASSWORD: ${CLICKHOUSE_READER_PASSWORD:-trailscope_reader}
+  TRAILSCOPE_POSTGRES_URL: postgres://trailscope:${POSTGRES_PASSWORD:-trailscope}@postgres:5432/trailscope
+  TRAILSCOPE_REDIS_URL: redis://redis:6379
+  TRAILSCOPE_LOG_FORMAT: json
+  TRAILSCOPE_RETENTION_DAYS: ${TRAILSCOPE_RETENTION_DAYS:-30}
+  TRAILSCOPE_RETENTION_BODY_DAYS: ${TRAILSCOPE_RETENTION_BODY_DAYS:-7}
   # Encrypts stored secrets and signs mute links. Set a long random value in production.
-  LOGBOX_SECRET_KEY: ${LOGBOX_SECRET_KEY:-}
+  TRAILSCOPE_SECRET_KEY: ${TRAILSCOPE_SECRET_KEY:-}
   # Optional: email for alerts and single sign-on. Unset or empty values are ignored.
-  LOGBOX_SMTP_HOST: ${LOGBOX_SMTP_HOST:-}
-  LOGBOX_SMTP_PORT: ${LOGBOX_SMTP_PORT:-}
-  LOGBOX_SMTP_SECURITY: ${LOGBOX_SMTP_SECURITY:-}
-  LOGBOX_SMTP_USERNAME: ${LOGBOX_SMTP_USERNAME:-}
-  LOGBOX_SMTP_PASSWORD: ${LOGBOX_SMTP_PASSWORD:-}
-  LOGBOX_SMTP_FROM: ${LOGBOX_SMTP_FROM:-}
-  LOGBOX_SMTP_FROM_NAME: ${LOGBOX_SMTP_FROM_NAME:-}
-  LOGBOX_OIDC_ISSUER: ${LOGBOX_OIDC_ISSUER:-}
-  LOGBOX_OIDC_CLIENT_ID: ${LOGBOX_OIDC_CLIENT_ID:-}
-  LOGBOX_OIDC_CLIENT_SECRET: ${LOGBOX_OIDC_CLIENT_SECRET:-}
-  LOGBOX_OIDC_DISPLAY_NAME: ${LOGBOX_OIDC_DISPLAY_NAME:-}
-  LOGBOX_OIDC_AUTO_CREATE_DOMAINS: ${LOGBOX_OIDC_AUTO_CREATE_DOMAINS:-}
+  TRAILSCOPE_SMTP_HOST: ${TRAILSCOPE_SMTP_HOST:-}
+  TRAILSCOPE_SMTP_PORT: ${TRAILSCOPE_SMTP_PORT:-}
+  TRAILSCOPE_SMTP_SECURITY: ${TRAILSCOPE_SMTP_SECURITY:-}
+  TRAILSCOPE_SMTP_USERNAME: ${TRAILSCOPE_SMTP_USERNAME:-}
+  TRAILSCOPE_SMTP_PASSWORD: ${TRAILSCOPE_SMTP_PASSWORD:-}
+  TRAILSCOPE_SMTP_FROM: ${TRAILSCOPE_SMTP_FROM:-}
+  TRAILSCOPE_SMTP_FROM_NAME: ${TRAILSCOPE_SMTP_FROM_NAME:-}
+  TRAILSCOPE_OIDC_ISSUER: ${TRAILSCOPE_OIDC_ISSUER:-}
+  TRAILSCOPE_OIDC_CLIENT_ID: ${TRAILSCOPE_OIDC_CLIENT_ID:-}
+  TRAILSCOPE_OIDC_CLIENT_SECRET: ${TRAILSCOPE_OIDC_CLIENT_SECRET:-}
+  TRAILSCOPE_OIDC_DISPLAY_NAME: ${TRAILSCOPE_OIDC_DISPLAY_NAME:-}
+  TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS: ${TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS:-}
 
-x-logbox: &logbox
-  image: ${LOGBOX_IMAGE:-logbox:local}
+x-trailscope: &trailscope
+  image: ${TRAILSCOPE_IMAGE:-trailscope:local}
   restart: unless-stopped
-  environment: *logbox-env
+  environment: *trailscope-env
   healthcheck:
-    test: ["CMD", "/usr/local/bin/logbox", "healthcheck"]
+    test: ["CMD", "/usr/local/bin/trailscope", "healthcheck"]
     interval: 10s
     timeout: 3s
     retries: 6
@@ -47,12 +47,12 @@ x-logbox: &logbox
 
 services:
   migrate:
-    image: ${LOGBOX_IMAGE:-logbox:local}
+    image: ${TRAILSCOPE_IMAGE:-trailscope:local}
     build:
       context: ..
       dockerfile: Dockerfile
     command: ["migrate"]
-    environment: *logbox-env
+    environment: *trailscope-env
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -60,19 +60,19 @@ services:
         condition: service_healthy
 
   ingest:
-    <<: *logbox
+    <<: *trailscope
     command: ["ingest"]
     ports:
-      - "${LOGBOX_INGEST_PORT:-8081}:8080"
+      - "${TRAILSCOPE_INGEST_PORT:-8081}:8080"
 
   api:
-    <<: *logbox
+    <<: *trailscope
     command: ["api"]
     ports:
-      - "${LOGBOX_PORT:-8080}:8080"
+      - "${TRAILSCOPE_PORT:-8080}:8080"
 
   alerts:
-    <<: *logbox
+    <<: *trailscope
     command: ["alerts"]
 
   redis:
