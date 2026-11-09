@@ -92,12 +92,16 @@ Integration numbers were measured on a Linux workstation (Intel Core i7-12650H, 
 | `@trailscope/nestjs` | Not measured separately: the same Node HTTP instrumentation as Express, plus one interceptor call per request | — | — |
 | Python, ASGI (FastAPI, Starlette) | `sdks/python/bench/overhead.py`: the middleware around an ASGI app, 50,000 requests, against the bare app | 0.0167 ms | **0.0331 ms** |
 | Python, Django | Same script: the middleware around a view with `RequestFactory` requests | 0.0291 ms | **0.0495 ms** |
+| PHP, Laravel | `sdks/php/bench/overhead.php`: the middleware around a route handler with synthetic Laravel requests and responses, 50,000 iterations, PHP 8.5, against the bare handler | 0.015 ms | **0.024 ms** |
+| Java, servlet filter (Spring Boot starter) | `sdks/java/bench` (`mvn -q -P bench -pl bench exec:java`): the filter around a servlet with Spring's mock request and response, 100,000 iterations, JDK 21, against the bare servlet | 0.0017 ms | **0.0039 ms** |
 
 ```bash
 pnpm --filter "./sdks/node/**" build
 node sdks/node/packages/express/bench/overhead.mjs
 node sdks/node/packages/fastify/bench/overhead.mjs
 cd sdks/python && python bench/overhead.py
+cd sdks/java && mvn -q install && mvn -q -P bench -pl bench exec:java
+cd sdks/php && composer install && php bench/overhead.php
 ```
 
 ## Query, live tail and web

@@ -9,6 +9,8 @@ Small apps wired to the Trailscope SDKs. Each one serves the same few routes und
 | [nestjs](nestjs) | `TrailscopeModule`, exception filter, `TrailscopeLogger`, guards setting the user, BullMQ with `withTrailscopeContext` and `@TrackJob` (Express or Fastify platform) |
 | [fastapi](fastapi) | ASGI middleware, `TrailscopeHandler`, a span, an async job |
 | [django](django) | middleware and settings, `LOGGING`, Celery tasks with retries |
+| [laravel](laravel) | the auto-discovered package, the signed-in user picked up from Laravel's auth, a span, the `trailscope` log channel, a database queue (SQLite) with a retried job |
+| [spring-boot](spring-boot) | the Spring Boot starter with properties, an interceptor setting the user, an `@Async` job with a retry, the Logback appender, a span |
 
 ## Running them
 
@@ -28,6 +30,17 @@ cd examples/fastapi && pip install -r requirements.txt && uvicorn main:app --por
 cd examples/django && pip install -r requirements.txt
 REDIS_URL=redis://localhost:6379/0 celery -A app worker &
 python manage.py runserver 3000
+
+# Laravel example (PHP 8.3+ and Composer); put TRAILSCOPE_INGEST_KEY in .env,
+# because `artisan serve` ignores shell variables when a .env file exists
+cd examples/laravel && composer install && cp .env.example .env
+touch database/database.sqlite && php artisan migrate
+php artisan queue:work &
+php artisan serve --port 3000
+
+# Java example (JDK 17+ and Maven)
+(cd sdks/java && mvn -q install)
+cd examples/spring-boot && mvn spring-boot:run      # listens on port 3000
 ```
 
 Then send some traffic and open Live tail:
@@ -38,4 +51,4 @@ curl -H 'x-user-id: u_1' -H 'content-type: application/json' -d '{"title":"flaky
 curl localhost:3000/projects/p1/export
 ```
 
-The NestJS and Django examples need Redis for their job queues. In those two, a task titled `flaky` fails its first notification attempt, so you can see a retry in the request's journey.
+The NestJS and Django examples need Redis for their job queues, the Laravel example uses SQLite, and the Spring Boot example retries in-process. In those four, a task titled `flaky` fails its first notification attempt, so you can see a retry in the request's journey.

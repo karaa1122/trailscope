@@ -1,0 +1,47 @@
+name: PHP SDK split
+
+# Packagist reads composer.json at a repository root, so sdks/php is mirrored to a
+# read-only repository (karaa1122/trailscope-php) that Packagist watches. Until the
+# PHP_SPLIT_DEPLOY_KEY secret exists (a write deploy key of that repository), every
+# run is skipped. PHP SDK versions follow the monorepo's v* tags.
+on:
+  push:
+    branches: [main]
+    paths: ["sdks/php/**"]
+    tags: ["v*"] # path filters don't apply to tag pushes
+
+permissions:
+  contents: read
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip until the mirror is set up
+        id: gate
+        env:
+          SSH_KEY: ${{ secrets.PHP_SPLIT_DEPLOY_KEY }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "PHP_SPLIT_DEPLOY_KEY isn't set; nothing to mirror."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          fetch-depth: 0
+      - name: Check Client::VERSION matches the tag
+        if: steps.gate.outputs.skip != 'true' && github.ref_type == 'tag'
+        run: grep -q "VERSION = '${GITHUB_REF_NAME#v}'" sdks/php/src/Client.php || { echo "bump Client::VERSION"; exit 1; }
+      - if: steps.gate.outputs.skip != 'true'
+        run: git subtree split --prefix=sdks/php -b php-split
+      - name: Push to the mirror
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          SSH_KEY: ${{ secrets.PHP_SPLIT_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh && printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git remote add mirror git@github.com:karaa1122/trailscope-php.git
+          git push --force mirror php-split:refs/heads/main
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then git push --force mirror "php-split:refs/tags/$GITHUB_REF_NAME"; fi

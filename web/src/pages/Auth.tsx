@@ -125,7 +125,18 @@ export function InviteAccept({ token }: { token: string }) {
   );
 }
 
-type Framework = 'express' | 'fastify' | 'nestjs' | 'fastapi' | 'django' | 'http';
+type Framework = 'express' | 'fastify' | 'nestjs' | 'fastapi' | 'django' | 'laravel' | 'spring' | 'http';
+
+const FRAMEWORKS: { id: Framework; label: string }[] = [
+  { id: 'express', label: 'Express' },
+  { id: 'fastify', label: 'Fastify' },
+  { id: 'nestjs', label: 'NestJS' },
+  { id: 'fastapi', label: 'FastAPI' },
+  { id: 'django', label: 'Django' },
+  { id: 'laravel', label: 'Laravel' },
+  { id: 'spring', label: 'Spring Boot' },
+  { id: 'http', label: 'HTTP' },
+];
 
 function snippet(fw: Framework, endpoint: string, key: string): string {
   const env = `TRAILSCOPE_ENDPOINT=${endpoint}\nTRAILSCOPE_INGEST_KEY=${key}\nTRAILSCOPE_SERVICE=api`;
@@ -140,6 +151,10 @@ function snippet(fw: Framework, endpoint: string, key: string): string {
       return `# pip install "trailscope[fastapi]"\nfrom fastapi import FastAPI\nimport trailscope\nfrom trailscope.asgi import TrailscopeMiddleware\n\ntrailscope.init(endpoint="${endpoint}", ingest_key="${key}", service="api")\napp = FastAPI()\napp.add_middleware(TrailscopeMiddleware)  # add it last, so it runs first`;
     case 'django':
       return `# pip install "trailscope[django]"\n# settings.py\nTRAILSCOPE = {"endpoint": "${endpoint}", "ingest_key": "${key}", "service": "api"}\nMIDDLEWARE = ["trailscope.django.TrailscopeMiddleware", *MIDDLEWARE]`;
+    case 'laravel':
+      return `# composer require trailscope/trailscope\n# .env\nTRAILSCOPE_ENDPOINT=${endpoint}\nTRAILSCOPE_INGEST_KEY=${key}\nTRAILSCOPE_SERVICE=api\n# optional: send log lines too\nLOG_STACK=single,trailscope`;
+    case 'spring':
+      return `<!-- pom.xml -->\n<dependency>\n  <groupId>dev.trailscope</groupId>\n  <artifactId>trailscope-spring-boot-starter</artifactId>\n  <version>0.1.0</version>\n</dependency>\n\n# application.properties\ntrailscope.endpoint=${endpoint}\ntrailscope.ingest-key=${key}\ntrailscope.service=api`;
     case 'http':
       return `curl -X POST ${endpoint}/v1/ingest \\\n  -H 'Authorization: Bearer ${key}' \\\n  -H 'Content-Type: application/x-ndjson' \\\n  --data-binary '{"type":"request","service":"api","method":"GET","path":"/hello","status":200,"durationMs":12}'`;
   }
@@ -251,9 +266,9 @@ export function Setup() {
             Add the SDK for your framework. Requests start showing up in the live tail within a couple of seconds.
           </p>
           <div className="segmented" role="group" aria-label="Framework" style={{ flexWrap: 'wrap' }}>
-            {(['express', 'fastify', 'nestjs', 'fastapi', 'django', 'http'] as Framework[]).map((f) => (
-              <button key={f} type="button" aria-pressed={fw === f} onClick={() => setFw(f)}>
-                {f === 'http' ? 'HTTP' : f === 'nestjs' ? 'NestJS' : f === 'fastapi' ? 'FastAPI' : f[0]!.toUpperCase() + f.slice(1)}
+            {FRAMEWORKS.map((f) => (
+              <button key={f.id} type="button" aria-pressed={fw === f.id} onClick={() => setFw(f.id)}>
+                {f.label}
               </button>
             ))}
           </div>

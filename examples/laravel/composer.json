@@ -1,0 +1,40 @@
+{
+    "name": "trailscope/example-laravel",
+    "description": "Minimal Laravel app wired to the Trailscope SDK.",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {
+        "php": "^8.3",
+        "laravel/framework": "^13.40",
+        "trailscope/trailscope": "^0.1"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../sdks/php",
+            "options": {
+                "symlink": true,
+                "versions": {
+                    "trailscope/trailscope": "0.1.0"
+                }
+            }
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

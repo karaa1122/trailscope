@@ -117,3 +117,53 @@ jobs:
       - run: ruff format --check .
       - run: mypy
       - run: pytest -q
+
+  java-sdk:
+    name: Java SDK
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: [17, 21]
+    defaults:
+      run:
+        working-directory: sdks/java
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - run: mvn -B verify
+      - run: mvn -B -q install && mvn -B -q -f ../../examples/spring-boot/pom.xml package -DskipTests
+
+  php-sdk:
+    name: PHP SDK (PHP ${{ matrix.php }}, Laravel ${{ matrix.laravel }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: "8.2", laravel: "12" }
+          - { php: "8.5", laravel: "12" }
+          - { php: "8.3", laravel: "13" }
+          - { php: "8.5", laravel: "13" }
+    defaults:
+      run:
+        working-directory: sdks/php
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: Pin Laravel ${{ matrix.laravel }}
+        run: |
+          composer require --dev --no-update "laravel/framework:^${{ matrix.laravel }}.0"
+          # Pint needs PHP 8.3+
+          if [ "${{ matrix.php }}" = "8.2" ]; then composer remove --dev --no-update laravel/pint; fi
+      - run: composer update --no-interaction --no-progress --prefer-dist
+      - run: composer syntax
+      - run: vendor/bin/pint --test
+        if: matrix.php == '8.5' && matrix.laravel == '13'
+      - run: composer analyse

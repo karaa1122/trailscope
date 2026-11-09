@@ -28,7 +28,7 @@
 - **Errors** grouped by fingerprint, with first and last seen, users affected, the release that introduced them and trends.
 - **Routes:** a heatmap of latency, errors or volume per route and minute, and per-route charts.
 - **Alerts:** rules on 5xx rate, p95 latency, counts or new and spiking errors, sent to email, Slack, Telegram or signed webhooks; plus a real-time **Email on 5xx** with throttling, digests and one-click mute links.
-- **SDKs** for Express, Fastify, NestJS (with a Logger bridge and BullMQ), Django, FastAPI/Starlette and Celery, and an **OpenTelemetry (OTLP/HTTP) receiver** for everything else.
+- **SDKs** for Express, Fastify, NestJS (with a Logger bridge and BullMQ), Django, FastAPI/Starlette, Celery, Laravel (queues, log channel, Octane), Spring Boot and other Java servlet apps, and an **OpenTelemetry (OTLP/HTTP) receiver** for everything else.
 - **Secure by default:** redaction in the SDK and again on the server, IP masking, roles and a separate "can view bodies" permission, read-only query execution, optional OIDC single sign-on.
 - **Fast:** 50,000 events/s ingest on 4 vCPU; filtered queries over 100 million requests in well under half a second ([benchmarks](docs/benchmarks.md)).
 
@@ -87,6 +87,35 @@ MIDDLEWARE = ["trailscope.django.TrailscopeMiddleware", ...]
 TRAILSCOPE = {"service": "orders-api"}
 ```
 
+**Spring Boot**
+
+```xml
+<dependency>
+  <groupId>dev.trailscope</groupId>
+  <artifactId>trailscope-spring-boot-starter</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+```properties
+# TRAILSCOPE_ENDPOINT and TRAILSCOPE_INGEST_KEY come from the environment
+trailscope.service=orders-api
+```
+
+**Laravel**
+
+```bash
+composer require trailscope/trailscope
+```
+
+```dotenv
+TRAILSCOPE_ENDPOINT=http://localhost:8080
+TRAILSCOPE_INGEST_KEY=trs_ingest_…
+TRAILSCOPE_SERVICE=orders-api
+# optional: send log lines too
+LOG_STACK=single,trailscope
+```
+
 **OpenTelemetry**
 
 ```bash
@@ -133,7 +162,7 @@ One process (`trailscope all`) handles everything for most installs; ingest, API
 - [Query language](docs/query-language.md)
 - [Alerts and email](docs/alerts.md)
 - [Ingest protocol and OpenTelemetry](docs/ingest-protocol.md), [HTTP API](docs/api.md)
-- SDKs: [behaviour](docs/sdk-spec.md), [Node core](docs/sdk-node.md), [Express](docs/sdk-express.md), [Fastify](docs/sdk-fastify.md), [NestJS](docs/sdk-nestjs.md), [Python](docs/sdk-python.md)
+- SDKs: [behaviour](docs/sdk-spec.md), [Node core](docs/sdk-node.md), [Express](docs/sdk-express.md), [Fastify](docs/sdk-fastify.md), [NestJS](docs/sdk-nestjs.md), [Python](docs/sdk-python.md), [Java](docs/sdk-java.md), [Laravel and PHP](docs/sdk-laravel.md)
 - [Benchmarks](docs/benchmarks.md)
 
 ## Contributing

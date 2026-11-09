@@ -38,6 +38,13 @@ const FRAMEWORK_MARKERS: &[&str] = &[
     "<frozen ",
     "asyncio/",
     "java.base/",
+    "jdk.internal.",
+    "org.springframework.",
+    "org.apache.catalina.",
+    "org.apache.coyote.",
+    "org.apache.tomcat.",
+    "jakarta.servlet.",
+    "/vendor/",
     "/rustc/",
 ];
 

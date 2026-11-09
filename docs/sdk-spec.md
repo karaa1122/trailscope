@@ -9,14 +9,16 @@ What every official Trailscope SDK does, so that a request logged from Express l
 | [`@trailscope/fastify`](sdk-fastify.md) | Node.js 20+ | Fastify 5 |
 | [`@trailscope/nestjs`](sdk-nestjs.md) | Node.js 20+ | NestJS 11 and 12 (Express or Fastify platform), Logger bridge, BullMQ |
 | [`trailscope`](sdk-python.md) | Python 3.10+ | Django, ASGI (FastAPI, Starlette), Celery, `logging` |
+| [`dev.trailscope:trailscope-java`, `-servlet`, `-spring-boot-starter`, `-logback`](sdk-java.md) | Java 17+ | Spring Boot 3 (Spring MVC), any Jakarta Servlet 6 container, Logback, `@Async` and executors |
+| [`trailscope/trailscope`](sdk-laravel.md) | PHP 8.2+ | Laravel 12 and 13 (middleware, exception reporting, queues, log channel, Octane), Monolog 3, core client |
 
 ## 1. Never block the request path
 
 - Capture calls are synchronous, cheap and never touch the network. They append to an **in-memory queue bounded at 10,000 items**. When it is full, the oldest item is dropped and counted (`stats().dropped`).
-- A **background flush** (a timer in Node, a daemon thread in Python) runs every second, or early once 500 items are queued. A flush sends batches of up to 1,000 items as **gzipped NDJSON** to `POST /v1/ingest`.
+- A **background flush** (a timer in Node, a daemon thread in Python and Java; PHP has no threads, so it flushes after the response has been sent, between queue jobs, on Octane ticks and at shutdown, see [sdk-laravel.md](sdk-laravel.md)) runs every second, or early once 500 items are queued. A flush sends batches of up to 1,000 items as **gzipped NDJSON** to `POST /v1/ingest`.
 - **Redaction, `beforeSend`, serialization and compression happen in the flush**, not when the item is captured.
 - **Retries:** network errors, `429` and `5xx` put the batch back at the front of the queue (dropping the oldest items if there is no room) and pause flushing with exponential backoff and jitter (1 s doubling to 60 s, randomized between half and the full value). A `Retry-After` header sets the minimum pause. Other `4xx` responses drop the batch; `401`/`403` print one warning about the ingest key.
-- **Shutdown** flushes what is left, waiting at most 5 seconds. Node: `client.shutdown()` (also on `beforeExit`, and by `TrailscopeModule` on application shutdown). Python: `client.shutdown()`, registered with `atexit` by `init()`.
+- **Shutdown** flushes what is left, waiting at most 5 seconds. Node: `client.shutdown()` (also on `beforeExit`, and by `TrailscopeModule` on application shutdown). Python: `client.shutdown()`, registered with `atexit` by `init()`. Java: `client.shutdown()`, a JVM shutdown hook added by `Trailscope.init()`, or the Spring context closing. PHP: every client registers a shutdown function.
 - **Forks (Python):** after `os.fork()` the child starts with an empty queue, fresh locks and a new flush thread, so preforking servers (gunicorn, Celery prefork) don't share or duplicate items.
 - An SDK must never raise into the application because of Trailscope: transport, serialization and recording errors are caught and reported only through the SDK's debug log (`TRAILSCOPE_DEBUG=1`).
 
@@ -42,7 +44,7 @@ At startup and then every 5 minutes, the SDK fetches `GET /v1/config` (the proje
 
 ## 3. Context
 
-Every request runs inside a context (AsyncLocalStorage in Node, contextvars in Python) holding:
+Every request runs inside a context (AsyncLocalStorage in Node, contextvars in Python, a ThreadLocal in Java carried to other threads by `Trailscope.wrap()`, a per-process slot in PHP) holding:
 
 | Field | Source |
 |---|---|
@@ -61,7 +63,7 @@ Log lines, spans, events and jobs started inside the request read the context, s
 
 One `request` item per HTTP exchange, recorded when the response finishes:
 
-- **Route** is the framework's pattern converted to `:name` parameters (`/projects/:project_id/tasks`): Express `req.baseUrl + req.route.path`, Fastify `routeOptions.url`, Nest's matched route, Django `resolver_match.route` (`<int:id>` and regex groups become `:id`), Starlette/FastAPI `scope["route"].path_format` (`{id}` becomes `:id`) with any mount prefix. When nothing matched (a 404), the route is left empty and the server derives one from the path.
+- **Route** is the framework's pattern converted to `:name` parameters (`/projects/:project_id/tasks`): Express `req.baseUrl + req.route.path`, Fastify `routeOptions.url`, Nest's matched route, Django `resolver_match.route` (`<int:id>` and regex groups become `:id`), Starlette/FastAPI `scope["route"].path_format` (`{id}` becomes `:id`) with any mount prefix, Spring MVC `HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE` (`{id}` becomes `:id`) with the context path, Laravel the matched route's URI (`{id}` and `{id?}` become `:id`). When nothing matched (a 404), the route is left empty and the server derives one from the path.
 - **Ignored routes** (default `/health`, `/healthz`, `/ready`, `/readyz`, `/livez`, matched against the route and the path) aren't recorded.
 - **Sampling:** requests with status ≥ 400, an error, or a duration ≥ `slowMs` (default 1,000 ms) are always kept. Others are kept with probability `sampleRate` (default 1), overridable per route. A kept sampled request records its `sampleRate` so counts can be scaled.
 - **Bodies** follow the capture policy: `errors` (the default: status ≥ 400 or slow), `always` or `never`. At most `maxBodyBytes` (default 8 KB) per body is kept, cut at a UTF-8 boundary, and `bodyTruncated` is set. Binary and multipart bodies (by content type, or a NUL byte in the first 512 bytes) and compressed responses (`Content-Encoding` other than `identity`) are skipped, as are Django's streaming responses. For multipart forms, Django keeps the text fields it already parsed and lists files by name, size and type, never their content. Response bodies are copied as they are written, at most `maxBodyBytes + 1` bytes, whatever the response size, so a streamed response keeps its beginning.
@@ -82,7 +84,7 @@ On by default, applied in the flush before anything leaves the process. The serv
 
 ## 6. Jobs
 
-- A job started inside a request belongs to it by default. To carry the context to another process, serialize it into the job (`serializeContext()` / `serialize_context()`; the BullMQ helper uses `job.data.__trailscope`, the Celery integration a `trailscope` message header) and restore it in the worker.
+- A job started inside a request belongs to it by default. To carry the context to another process, serialize it into the job (`serializeContext()` / `serialize_context()` / Java `Trailscope.serializeContext()`; the BullMQ helper uses `job.data.__trailscope`, the Celery integration a `trailscope` message header, the Laravel integration a `trailscope` key in the job payload) and restore it in the worker.
 - Each run is an `event` with `kind: "job"`, the job name, `status` `ok` or `error`, the duration, the **1-based attempt number**, the error's type, message and stack on failure, and the restored request ID, trace ID, user and correlation keys. Celery retries are recorded as `error` events with level `warn`.
 - Log lines written during the job carry the job's context.
 
