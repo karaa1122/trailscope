@@ -1,0 +1,17 @@
+---
+// A keyboard shortcut from the web UI (web/src/components/Shell.tsx), shown
+// next to the name of the page it opens. Used on the feature labels only.
+interface Props {
+  keys: readonly string[];
+  /** What a screen reader says instead of the default "In the app: G then J". */
+  label?: string;
+}
+
+const { keys, label } = Astro.props;
+const spoken = label ?? `In the app: ${keys.join(' then ')}`;
+---
+
+<span class="keys" title={spoken}>
+  <span class="sr-only">{spoken}</span>
+  {keys.map((key) => <kbd aria-hidden="true">{key}</kbd>)}
+</span>

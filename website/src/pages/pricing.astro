@@ -11,7 +11,7 @@ const plans = [
     name: 'Open source',
     price: '$0',
     per: 'forever',
-    blurb: 'Everything, on your own server, with no limits.',
+    blurb: 'Everything, on your own server, with no limits',
     cta: { label: 'Self-hosting guide', href: '/docs/self-hosting/' },
     features: [
       'Unlimited requests and projects',
@@ -26,7 +26,7 @@ const plans = [
     name: 'Free',
     price: '$0',
     per: 'per month',
-    blurb: 'For side projects and trying Trailscope out.',
+    blurb: 'For side projects and trying Trailscope out',
     cta: { label: 'Join the waitlist', href: '/pricing/?plan=free#waitlist' },
     features: [
       '1 million events a month',
@@ -40,7 +40,7 @@ const plans = [
     name: 'Team',
     price: '$19',
     per: 'per month',
-    blurb: 'For production APIs and the team that runs them.',
+    blurb: 'For production APIs and the team that runs them',
     featured: true,
     cta: { label: 'Join the waitlist', href: '/pricing/?plan=team#waitlist' },
     features: [
@@ -57,7 +57,7 @@ const plans = [
     name: 'Business',
     price: '$99',
     per: 'per month',
-    blurb: 'For larger traffic, longer history and SSO.',
+    blurb: 'For larger traffic, longer history and SSO',
     cta: { label: 'Join the waitlist', href: '/pricing/?plan=business#waitlist' },
     features: [
       '50 million events a month',
@@ -140,7 +140,7 @@ const faq = [
 >
   <div class="page-head wrap">
     <span class="eyebrow">Pricing</span>
-    <h1>Free to self-host. Cloud when you'd rather not.</h1>
+    <h1>Free to self-host, Cloud when you'd rather not</h1>
     <p>
       Trailscope is open source and free to run on your own servers. Trailscope Cloud will run it for
       you, with the same features.
@@ -156,7 +156,6 @@ const faq = [
         {
           plans.map((plan) => (
             <div class={`plan${'featured' in plan ? ' featured' : ''}`}>
-              {'featured' in plan && <span class="badge">Most teams</span>}
               <span class="kind">{plan.kind}</span>
               <h2>{plan.name}</h2>
               <div class="price">

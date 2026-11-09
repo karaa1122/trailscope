@@ -3,6 +3,7 @@ import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import CodeTabs from '../components/CodeTabs.astro';
 import Icon from '../components/Icon.astro';
+import Keys from '../components/Keys.astro';
 import Waitlist from '../components/Waitlist.astro';
 import { REPO } from '../site';
 
@@ -20,42 +21,42 @@ const more = [
   {
     icon: 'activity',
     title: 'Live tail',
-    text: 'Requests on screen within a second, with live tiles, a route heatmap and new errors as they appear.',
+    text: 'Requests on screen within a second, with live tiles, a route heatmap and new errors as they appear',
   },
   {
     icon: 'bell',
     title: 'Alert rules',
-    text: 'On 5xx rate, p95 latency, counts or new and spiking errors, to email, Slack, Telegram or signed webhooks.',
+    text: 'On 5xx rate, p95 latency, counts or new and spiking errors, to email, Slack, Telegram or signed webhooks',
   },
   {
     icon: 'mail',
     title: 'Email on 5xx',
-    text: 'Hear about server errors in real time, with throttling, digests, regression notices and one-click mute links.',
+    text: 'Hear about server errors in real time, with throttling, digests, regression notices and one-click mute links',
   },
   {
     icon: 'replay',
     title: 'Copy as cURL, replay',
-    text: 'Reproduce any request from your terminal, or replay it against a staging server you allowed.',
+    text: 'Reproduce any request from your terminal, or replay it against a staging server you allowed',
   },
   {
     icon: 'eyeOff',
     title: 'Redaction, twice',
-    text: 'Passwords, tokens and card fields are masked in your app before sending, and again on the server.',
+    text: 'Passwords, tokens and card fields are masked in your app before sending, and again on the server',
   },
   {
     icon: 'shield',
     title: 'Roles and body access',
-    text: 'Owners, admins, members and viewers, plus a separate permission to see request and response bodies.',
+    text: 'Owners, admins, members and viewers, plus a separate permission to see request and response bodies',
   },
   {
     icon: 'login',
     title: 'Single sign-on',
-    text: 'Sign in with any OpenID Connect provider (Google, Microsoft Entra, Okta, Keycloak and others).',
+    text: 'Sign in with any OpenID Connect provider: Google, Microsoft Entra, Okta, Keycloak and others',
   },
   {
     icon: 'share',
     title: 'OpenTelemetry',
-    text: 'No SDK for your stack? Point an OTLP/HTTP exporter at Trailscope and your spans become requests.',
+    text: 'Point any OTLP/HTTP exporter at Trailscope and your spans become requests, for stacks without an SDK',
   },
 ] as const;
 ---
@@ -66,36 +67,23 @@ const more = [
 >
   <section class="hero">
     <div class="wrap">
-      <a class="pill" href={REPO}
-        ><b>Open source</b> Apache-2.0<span class="more"> · runs on your server</span>
-        <Icon name="arrowRight" /></a
-      >
-      <h1>See <em>every request</em> your API handles.</h1>
+      <h1>See every request your API handles</h1>
       <p class="lede">
-        Trailscope logs each request your services handle (status, timing, headers, bodies and
-        errors) on your own server. Filter them with SQL, open any one to see what went wrong, and
-        follow a customer across services and background jobs.
+        Open-source request logging on your own server. Filter every request with SQL, open the one
+        that failed and follow a customer across services and background jobs.
       </p>
       <div class="cta">
         <a class="btn primary" href="#quickstart">Self-host in a minute</a>
         <a class="btn" href="/pricing/#waitlist">Join the Cloud waitlist</a>
       </div>
-      <div class="term">
-        <pre><span class="p">$ </span>git clone {REPO}
-<span class="p">$ </span>cd trailscope/deploy
-<span class="p">$ </span>docker compose up -d</pre>
-        <button class="copy" type="button" data-copy={quickstart} aria-label="Copy the commands">
-          <Icon name="copy" />
-        </button>
-      </div>
     </div>
-    <div class="hero-shot">
+    <div class="hero-shot wrap">
       <div class="frame">
         <Image
           src={liveTail}
           alt="Trailscope live tail: request rate, error rate and p95 tiles, a route heatmap with a release marker, new errors and the request stream"
-          widths={[720, 1080, 1440]}
-          sizes="(max-width: 1240px) 100vw, 1240px"
+          widths={[720, 1080, 1440, 2160]}
+          sizes="(max-width: 640px) 720px, (max-width: 1240px) 100vw, 1176px"
           loading="eager"
           fetchpriority="high"
         />
@@ -124,7 +112,7 @@ const more = [
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Why Trailscope</span>
-        <h2>Answers in the request itself, not in a pile of log lines.</h2>
+        <h2>Answers in the request itself, not in a pile of log lines</h2>
         <p>
           Your API already knows what happened. Trailscope keeps every request with its context, so
           "what did this customer see at 14:02?" takes seconds, not an afternoon.
@@ -133,11 +121,10 @@ const more = [
 
       <div class="feature">
         <div class="feature-text">
-          <span class="eyebrow">Inspector</span>
-          <h3>Debug the request, not a log line.</h3>
+          <p class="label">Inspector <Keys keys={['↵']} label="In the app, Enter opens the selected request" /></p>
+          <h3>Open the request that failed</h3>
           <p>
-            Open any request and see what was sent and answered, the error with its stack, and where
-            the time went.
+            See what was sent and answered, the error with its stack, and where the time went.
           </p>
           <ul class="checks">
             <li>Headers, bodies, user, release and journey keys</li>
@@ -157,8 +144,8 @@ const more = [
 
       <div class="feature flip">
         <div class="feature-text">
-          <span class="eyebrow">Journeys</span>
-          <h3>Follow one customer across everything.</h3>
+          <p class="label">Journeys <Keys keys={['G', 'J']} /></p>
+          <h3>Follow one customer across everything</h3>
           <p>
             Tag requests with a user, account, order or session, and Trailscope puts everything for it
             on one timeline, across services, background jobs and log lines.
@@ -180,8 +167,8 @@ const more = [
 
       <div class="feature">
         <div class="feature-text">
-          <span class="eyebrow">Explore</span>
-          <h3>Filter with the SQL you already know.</h3>
+          <p class="label">Explore <Keys keys={['G', 'E']} /></p>
+          <h3>Filter with the SQL you already know</h3>
           <p>
             Write a <code>WHERE</code> clause, use quick search, or click filter chips. Group by any column
             with p50, p95 and p99, and share the view as a link.
@@ -189,7 +176,7 @@ const more = [
           <div class="queries">
             <code><span>status &gt;= 500</span> AND route LIKE '/checkout/%'</code>
             <code><span>status:5xx</span> user:u_42 duration:&gt;1s</code>
-            <small>Well under half a second over 100 million requests.</small>
+            <small>Under half a second over 102 million requests</small>
           </div>
         </div>
         <div class="frame">
@@ -204,8 +191,8 @@ const more = [
 
       <div class="feature flip">
         <div class="feature-text">
-          <span class="eyebrow">Errors and routes</span>
-          <h3>Find the release that broke it.</h3>
+          <p class="label">Errors and routes <Keys keys={['G', 'R']} /></p>
+          <h3>Find the release that broke it</h3>
           <p>
             Errors are grouped by fingerprint with first and last seen, users affected and the release
             that introduced them. The route heatmap shows latency and errors per minute, with every
@@ -232,21 +219,21 @@ const more = [
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">And everything around it</span>
-        <h2>Built for the team that gets paged.</h2>
+        <h2>Built for the team that gets paged</h2>
       </div>
-      <div class="grid">
+      <ul class="extras">
         {
           more.map((item) => (
-            <div class="card">
-              <span class="icon">
+            <li>
+              <h3>
                 <Icon name={item.icon} />
-              </span>
-              <h3>{item.title}</h3>
+                {item.title}
+              </h3>
               <p>{item.text}</p>
-            </div>
+            </li>
           ))
         }
-      </div>
+      </ul>
     </div>
   </section>
 
@@ -254,7 +241,7 @@ const more = [
     <div class="wrap">
       <div class="section-head center">
         <span class="eyebrow">Add it to your app</span>
-        <h2>A few lines, and every request shows up.</h2>
+        <h2>A few lines, and every request shows up</h2>
         <p>
           The SDKs send in the background, add at most 0.05 ms per request, and mask passwords and
           tokens before anything leaves your process.
@@ -272,7 +259,7 @@ const more = [
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Fast and cheap to run</span>
-        <h2>One Rust binary, ClickHouse and Postgres.</h2>
+        <h2>One Rust binary, ClickHouse and Postgres</h2>
         <p>
           Everything runs on one small machine. ClickHouse stores a request in about 70 bytes, so
           100 million requests take under 7 GB of disk.
@@ -297,10 +284,10 @@ const more = [
         </div>
       </div>
       <p class="stats-note">
-        Measured and reproducible: <a href="/docs/benchmarks/">how we benchmarked</a>.
+        Measured and reproducible: <a href="/docs/benchmarks/">how we benchmarked</a>
       </p>
 
-      <div class="flow" style="margin-top: 56px">
+      <div class="flow">
         <div class="flow-col">
           <h3>Your services</h3>
           <ul>
@@ -335,16 +322,19 @@ const more = [
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Quickstart</span>
-        <h2>Running in about a minute.</h2>
+        <h2>Running in about a minute</h2>
         <p>All you need is Docker. The setup wizard does the rest.</p>
       </div>
       <ol class="steps">
         <li>
           <h3>Start it</h3>
           <p>Trailscope, ClickHouse and Postgres in one Compose file.</p>
-          <pre>git clone {REPO}
-cd trailscope/deploy
-docker compose up -d</pre>
+          <div class="snippet">
+            <pre>{quickstart}</pre>
+            <button class="copy" type="button" data-copy={quickstart} aria-label="Copy the commands">
+              <Icon name="copy" />
+            </button>
+          </div>
         </li>
         <li>
           <h3>Create your project</h3>
@@ -374,23 +364,23 @@ TRAILSCOPE_INGEST_KEY=trs_ingest_…</pre>
       <div class="teaser">
         <div class="option">
           <span class="tag">Self-hosted</span>
-          <h3>Free, forever, with everything.</h3>
+          <h3>Free, forever, with everything</h3>
           <p>
             Every feature, no limits and no license key. Your data never leaves your servers. Apache-2.0.
           </p>
           <a class="btn" href="/docs/self-hosting/">Read the self-hosting guide</a>
         </div>
         <div class="option highlight">
-          <span class="tag soon">Cloud · coming soon</span>
-          <h3>Or let us run it for you.</h3>
+          <span class="tag">Cloud, coming soon</span>
+          <h3>Or let us run it for you</h3>
           <p>
             Trailscope Cloud: the same software, hosted in the EU, with a free plan and simple monthly
             pricing.
           </p>
-          <a class="btn primary" href="/pricing/">See planned pricing</a>
+          <a class="btn" href="/pricing/">See planned pricing</a>
         </div>
       </div>
-      <div style="margin-top: 16px">
+      <div class="waitlist-gap">
         <Waitlist />
       </div>
     </div>
