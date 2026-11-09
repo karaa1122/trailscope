@@ -8,6 +8,7 @@ An open-source, self-hosted API request logging tool: a Rust server with ClickHo
 
 - Original brief: [docs/agents/spec.md](docs/agents/spec.md). It defines the milestones M0–M8, the data model, the query language, the UI and the performance targets.
 - Follow-up brief (SMTP email on 5xx): [docs/agents/spec-email-notifications.md](docs/agents/spec-email-notifications.md).
+- Plan for the hosted, multi-tenant Trailscope Cloud (milestones C1–C7, not started): [docs/agents/spec-cloud.md](docs/agents/spec-cloud.md).
 - Visual reference for the UI: [design/](design/) (HTML mockups; match them).
 - Every judgement call goes in [docs/DECISIONS.md](docs/DECISIONS.md) (context, choice, alternatives).
 
