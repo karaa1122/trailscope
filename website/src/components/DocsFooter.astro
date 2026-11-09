@@ -1,0 +1,54 @@
+---
+// Starlight's footer, plus Mermaid rendering for the diagrams that
+// sync-docs turns into <pre class="mermaid">. Mermaid is only downloaded on
+// pages that have a diagram.
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+
+<Default />
+
+<script>
+  const blocks = [...document.querySelectorAll<HTMLElement>('pre.mermaid')];
+  if (blocks.length > 0) {
+    const { default: mermaid } = await import('mermaid');
+    const light = document.documentElement.dataset.theme === 'light';
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      fontFamily: 'Geist, system-ui, sans-serif',
+      themeVariables: light
+        ? {
+            background: '#ffffff',
+            primaryColor: '#f0f2f5',
+            primaryBorderColor: '#c4cad4',
+            primaryTextColor: '#11151b',
+            lineColor: '#5b6575',
+            clusterBkg: '#f6f7f9',
+            clusterBorder: '#d5d9e1',
+          }
+        : {
+            background: '#111419',
+            primaryColor: '#161a21',
+            primaryBorderColor: '#2e3540',
+            primaryTextColor: '#e7eaee',
+            lineColor: '#7d8696',
+            clusterBkg: '#0d1014',
+            clusterBorder: '#262c36',
+          },
+    });
+    await mermaid.run({ nodes: blocks });
+  }
+</script>
+
+<style is:global>
+  pre.mermaid {
+    display: flex;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 10px;
+    padding: 1.25rem;
+    overflow-x: auto;
+  }
+</style>

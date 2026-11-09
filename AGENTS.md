@@ -33,7 +33,7 @@ An open-source, self-hosted API request logging tool: a Rust server with ClickHo
 | M7 SDKs | done | `@trailscope/express`, `@trailscope/fastify`, `@trailscope/nestjs`, Python `trailscope` (Django, ASGI, Celery, logging handler); `examples/`; overhead benchmarks (all < 0.05 ms p99 added); docs/sdk-*.md |
 | M8 Harden and ship | done | OTLP/HTTP receiver, OIDC sign-in, performance verified on 102M requests, README and docs, release workflow (GHCR, npm via changesets, PyPI), Dependabot |
 
-Since M8: SDKs for Java (decision 063) and PHP/Laravel (decision 064); Explore also reads jobs and log events (decision 058); replay looks only at whether the request body was cut (decision 059); empty `TRAILSCOPE_*` variables count as unset, so the compose files pass the SMTP and OIDC settings through (decision 060). The project was renamed from Logbox, its working name, to Trailscope (decision 062).
+Since M8: SDKs for Java (decision 063) and PHP/Laravel (decision 064); Explore also reads jobs and log events (decision 058); replay looks only at whether the request body was cut (decision 059); empty `TRAILSCOPE_*` variables count as unset, so the compose files pass the SMTP and OIDC settings through (decision 060). The project was renamed from Logbox, its working name, to Trailscope (decision 062). The website (landing page, planned Cloud pricing with a waitlist, and the docs built from `docs/`) lives in `website/` and is served from trailscope.pro (decision 065).
 
 ## Running it locally
 
@@ -80,6 +80,7 @@ Rust 1.99.1 (`rust-toolchain.toml`), ClickHouse 26.8 LTS, Postgres 18, Redis 8, 
 - `examples/`: Express, Fastify, NestJS (+BullMQ), FastAPI, Django (+Celery), Spring Boot, Laravel (database queue on SQLite). See examples/README.md.
 - `web/src`: `router.tsx` (code-based TanStack routes, typed search params), `lib/` (`api.ts` typed client + CSRF, `types.ts`, `session.tsx`, `query.ts`, `live.ts`, `hotkeys.ts`, `format.ts`), `components/` (`Shell`, `CommandPalette`, `QueryBar`, `SqlEditor`, `charts.tsx`, `TimeRange`, `ui.tsx`), `pages/` (`LiveTail`, `Explore`, `Inspector`, `Journeys`, `Errors`, `Routes`, `Views`, `Settings`, `SettingsNotifications`, `Alerts`, `Auth`). Styles: `styles/tokens.css` (dark + light tokens), `styles/app.css`.
 - `e2e/screenshots.mjs`: Playwright screenshots of a running instance (`BASE_URL=… OUT=… node screenshots.mjs`).
+- `website/` (decision 065): the public site, Astro + Starlight. `src/pages/` (landing, pricing, privacy, thank-you pages), `src/components/` (`Waitlist`, `CodeTabs`, Starlight overrides `DocsNav` and `DocsFooter` with the Mermaid loader), `scripts/sync-docs.mjs` (turns `docs/*.md` into `src/content/docs/docs/`, generated and git-ignored: edit `docs/`, never the copies), `domain.txt` (the only place the domain is set), `waitlist/waitlist.py` (stdlib POST `/api/waitlist` → SQLite) and `deploy/` (`nginx.conf`, the systemd unit, `setup-server.sh`, `deploy.sh`). `pnpm --filter trailscope-website dev` serves it locally; screenshots come from `docs/images`.
 
 Lessons from building the SDKs: Starlette runs the last-added middleware first (add `TrailscopeMiddleware` last); BullMQ 6 needs `ioredis` installed by the app; Nest's `ExceptionsHandler` log line would duplicate error groups, so the Logger bridge ignores it; Nest on Fastify needs the `preHandler` hook for guards to see the context.
 
@@ -92,6 +93,8 @@ Roughly in priority order:
 3. **Journeys on low-cardinality keys** read every matching row (about 0.7 s over 7 days for a key with a few hundred values on 100M requests); a per-key rollup or a capped, time-ordered read would help.
 4. The ingest benchmark numbers come from an older development machine; rerun `trailscope demo --load` to refresh them.
 5. Journey header: when the 2,000-item cap is hit, "Quiet since" refers to the last loaded item, not the real last activity.
+6. **Java group ID:** `dev.trailscope` can only be published on Maven Central by the owner of trailscope.dev, but the project's domain is trailscope.pro. Switch to `pro.trailscope` (or `io.github.karaa1122`) before the first Java release.
+7. **Website:** the waitlist has no notification; read signups with `sudo python3 /opt/trailscope-waitlist/waitlist.py export --db /var/lib/trailscope-waitlist/waitlist.db` on the server.
 
 ## Getting oriented
 

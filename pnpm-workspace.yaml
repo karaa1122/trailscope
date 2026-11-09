@@ -5,3 +5,4 @@ packages:
   - examples/fastify
   - examples/nestjs
   - e2e
+  - website

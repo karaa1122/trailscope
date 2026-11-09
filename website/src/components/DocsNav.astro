@@ -1,0 +1,32 @@
+---
+// Replaces Starlight's social icons in the docs header: links back to the
+// rest of the site, then the GitHub icon.
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+---
+
+<nav class="docs-nav" aria-label="Site">
+  <a href="/">Home</a>
+  <a href="/pricing/">Pricing</a>
+</nav>
+<Default />
+
+<style>
+  .docs-nav {
+    display: flex;
+    gap: 1.25rem;
+    margin-inline-end: 0.5rem;
+  }
+  .docs-nav a {
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    font-size: var(--sl-text-sm);
+  }
+  .docs-nav a:hover {
+    color: var(--sl-color-white);
+  }
+  @media (max-width: 50rem) {
+    .docs-nav {
+      display: none;
+    }
+  }
+</style>

@@ -7,6 +7,8 @@
 
 **Self-hosted API request logging: see every request your services handle, query them with SQL, and follow one customer's journey across services and background jobs.**
 
+**Website and documentation: [trailscope.pro](https://trailscope.pro)**
+
 ![Live tail with tiles, the route heatmap and new errors](docs/images/live-tail.png)
 
 ## Why Trailscope
@@ -156,6 +158,8 @@ flowchart LR
 One process (`trailscope all`) handles everything for most installs; ingest, API and alerts can also run separately with Redis for live tail. Details in [architecture.md](docs/architecture.md).
 
 ## Documentation
+
+Also published, with search, at [trailscope.pro/docs](https://trailscope.pro/docs/).
 
 - [Architecture](docs/architecture.md) and [decisions](docs/DECISIONS.md)
 - [Self-hosting](docs/self-hosting.md), [configuration](docs/configuration.md) and [security](docs/security.md)

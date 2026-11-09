@@ -1,0 +1,113 @@
+---
+// The Trailscope Cloud waitlist. Posts to /api/waitlist (website/waitlist/
+// waitlist.py behind nginx). Works without JavaScript: the server then
+// redirects to /thanks/ or /waitlist-error/.
+---
+
+<div id="waitlist" class="waitlist">
+  <div class="waitlist-copy">
+    <span class="eyebrow">Trailscope Cloud</span>
+    <h2>Rather not run it yourself?</h2>
+    <p>
+      We're building a hosted Trailscope: the same software, run for you, with nothing to install
+      beyond the SDK. Leave your email and we'll write when it opens.
+    </p>
+    <ul class="checks">
+      <li>Early access before the public launch</li>
+      <li>One email when it's ready, no newsletter</li>
+      <li>EU hosting at launch</li>
+    </ul>
+  </div>
+  <form class="wl-form" method="post" action="/api/waitlist" data-waitlist>
+    <label class="field full">
+      Work email
+      <input
+        type="email"
+        name="email"
+        required
+        maxlength="254"
+        autocomplete="email"
+        placeholder="you@company.com"
+      />
+    </label>
+    <label class="field">
+      Plan you'd pick
+      <select name="plan">
+        <option value="free">Free</option>
+        <option value="team" selected>Team</option>
+        <option value="business">Business</option>
+        <option value="unsure">Not sure yet</option>
+      </select>
+    </label>
+    <label class="field">
+      Requests per month
+      <select name="volume">
+        <option value="unsure">Not sure</option>
+        <option value="<1m">Under 1 million</option>
+        <option value="1-10m">1–10 million</option>
+        <option value="10-50m">10–50 million</option>
+        <option value="50m+">Over 50 million</option>
+      </select>
+    </label>
+    <div class="hp" aria-hidden="true">
+      <label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+    </div>
+    <div class="wl-actions">
+      <button class="btn primary" type="submit">Join the waitlist</button>
+      <p class="wl-status" role="status" aria-live="polite"></p>
+    </div>
+    <p class="wl-note">
+      We keep your email on our own server in the EU and use it only to tell you about Trailscope
+      Cloud. <a href="/privacy/">Privacy</a>
+    </p>
+  </form>
+</div>
+
+<script>
+  const PLANS = ['free', 'team', 'business', 'unsure'];
+
+  for (const form of document.querySelectorAll<HTMLFormElement>('form[data-waitlist]')) {
+    const plan = new URLSearchParams(location.search).get('plan');
+    const select = form.elements.namedItem('plan');
+    if (plan && PLANS.includes(plan) && select instanceof HTMLSelectElement) select.value = plan;
+
+    const status = form.querySelector<HTMLElement>('.wl-status');
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const show = (state: 'ok' | 'error' | 'busy', text: string) => {
+      if (!status) return;
+      status.dataset.state = state;
+      status.textContent = text;
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      if (button) button.disabled = true;
+      show('busy', 'Sending…');
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const body: unknown = await res.json().catch(() => null);
+        const error =
+          body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+            ? body.error
+            : null;
+        if (res.ok) {
+          form.reset();
+          show('ok', "You're on the list. We'll email you when Trailscope Cloud opens.");
+        } else if (res.status === 429) {
+          show('error', 'Too many tries from your network. Please try again in a few minutes.');
+        } else {
+          show('error', error ?? 'Something went wrong. Please try again.');
+        }
+      } catch {
+        show('error', "Couldn't reach the server. Please try again.");
+      } finally {
+        if (button) button.disabled = false;
+      }
+    });
+  }
+</script>
