@@ -37,3 +37,8 @@ allow-wildcard-paths = true
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+# Our own crates are unpublished (publish = false) and AGPL-3.0-only (decision 069);
+# the allow list above is for dependencies.
+[licenses.private]
+ignore = true

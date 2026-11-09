@@ -1,7 +1,7 @@
 # <img src="docs/images/logo.svg" width="32" height="32" alt=""> Trailscope
 
 [![CI](https://github.com/karaa1122/trailscope/actions/workflows/ci.yml/badge.svg)](https://github.com/karaa1122/trailscope/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE) [![SDKs: Apache-2.0](https://img.shields.io/badge/SDKs-Apache--2.0-blue.svg)](#license)
 [![PyPI](https://img.shields.io/pypi/v/trailscope?label=pypi%20trailscope)](https://pypi.org/project/trailscope/)
 [![npm](https://img.shields.io/npm/v/@trailscope/node?label=npm%20%40trailscope%2Fnode)](https://www.npmjs.com/package/@trailscope/node)
 
@@ -16,7 +16,7 @@
 - **Debug the request, not a log line.** Open any request to see what was sent and answered, the error with its stack, and where the time went. Copy it as cURL or replay it against staging.
 - **Follow one customer across everything.** Journeys put the requests, background jobs and log lines for one user, order or session on a single timeline.
 - **Search the way you think.** A SQL `WHERE` filter or a quick search over every field, answered in well under a second on 100 million requests.
-- **Your data stays on your server.** One Rust binary plus ClickHouse and Postgres runs on a small machine, with no outside service involved. Apache-2.0.
+- **Your data stays on your server.** One Rust binary plus ClickHouse and Postgres runs on a small machine, with no outside service involved. Open source: AGPL-3.0 for the server, Apache-2.0 for the SDKs.
 - **It doesn't slow your app down.** The SDKs add at most 0.05 ms per request, send in the background, and hide passwords and tokens before anything leaves the process.
 
 > **Status: early release (0.x).** Trailscope works end to end and has been load-tested, but it hasn't run in many production setups yet, and the alerting, SDK and single sign-on code has fewer automated tests than the ingest and query core. Expect rough edges and breaking changes before 1.0, and please [open an issue](https://github.com/karaa1122/trailscope/issues) when something doesn't work.
@@ -175,4 +175,5 @@ Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for
 
 ## License
 
-[Apache-2.0](LICENSE)
+- The server, web UI and website: [AGPL-3.0](LICENSE). You can run, change and self-host Trailscope freely; if you offer a modified Trailscope to others over a network, you share your changes under the same license.
+- The SDKs (`sdks/`) and the examples (`examples/`): Apache-2.0, so adding Trailscope to your application never puts your code under the AGPL.

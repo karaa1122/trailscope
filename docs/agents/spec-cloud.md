@@ -4,7 +4,7 @@ Plan for turning Trailscope into a hosted service, written 2026-11-09 after the 
 
 ## Goal
 
-Anyone can sign up at **cloud.trailscope.pro**, create an organization, get an ingest key and see their requests within minutes, on the Free plan or a paid one (Team $19, Business $99 a month, planned prices on trailscope.pro/pricing). The Cloud runs the same open-source code as self-hosted Trailscope; Cloud-only behaviour (sign-up, plans, billing, limits) is switched on by configuration, not a fork.
+Anyone can sign up at **cloud.trailscope.pro**, create an organization, get an ingest key and see their requests within minutes, on the Free plan or a paid one (Team $19, Business $99 a month, planned prices on trailscope.pro/pricing), paid in Iraqi dinars through FIB (see C4). The Cloud runs the same open-source code as self-hosted Trailscope; Cloud-only behaviour (sign-up, plans, billing, limits) is switched on by configuration, not a fork.
 
 Today cloud.trailscope.pro runs one ordinary single-company install for the owner's own projects. The Cloud replaces it in place: its projects become the first organization.
 
@@ -46,13 +46,26 @@ Each milestone ends with everything building, linting and its tests passing (cro
 - Usage page in Settings: events this month, by project, against the plan.
 - **Done when:** an organization over its Free limit gets `429`s while another organization on the same server is unaffected, and rows of a 7-day organization disappear while a 30-day organization's rows stay.
 
-### C4 · Billing (about 1.5 weeks)
+### C4 · Billing with FIB (about 1.5 weeks)
 
-- Stripe Checkout for upgrades, the Stripe Customer Portal for card changes, invoices and cancellation; Stripe Tax for EU VAT.
-- Webhooks (`checkout.session.completed`, `customer.subscription.*`, `invoice.payment_failed`) update `organizations.plan`, `subscription_status` and `current_period_end`; signed and idempotent.
-- Overage: a daily job reports each paid organization's events above its plan as Stripe metered usage ($1.50 per million on Team, $1.20 on Business).
-- Failed payments: 7 days of grace, then Free limits; data beyond Free retention is kept 14 more days in case they pay.
-- **Done when:** a test-mode card can upgrade, be charged overage, downgrade and cancel, and the plan in Trailscope always matches Stripe.
+The owner bills as an individual through **FIB online payments** (First Iraqi Bank). What FIB's developer documentation says (fib.iq/developers/web-payment, read 2026-11-09):
+
+- OAuth2 client credentials (`client_id`, `client_secret`); access tokens live about 60 seconds, so fetch one per operation and cache it briefly. The credentials decide test or live mode; the sandbox is `https://fib.stage.fib.iq`, the production host comes with the production credentials.
+- `POST /protected/v1/payments` with an amount in **IQD only** (no USD), an optional description (50 characters) and an optional `statusCallbackUrl`. The answer has `paymentId`, a QR code, a readable code, app links and `validUntil`. The customer pays in the FIB app by scanning the code, typing the readable code or tapping the link.
+- `GET /protected/v1/payments/{id}/status`: `PAID`, `UNPAID` or `DECLINED` (with a reason: expired, cancelled, server failure). `POST …/cancel` cancels an unpaid payment.
+- The callback is a POST with only `id` and `status`, **without a signature**. There is no refund API and **no recurring or saved payment**: every period is a new payment the customer approves in the app.
+
+So the Cloud bills **prepaid, one invoice per period**:
+
+- Prices are set in IQD by the owner (the USD prices on the site are a guide until then); monthly or yearly with a discount, since every payment is a manual step for the customer.
+- Postgres `invoices (id, org_id, plan, period_start, period_end, amount_iqd, fib_payment_id, status, valid_until, paid_at, callback_token)`. Upgrading creates an invoice and an FIB payment; the billing page shows the QR code, the readable code and the app link, and polls until paid.
+- A callback is only a hint: the URL carries a random per-invoice token (unknown tokens are ignored), and any callback, plus a sweep of open invoices every 5 minutes, triggers a status call to FIB with our own token. Only that answer changes an invoice. Payments are matched by `paymentId` and amount.
+- Renewal: 7 days before the period ends, the next invoice is created and its pay link emailed (Resend); 7 days of grace after the due date, then Free limits; data beyond Free retention is kept 14 more days in case they pay.
+- Overage (events above the plan) is counted during the period and added to the next invoice.
+- Refunds are manual (bank transfer by the owner) and recorded on the invoice.
+- **Done when:** in FIB's sandbox an organization can upgrade by paying a QR code, renew, go past due and fall back to Free; every state change comes from a status call; a callback for an unknown or unpaid payment changes nothing.
+
+Open with FIB before building: that an individual can get production credentials (their docs speak of shops and business/corporate apps), fees per payment, the production host, how long a payment stays valid, and whether the callback is retried.
 
 ### C5 · Safety (about 1 week)
 
@@ -64,15 +77,15 @@ Each milestone ends with everything building, linting and its tests passing (cro
 
 ### C6 · Operations (about 1 week, in parallel with C4/C5)
 
-- Hosting: its own machine in the EU, not the shared server that runs other sites. Start with one dedicated server (8+ cores, 64 GB RAM, NVMe) running Trailscope in split mode (ingest, API and alerts as separate containers, Redis for live tail) with ClickHouse and Postgres on the same box; split ClickHouse out when load requires it.
-- Backups: ClickHouse `BACKUP … TO S3` nightly and Postgres base backups plus WAL, both to S3-compatible object storage in another location; a monthly restore test.
+- Hosting: the owner's Oracle Cloud account, region Frankfurt (EU, as the pricing page promises). Not the VM that already runs the owner's other production sites (its two cores are often saturated by another project): a separate Ampere A1 instance, which needs the Pay As You Go account because the free A1 allowance is used. Start with 4 OCPU / 24 GB and a block volume of 200 GB or more for ClickHouse, running Trailscope in split mode (ingest, API and alerts as separate containers, Redis for live tail) with ClickHouse and Postgres on the same instance; grow the shape, then split ClickHouse out, when load requires it. Set an Oracle budget alert.
+- Backups: ClickHouse `BACKUP … TO S3` nightly and Postgres base backups plus WAL, both to Oracle Object Storage (S3-compatible API) in another region; a monthly restore test.
 - Monitoring: `/metrics` into Prometheus and Grafana, uptime checks from outside, a public status page (status.trailscope.pro). The Cloud logs its own API into a second Trailscope instance.
 - Deploys: the GHCR image from the release workflow (decision 068), pinned by tag, rolled out with `docker compose pull && up -d`; ingest stays up during deploys (the SDKs retry, and nginx in front can queue for a few seconds).
 - **Done when:** a restore from last night's backup has been done once on a spare machine, and an outage page fires within 2 minutes of stopping the API.
 
 ### C7 · Legal and launch (about 1 week, mostly writing)
 
-- Terms of service, an updated privacy policy, a data processing agreement (GDPR Art. 28) with the list of subprocessors (hosting provider, Stripe, Resend, object storage), and a short security page.
+- Terms of service, an updated privacy policy, a data processing agreement (GDPR Art. 28) with the list of subprocessors (Oracle Cloud for hosting and backups, FIB for payments, Resend for email), and a short security page.
 - Support: hello@trailscope.pro (Resend inbox), response targets per plan.
 - Launch order: private beta for the waitlist on Free and Team without charging (after C1–C3, C5, C6), then paid plans (after C4, C7). The owner decides when the landing page changes from the waitlist to sign-up; until then trailscope.pro stays as it is.
 
@@ -80,15 +93,25 @@ Each milestone ends with everything building, linting and its tests passing (cro
 
 - Storage is small: about 70 bytes per request in ClickHouse (docs/benchmarks.md), so a Team organization at its full 10M events for 30 days keeps under 1 GB of metadata plus bodies for 7 days.
 - The fixed cost dominates at the start: one dedicated EU server and object storage. A handful of Team subscriptions covers it; Free organizations cost mainly disk, bounded by their 7-day retention and 1M events.
-- Payment fees and VAT handling come out of the price; Stripe Tax handles the VAT rules.
+- FIB's fee per payment comes out of the price (ask FIB). Selling as an individual: check with an accountant what to declare, and whether selling to customers in the EU creates VAT obligations.
+- Only FIB users can pay at first, so the paying market is Iraq; customers elsewhere can use Free or self-host until a second payment provider is added.
 
-## Decisions the owner has to make
+## Decisions
 
-1. **License** before announcing the Cloud: keep Apache-2.0 (anyone may host Trailscope as a competing service), or move to AGPL or FSL for new versions. Changing later only affects new releases and needs agreement from outside contributors.
-2. **Hosting provider and region** for the Cloud server (EU required by the pricing page).
-3. **Who bills:** Stripe needs a person or a company with a tax status; VAT registration depends on the country.
-4. **Free plan abuse policy:** what happens to organizations that only send noise, and when inactive Free organizations are deleted.
+Made by the owner on 2026-11-09:
+
+1. **License:** the server is AGPL-3.0, the SDKs stay Apache-2.0 (decision 069).
+2. **Hosting:** the owner's Oracle Cloud account, Frankfurt.
+3. **Who bills:** the owner, as an individual.
+4. **Payments:** FIB online payments, in IQD (C4).
+
+Still open:
+
+1. The IQD price list (and the overage price per million events).
+2. What happens to Free organizations that only send noise, and when inactive Free organizations are deleted.
+3. A second payment provider for customers outside Iraq, if there is demand.
+4. FIB's answers on individual merchants, fees and the production host (C4).
 
 ## Order and estimate
 
-C1 → C2 → C3 → C5 with C6 alongside: private beta after about 6 weeks of focused work. C4 and C7: paid launch about 2 weeks later.
+C1 → C2 → C3 → C5 with C6 alongside: private beta after about 6 weeks of focused work. C4 and C7: paid launch about 2 weeks later, once FIB has issued production credentials.

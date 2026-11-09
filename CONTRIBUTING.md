@@ -60,3 +60,7 @@ See [docs/architecture.md](docs/architecture.md) for how the pieces fit together
 ## Reporting security issues
 
 Please don't open public issues for vulnerabilities; see [SECURITY.md](SECURITY.md).
+
+## License of contributions
+
+Contributions are accepted under the license of the part of the repository they change: AGPL-3.0 for the server, web UI and website, Apache-2.0 for the SDKs (`sdks/`) and examples (`examples/`). By opening a pull request you agree to license your change that way.

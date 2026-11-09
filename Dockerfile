@@ -38,7 +38,7 @@ RUN cargo build --release --locked --bin trailscope \
 FROM ${RUNTIME_IMAGE}
 LABEL org.opencontainers.image.title="trailscope" \
       org.opencontainers.image.description="Self-hosted API request logging" \
-      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/karaa1122/trailscope"
 COPY --from=builder /usr/local/bin/trailscope /usr/local/bin/trailscope
 USER nonroot:nonroot
