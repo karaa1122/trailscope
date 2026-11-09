@@ -9,7 +9,7 @@ What every official Trailscope SDK does, so that a request logged from Express l
 | [`@trailscope/fastify`](sdk-fastify.md) | Node.js 20+ | Fastify 5 |
 | [`@trailscope/nestjs`](sdk-nestjs.md) | Node.js 20+ | NestJS 11 and 12 (Express or Fastify platform), Logger bridge, BullMQ |
 | [`trailscope`](sdk-python.md) | Python 3.10+ | Django, ASGI (FastAPI, Starlette), Celery, `logging` |
-| [`dev.trailscope:trailscope-java`, `-servlet`, `-spring-boot-starter`, `-logback`](sdk-java.md) | Java 17+ | Spring Boot 3 (Spring MVC), any Jakarta Servlet 6 container, Logback, `@Async` and executors |
+| [`pro.trailscope:trailscope-java`, `-servlet`, `-spring-boot-starter`, `-logback`](sdk-java.md) | Java 17+ | Spring Boot 3 (Spring MVC), any Jakarta Servlet 6 container, Logback, `@Async` and executors |
 | [`trailscope/trailscope`](sdk-laravel.md) | PHP 8.2+ | Laravel 12 and 13 (middleware, exception reporting, queues, log channel, Octane), Monolog 3, core client |
 
 ## 1. Never block the request path

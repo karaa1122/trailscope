@@ -28,7 +28,7 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
     <dependency>
-      <groupId>dev.trailscope</groupId>
+      <groupId>pro.trailscope</groupId>
       <artifactId>trailscope-spring-boot-starter</artifactId>
       <version>${trailscope.version}</version>
     </dependency>

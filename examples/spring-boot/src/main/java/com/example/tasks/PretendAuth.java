@@ -1,6 +1,6 @@
 package com.example.tasks;
 
-import dev.trailscope.Trailscope;
+import pro.trailscope.Trailscope;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Configuration;

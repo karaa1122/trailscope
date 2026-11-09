@@ -6,7 +6,7 @@ The [Trailscope](https://github.com/karaa1122/trailscope) SDK for Java 17+: logs
 
 ```xml
 <dependency>
-  <groupId>dev.trailscope</groupId>
+  <groupId>pro.trailscope</groupId>
   <artifactId>trailscope-spring-boot-starter</artifactId>
   <version>0.1.0</version>
 </dependency>
@@ -16,7 +16,7 @@ Set `TRAILSCOPE_ENDPOINT` and `TRAILSCOPE_INGEST_KEY` (or `trailscope.endpoint` 
 
 ## Any Jakarta Servlet 6 container
 
-Add `dev.trailscope:trailscope-servlet` and register `dev.trailscope.servlet.TrailscopeFilter` first, for `/*`, with `async-supported`. Logback users add `dev.trailscope:trailscope-logback`.
+Add `pro.trailscope:trailscope-servlet` and register `pro.trailscope.servlet.TrailscopeFilter` first, for `/*`, with `async-supported`. Logback users add `pro.trailscope:trailscope-logback`.
 
 Documentation: [docs/sdk-java.md](https://github.com/karaa1122/trailscope/blob/main/docs/sdk-java.md).
 

@@ -1,8 +1,8 @@
 package com.example.tasks;
 
-import dev.trailscope.SpanKind;
-import dev.trailscope.Trailscope;
-import dev.trailscope.TrailscopeClient;
+import pro.trailscope.SpanKind;
+import pro.trailscope.Trailscope;
+import pro.trailscope.TrailscopeClient;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

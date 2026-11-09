@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>dev.trailscope</groupId>
+    <groupId>pro.trailscope</groupId>
     <artifactId>trailscope-parent</artifactId>
     <version>0.1.0</version>
   </parent>
@@ -16,7 +16,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>dev.trailscope</groupId>
+      <groupId>pro.trailscope</groupId>
       <artifactId>trailscope-java</artifactId>
     </dependency>
     <dependency>
@@ -33,7 +33,7 @@
         <configuration>
           <archive>
             <manifestEntries>
-              <Automatic-Module-Name>dev.trailscope.servlet</Automatic-Module-Name>
+              <Automatic-Module-Name>pro.trailscope.servlet</Automatic-Module-Name>
             </manifestEntries>
           </archive>
         </configuration>

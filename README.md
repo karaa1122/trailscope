@@ -93,7 +93,7 @@ TRAILSCOPE = {"service": "orders-api"}
 
 ```xml
 <dependency>
-  <groupId>dev.trailscope</groupId>
+  <groupId>pro.trailscope</groupId>
   <artifactId>trailscope-spring-boot-starter</artifactId>
   <version>0.1.0</version>
 </dependency>

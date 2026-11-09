@@ -154,7 +154,7 @@ function snippet(fw: Framework, endpoint: string, key: string): string {
     case 'laravel':
       return `# composer require trailscope/trailscope\n# .env\nTRAILSCOPE_ENDPOINT=${endpoint}\nTRAILSCOPE_INGEST_KEY=${key}\nTRAILSCOPE_SERVICE=api\n# optional: send log lines too\nLOG_STACK=single,trailscope`;
     case 'spring':
-      return `<!-- pom.xml -->\n<dependency>\n  <groupId>dev.trailscope</groupId>\n  <artifactId>trailscope-spring-boot-starter</artifactId>\n  <version>0.1.0</version>\n</dependency>\n\n# application.properties\ntrailscope.endpoint=${endpoint}\ntrailscope.ingest-key=${key}\ntrailscope.service=api`;
+      return `<!-- pom.xml -->\n<dependency>\n  <groupId>pro.trailscope</groupId>\n  <artifactId>trailscope-spring-boot-starter</artifactId>\n  <version>0.1.0</version>\n</dependency>\n\n# application.properties\ntrailscope.endpoint=${endpoint}\ntrailscope.ingest-key=${key}\ntrailscope.service=api`;
     case 'http':
       return `curl -X POST ${endpoint}/v1/ingest \\\n  -H 'Authorization: Bearer ${key}' \\\n  -H 'Content-Type: application/x-ndjson' \\\n  --data-binary '{"type":"request","service":"api","method":"GET","path":"/hello","status":200,"durationMs":12}'`;
   }

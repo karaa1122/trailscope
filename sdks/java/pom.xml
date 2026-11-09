@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>dev.trailscope</groupId>
+  <groupId>pro.trailscope</groupId>
   <artifactId>trailscope-parent</artifactId>
   <version>0.1.0</version>
   <packaging>pom</packaging>
@@ -68,17 +68,17 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>dev.trailscope</groupId>
+        <groupId>pro.trailscope</groupId>
         <artifactId>trailscope-java</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>dev.trailscope</groupId>
+        <groupId>pro.trailscope</groupId>
         <artifactId>trailscope-servlet</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>dev.trailscope</groupId>
+        <groupId>pro.trailscope</groupId>
         <artifactId>trailscope-logback</artifactId>
         <version>${project.version}</version>
       </dependency>

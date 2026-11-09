@@ -2,7 +2,7 @@
   "name": "trailscope-website",
   "private": true,
   "type": "module",
-  "description": "trailscope.dev: landing page, pricing and the documentation (built from ../docs).",
+  "description": "trailscope.pro: landing page, pricing and the documentation (built from ../docs).",
   "scripts": {
     "sync-docs": "node scripts/sync-docs.mjs",
     "dev": "node scripts/sync-docs.mjs && astro dev",

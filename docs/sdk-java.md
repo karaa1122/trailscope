@@ -1,19 +1,19 @@
-# Java: `dev.trailscope`
+# Java: `pro.trailscope`
 
 Request logging for Spring Boot and any Jakarta Servlet 6 container, job events for background work, and a Logback appender. Java 17+. The core has no dependencies. Shared behaviour is described in [sdk-spec.md](sdk-spec.md).
 
 | Artifact | What it is |
 |---|---|
-| `dev.trailscope:trailscope-spring-boot-starter` | Spring Boot 3 auto-configuration. Brings the three below |
-| `dev.trailscope:trailscope-servlet` | A servlet `Filter` for Tomcat, Jetty, Undertow and other Jakarta Servlet 6 containers |
-| `dev.trailscope:trailscope-logback` | A Logback appender |
-| `dev.trailscope:trailscope-java` | The core client, for workers and scripts |
+| `pro.trailscope:trailscope-spring-boot-starter` | Spring Boot 3 auto-configuration. Brings the three below |
+| `pro.trailscope:trailscope-servlet` | A servlet `Filter` for Tomcat, Jetty, Undertow and other Jakarta Servlet 6 containers |
+| `pro.trailscope:trailscope-logback` | A Logback appender |
+| `pro.trailscope:trailscope-java` | The core client, for workers and scripts |
 
 ## Spring Boot
 
 ```xml
 <dependency>
-  <groupId>dev.trailscope</groupId>
+  <groupId>pro.trailscope</groupId>
   <artifactId>trailscope-spring-boot-starter</artifactId>
   <version>0.1.0</version>
 </dependency>
@@ -53,7 +53,7 @@ Add `trailscope-servlet` and register the filter first, for `/*`, with async sup
 <!-- web.xml -->
 <filter>
   <filter-name>trailscope</filter-name>
-  <filter-class>dev.trailscope.servlet.TrailscopeFilter</filter-class>
+  <filter-class>pro.trailscope.servlet.TrailscopeFilter</filter-class>
   <async-supported>true</async-supported>
   <init-param><param-name>service</param-name><param-value>orders-api</param-value></init-param>
 </filter>
@@ -115,7 +115,7 @@ The Spring Boot starter attaches the appender to the root logger. It sends `WARN
 Without Spring Boot, add `trailscope-logback` and the appender to `logback.xml`:
 
 ```xml
-<appender name="TRAILSCOPE" class="dev.trailscope.logback.TrailscopeAppender">
+<appender name="TRAILSCOPE" class="pro.trailscope.logback.TrailscopeAppender">
   <level>WARN</level>
 </appender>
 <root level="INFO">
@@ -155,7 +155,7 @@ client.flush(); client.shutdown(); client.stats();
 | `environment` | `trailscope.environment` | `TRAILSCOPE_ENVIRONMENT` | `production` | |
 | `release` | `trailscope.release` | `TRAILSCOPE_RELEASE` | | |
 | `enabled` | `trailscope.enabled` | `TRAILSCOPE_ENABLED=0` disables | `true` | |
-| `debug` | `trailscope.debug` | `TRAILSCOPE_DEBUG=1` | `false` | Logs SDK diagnostics on the `dev.trailscope` logger |
+| `debug` | `trailscope.debug` | `TRAILSCOPE_DEBUG=1` | `false` | Logs SDK diagnostics on the `pro.trailscope` logger |
 | `maxQueueSize` | `trailscope.max-queue-size` | | `10000` | Oldest dropped beyond this |
 | `flushInterval` / `flushAt` / `maxBatchSize` | `trailscope.flush-interval` … | | `1s` / `500` / `1000` | |
 | `requestTimeout` / `shutdownTimeout` | `trailscope.request-timeout` … | | `10s` / `5s` | |

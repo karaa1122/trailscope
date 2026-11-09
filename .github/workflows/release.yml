@@ -1,27 +1,48 @@
 name: Release
 
 # Push a tag like v0.2.0 to publish:
-# - the multi-arch server image to GHCR (ghcr.io/<owner>/trailscope:0.2.0, :0.2, :latest)
-# - every Node SDK whose version isn't on npm yet (versions come from changesets)
-# - the Python SDK, unless that version is already on PyPI
-# - the Java SDK to Maven Central, unless that version is already there
+# - the server image to GHCR for amd64 and arm64, each built on a native runner
+#   (ghcr.io/<owner>/trailscope:0.2.0, :0.2, :latest), and a GitHub release
+# - the SDKs, for each registry that is switched on with a repository variable
+#   (Settings → Secrets and variables → Actions → Variables):
+#     PUBLISH_NPM=true    Node SDKs whose version isn't on npm yet (needs the NPM_TOKEN secret)
+#     PUBLISH_PYPI=true   the Python SDK (PyPI trusted publishing, environment "pypi")
+#     PUBLISH_MAVEN=true  the Java SDK to Maven Central (secrets below, namespace pro.trailscope)
+# A registry switched on later can be published for an existing tag with
+# "Run workflow" (workflow_dispatch) and that tag.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish the SDKs from, e.g. v0.1.0"
+        required: true
 
 permissions:
   contents: read
 
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/trailscope
+
 jobs:
   image:
-    name: Server image
-    runs-on: ubuntu-latest
+    name: Server image (${{ matrix.arch }})
+    if: github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -31,29 +52,92 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/trailscope
+          images: ${{ env.IMAGE }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=image-${{ matrix.arch }}
+      - name: Export the digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    name: Server image (tags)
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Tag the multi-arch image
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          args=()
+          while read -r tag; do args+=(-t "$tag"); done < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          for digest in *; do args+=("$IMAGE@sha256:$digest"); done
+          docker buildx imagetools create "${args[@]}"
+          docker buildx imagetools inspect "$IMAGE:${{ steps.meta.outputs.version }}"
+
+  github-release:
+    name: GitHub release
+    needs: manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          flags=(--verify-tag --generate-notes --notes "Server image: \`docker pull $IMAGE:${TAG#v}\` (linux/amd64, linux/arm64).")
+          if [[ "$TAG" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$TAG" "${flags[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
 
   npm:
     name: Node SDKs to npm
+    if: vars.PUBLISH_NPM == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # npm provenance
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -69,6 +153,7 @@ jobs:
 
   pypi:
     name: Python SDK to PyPI
+    if: vars.PUBLISH_PYPI == 'true'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -76,6 +161,8 @@ jobs:
       id-token: write # trusted publishing
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
@@ -88,14 +175,18 @@ jobs:
 
   maven:
     name: Java SDK to Maven Central
+    if: vars.PUBLISH_MAVEN == 'true'
     runs-on: ubuntu-latest
     # Needs MAVEN_CENTRAL_USERNAME and MAVEN_CENTRAL_TOKEN (a central.sonatype.com user token),
-    # MAVEN_GPG_PRIVATE_KEY and MAVEN_GPG_PASSPHRASE, and the verified namespace dev.trailscope.
+    # MAVEN_GPG_PRIVATE_KEY and MAVEN_GPG_PASSPHRASE, and the verified namespace pro.trailscope
+    # (a DNS TXT record on trailscope.pro).
     defaults:
       run:
         working-directory: sdks/java
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -109,7 +200,7 @@ jobs:
       - id: check
         run: |
           v=$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)
-          if curl -sfI "https://repo1.maven.org/maven2/dev/trailscope/trailscope-java/$v/trailscope-java-$v.pom"; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+          if curl -sfI "https://repo1.maven.org/maven2/pro/trailscope/trailscope-java/$v/trailscope-java-$v.pom"; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.check.outputs.skip != 'true'
         run: mvn -B -P release deploy
         env:
