@@ -10,10 +10,40 @@ export interface User {
   can_view_bodies: boolean;
 }
 
+/** An organization: projects, members, invites and API tokens belong to one. */
+export interface OrgInfo {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+export interface OrgMembership extends OrgInfo {
+  role: Role;
+}
+
+export interface Org extends OrgMembership {
+  /** The organization this session works in. */
+  current: boolean;
+}
+
 export interface Me {
+  /** `user.role` is the role in the current organization. */
   user: User;
+  /** The organization the session works in; null when the user belongs to none. */
+  org: OrgInfo | null;
+  orgs: OrgMembership[];
+  /** May manage server-wide settings (SMTP) and create organizations. */
+  instanceAdmin: boolean;
   csrfToken: string | null;
   oidc: { enabled: boolean; displayName: string };
+}
+
+export interface InviteInfo {
+  email: string;
+  role: string;
+  organization: string;
+  /** The email already has an account: accepting asks for its password. */
+  existingAccount: boolean;
 }
 
 export interface ProjectSettings {

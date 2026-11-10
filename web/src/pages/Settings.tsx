@@ -9,26 +9,39 @@ import { useProject, useSession } from '../lib/session';
 import type { Project, ProjectSettings, RedactionRule, Role } from '../lib/types';
 import { NotificationsSection } from './SettingsNotifications';
 
-export type SettingsTab = 'project' | 'keys' | 'redaction' | 'replay' | 'members' | 'tokens' | 'notifications' | 'retention' | 'account';
+export type SettingsTab =
+  | 'project'
+  | 'keys'
+  | 'redaction'
+  | 'replay'
+  | 'organization'
+  | 'members'
+  | 'tokens'
+  | 'notifications'
+  | 'retention'
+  | 'account';
 
 const RANK: Record<Role, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
 const ROLES: Role[] = ['viewer', 'member', 'admin', 'owner'];
 
-const TABS: { id: SettingsTab; label: string; min: Role }[] = [
+/** `instance`: server-wide settings, only for instance admins. */
+const TABS: { id: SettingsTab; label: string; min: Role; instance?: boolean }[] = [
   { id: 'project', label: 'Project', min: 'viewer' },
   { id: 'keys', label: 'Ingest keys', min: 'admin' },
   { id: 'redaction', label: 'Redaction', min: 'admin' },
   { id: 'replay', label: 'Replay targets', min: 'admin' },
+  { id: 'organization', label: 'Organization', min: 'viewer' },
   { id: 'members', label: 'Members', min: 'admin' },
   { id: 'tokens', label: 'API tokens', min: 'viewer' },
-  { id: 'notifications', label: 'Notifications', min: 'admin' },
+  { id: 'notifications', label: 'Notifications', min: 'admin', instance: true },
   { id: 'retention', label: 'Retention', min: 'viewer' },
   { id: 'account', label: 'Account', min: 'viewer' },
 ];
 
 type Toaster = (msg: string) => void;
 
-const errText = (e: unknown) => (e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong');
+const errText = (e: unknown) =>
+  e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong';
 const when = (iso: string | null) => (iso ? fmtAgo(Date.parse(iso)) : 'never');
 
 export function Settings({ tab }: { tab?: SettingsTab }) {
@@ -36,7 +49,7 @@ export function Settings({ tab }: { tab?: SettingsTab }) {
   const navigate = useNavigate();
   const [toast, setToast] = useToast();
   const role = me?.user.role ?? 'viewer';
-  const tabs = TABS.filter((t) => RANK[role] >= RANK[t.min]);
+  const tabs = TABS.filter((t) => (t.instance ? !!me?.instanceAdmin : RANK[role] >= RANK[t.min]));
   const current = tabs.find((t) => t.id === tab)?.id ?? 'project';
   const isAdmin = RANK[role] >= RANK.admin;
 
@@ -46,7 +59,11 @@ export function Settings({ tab }: { tab?: SettingsTab }) {
         <h1 className="page-title">Settings</h1>
       </header>
       <div className="row wrap" style={{ gap: 18, alignItems: 'flex-start' }}>
-        <nav aria-label="Settings sections" style={{ flex: '0 1 190px', display: 'flex', flexDirection: 'column', gap: 2 }} className="nav">
+        <nav
+          aria-label="Settings sections"
+          style={{ flex: '0 1 190px', display: 'flex', flexDirection: 'column', gap: 2 }}
+          className="nav"
+        >
           {tabs.map((t) => (
             <a
               key={t.id}
@@ -62,11 +79,22 @@ export function Settings({ tab }: { tab?: SettingsTab }) {
             </a>
           ))}
         </nav>
-        <div style={{ flex: '999 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {current === 'project' && <ProjectSection toast={setToast} canEdit={isAdmin} isOwner={role === 'owner'} />}
+        <div
+          style={{
+            flex: '999 1 560px',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}
+        >
+          {current === 'project' && (
+            <ProjectSection toast={setToast} canEdit={isAdmin} isOwner={role === 'owner'} />
+          )}
           {current === 'keys' && <KeysSection toast={setToast} />}
           {current === 'redaction' && <RedactionSection toast={setToast} />}
           {current === 'replay' && <ReplaySection toast={setToast} />}
+          {current === 'organization' && <OrganizationSection toast={setToast} isAdmin={isAdmin} />}
           {current === 'members' && <MembersSection toast={setToast} isOwner={role === 'owner'} />}
           {current === 'tokens' && <TokensSection toast={setToast} role={role} />}
           {current === 'notifications' && <NotificationsSection toast={setToast} />}
@@ -79,10 +107,23 @@ export function Settings({ tab }: { tab?: SettingsTab }) {
   );
 }
 
-function Panel({ title, sub, children, actions }: { title: string; sub?: ReactNode; children: ReactNode; actions?: ReactNode }) {
+function Panel({
+  title,
+  sub,
+  children,
+  actions,
+}: {
+  title: string;
+  sub?: ReactNode;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
     <section aria-label={title} className="panel" style={{ overflow: 'hidden' }}>
-      <div className="row wrap" style={{ gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
+      <div
+        className="row wrap"
+        style={{ gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}
+      >
         <h2 className="panel-title">{title}</h2>
         {sub && <span className="panel-sub">{sub}</span>}
         {actions && <span style={{ marginLeft: 'auto' }}>{actions}</span>}
@@ -97,16 +138,33 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <label className="field">
       {label}
       {children}
-      {hint && <span className="dim" style={{ fontSize: 11.5 }}>{hint}</span>}
+      {hint && (
+        <span className="dim" style={{ fontSize: 11.5 }}>
+          {hint}
+        </span>
+      )}
     </label>
   );
 }
 
-const formStyle = { padding: 18, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 } as const;
+const formStyle = {
+  padding: 18,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+  gap: 16,
+} as const;
 
 // ---- project ---------------------------------------------------------------------
 
-function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: boolean; isOwner: boolean }) {
+function ProjectSection({
+  toast,
+  canEdit,
+  isOwner,
+}: {
+  toast: Toaster;
+  canEdit: boolean;
+  isOwner: boolean;
+}) {
   const project = useProject();
   const { refresh, projects, setProject } = useSession();
   const [name, setName] = useState(project.name);
@@ -126,7 +184,14 @@ function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: 
       const routeSampleRates = parseRates(rates);
       return api.updateProject(project.id, {
         name: name.trim(),
-        settings: { ...s, routeSampleRates, ignoreRoutes: ignore.split('\n').map((l) => l.trim()).filter(Boolean) },
+        settings: {
+          ...s,
+          routeSampleRates,
+          ignoreRoutes: ignore
+            .split('\n')
+            .map((l) => l.trim())
+            .filter(Boolean),
+        },
       });
     },
     onSuccess: async () => {
@@ -172,7 +237,13 @@ function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: 
           <fieldset disabled={!canEdit} style={{ border: 0, margin: 0, padding: 0 }}>
             <div style={formStyle}>
               <Field label="Name">
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
+                <input
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  maxLength={100}
+                />
               </Field>
               <Field label="Body capture" hint="Bodies are stored for errors only by default.">
                 <Segmented
@@ -187,25 +258,73 @@ function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: 
                   ]}
                 />
               </Field>
-              <Field label="Slow threshold (ms)" hint="Requests at or above this count as slow and as over SLO.">
-                <input className="input mono" type="number" min={1} max={600000} value={s.slowMs} onChange={(e) => setS({ ...s, slowMs: Number(e.target.value) })} />
+              <Field
+                label="Slow threshold (ms)"
+                hint="Requests at or above this count as slow and as over SLO."
+              >
+                <input
+                  className="input mono"
+                  type="number"
+                  min={1}
+                  max={600000}
+                  value={s.slowMs}
+                  onChange={(e) => setS({ ...s, slowMs: Number(e.target.value) })}
+                />
               </Field>
-              <Field label="Sample rate" hint="Share of fast, successful requests SDKs keep; 4xx, 5xx and slow requests are always kept.">
-                <input className="input mono" type="number" min={0} max={1} step={0.01} value={s.sampleRate} onChange={(e) => setS({ ...s, sampleRate: Number(e.target.value) })} />
+              <Field
+                label="Sample rate"
+                hint="Share of fast, successful requests SDKs keep; 4xx, 5xx and slow requests are always kept."
+              >
+                <input
+                  className="input mono"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={s.sampleRate}
+                  onChange={(e) => setS({ ...s, sampleRate: Number(e.target.value) })}
+                />
               </Field>
               <Field label="Max body size (bytes)">
-                <input className="input mono" type="number" min={0} max={1048576} value={s.maxBodyBytes} onChange={(e) => setS({ ...s, maxBodyBytes: Number(e.target.value) })} />
+                <input
+                  className="input mono"
+                  type="number"
+                  min={0}
+                  max={1048576}
+                  value={s.maxBodyBytes}
+                  onChange={(e) => setS({ ...s, maxBodyBytes: Number(e.target.value) })}
+                />
               </Field>
-              <Field label="Mask client IPs" hint="Keeps the first three IPv4 octets or the first 48 bits of an IPv6 address.">
+              <Field
+                label="Mask client IPs"
+                hint="Keeps the first three IPv4 octets or the first 48 bits of an IPv6 address."
+              >
                 <label className="row" style={{ minHeight: 44, color: 'var(--text)' }}>
-                  <input type="checkbox" checked={s.maskIp} onChange={(e) => setS({ ...s, maskIp: e.target.checked })} /> mask IPs at ingest
+                  <input
+                    type="checkbox"
+                    checked={s.maskIp}
+                    onChange={(e) => setS({ ...s, maskIp: e.target.checked })}
+                  />{' '}
+                  mask IPs at ingest
                 </label>
               </Field>
               <Field label="Per-route sample rates" hint="One per line: GET /healthz = 0.01">
-                <textarea className="textarea mono" rows={4} value={rates} onChange={(e) => setRates(e.target.value)} style={{ padding: 10 }} />
+                <textarea
+                  className="textarea mono"
+                  rows={4}
+                  value={rates}
+                  onChange={(e) => setRates(e.target.value)}
+                  style={{ padding: 10 }}
+                />
               </Field>
               <Field label="Ignored routes" hint="One route pattern per line; SDKs skip these.">
-                <textarea className="textarea mono" rows={4} value={ignore} onChange={(e) => setIgnore(e.target.value)} style={{ padding: 10 }} />
+                <textarea
+                  className="textarea mono"
+                  rows={4}
+                  value={ignore}
+                  onChange={(e) => setIgnore(e.target.value)}
+                  style={{ padding: 10 }}
+                />
               </Field>
             </div>
             {canEdit && (
@@ -223,7 +342,11 @@ function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: 
         <Panel title="All projects" sub={`${projects.length} in this install`}>
           {created && (
             <div style={{ padding: 18 }}>
-              <SecretOnce label={`Project “${created.name}” created. Its first ingest key:`} value={created.key} onDone={() => setCreated(null)} />
+              <SecretOnce
+                label={`Project “${created.name}” created. Its first ingest key:`}
+                value={created.key}
+                onDone={() => setCreated(null)}
+              />
             </div>
           )}
           {projects.map((p) => (
@@ -242,7 +365,11 @@ function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: 
                   className="btn btn-sm"
                   disabled={projects.length < 2}
                   title={projects.length < 2 ? 'The last project cannot be deleted' : undefined}
-                  onClick={() => window.prompt(`This deletes all data for “${p.name}”. Type its slug to confirm.`) === p.slug && remove.mutate(p)}
+                  onClick={() =>
+                    window.prompt(
+                      `This deletes all data for “${p.name}”. Type its slug to confirm.`,
+                    ) === p.slug && remove.mutate(p)
+                  }
                 >
                   Delete
                 </button>
@@ -259,7 +386,13 @@ function ProjectSection({ toast, canEdit, isOwner }: { toast: Toaster; canEdit: 
               input.value = '';
             }}
           >
-            <input name="name" className="input" placeholder="New project name" aria-label="New project name" style={{ maxWidth: 320 }} />
+            <input
+              name="name"
+              className="input"
+              placeholder="New project name"
+              aria-label="New project name"
+              style={{ maxWidth: 320 }}
+            />
             <button type="submit" className="btn">
               Create project
             </button>
@@ -278,10 +411,14 @@ function formatRates(r: Record<string, number>): string {
 
 function parseRates(text: string): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const line of text.split('\n').map((l) => l.trim()).filter(Boolean)) {
+  for (const line of text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)) {
     const i = line.lastIndexOf('=');
     const rate = Number(line.slice(i + 1));
-    if (i < 1 || !Number.isFinite(rate) || rate < 0 || rate > 1) throw new Error(`Per-route sample rate “${line}” must look like “GET /path = 0.5”`);
+    if (i < 1 || !Number.isFinite(rate) || rate < 0 || rate > 1)
+      throw new Error(`Per-route sample rate “${line}” must look like “GET /path = 0.5”`);
     out[line.slice(0, i).trim()] = rate;
   }
   return out;
@@ -303,9 +440,16 @@ function KeysSection({ toast }: { toast: Toaster }) {
     },
     onError: (e) => toast(errText(e)),
   });
-  const revoke = useMutation({ mutationFn: (id: string) => api.revokeKey(project.id, id), onSuccess: refresh, onError: (e) => toast(errText(e)) });
+  const revoke = useMutation({
+    mutationFn: (id: string) => api.revokeKey(project.id, id),
+    onSuccess: refresh,
+    onError: (e) => toast(errText(e)),
+  });
   return (
-    <Panel title="Ingest keys" sub="SDKs send events with these; revoking takes effect within a minute">
+    <Panel
+      title="Ingest keys"
+      sub="SDKs send events with these; revoking takes effect within a minute"
+    >
       {secret && (
         <div style={{ padding: 18 }}>
           <SecretOnce label="New ingest key." value={secret} onDone={() => setSecret(null)} />
@@ -314,7 +458,11 @@ function KeysSection({ toast }: { toast: Toaster }) {
       {keys.isLoading && <Skeleton h={80} />}
       {keys.data?.length === 0 && <Empty title="No keys" />}
       {keys.data?.map((k) => (
-        <div key={k.id} className="kv" style={{ alignItems: 'center', opacity: k.revokedAt ? 0.55 : 1 }}>
+        <div
+          key={k.id}
+          className="kv"
+          style={{ alignItems: 'center', opacity: k.revokedAt ? 0.55 : 1 }}
+        >
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span style={{ color: 'var(--text)', fontSize: 13 }}>{k.name}</span>
             <span className="mono dim" style={{ fontSize: 11.5 }}>
@@ -324,18 +472,131 @@ function KeysSection({ toast }: { toast: Toaster }) {
           {k.revokedAt ? (
             <span className="muted">revoked {when(k.revokedAt)}</span>
           ) : (
-            <button type="button" className="btn btn-sm" onClick={() => window.confirm(`Revoke “${k.name}”? SDKs using it stop sending.`) && revoke.mutate(k.id)}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() =>
+                window.confirm(`Revoke “${k.name}”? SDKs using it stop sending.`) &&
+                revoke.mutate(k.id)
+              }
+            >
               Revoke
             </button>
           )}
         </div>
       ))}
-      <NameForm placeholder="Key name, e.g. production api" button="Create key" onSubmit={(n) => create.mutate(n)} />
+      <NameForm
+        placeholder="Key name, e.g. production api"
+        button="Create key"
+        onSubmit={(n) => create.mutate(n)}
+      />
     </Panel>
   );
 }
 
-function NameForm({ placeholder, button, onSubmit }: { placeholder: string; button: string; onSubmit: (name: string) => void }) {
+// ---- organization --------------------------------------------------------------------
+
+function OrganizationSection({ toast, isAdmin }: { toast: Toaster; isAdmin: boolean }) {
+  const { me, refresh, switchOrg } = useSession();
+  const [name, setName] = useState(me?.org?.name ?? '');
+  useEffect(() => setName(me?.org?.name ?? ''), [me?.org?.name]);
+  const rename = useMutation({
+    mutationFn: (n: string) => api.renameOrg(n),
+    onSuccess: () => {
+      toast('Organization renamed');
+      void refresh();
+    },
+    onError: (e) => toast(errText(e)),
+  });
+  const create = useMutation({
+    mutationFn: (n: string) => api.createOrg(n),
+    // The new organization becomes the current one on the server.
+    onSuccess: () => window.location.assign('/live'),
+    onError: (e) => toast(errText(e)),
+  });
+  const orgs = me?.orgs ?? [];
+  return (
+    <>
+      <Panel title="Organization" sub="Projects, members, invites and API tokens belong to it">
+        <form
+          style={formStyle}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) rename.mutate(name.trim());
+          }}
+        >
+          <Field label="Name" hint={isAdmin ? undefined : 'Admins can rename it'}>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!isAdmin}
+              required
+              maxLength={100}
+            />
+          </Field>
+          <Field label="Slug">
+            <input className="input mono" value={me?.org?.slug ?? ''} disabled />
+          </Field>
+          {isAdmin && (
+            <div style={{ alignSelf: 'end' }}>
+              <button
+                type="submit"
+                className="btn"
+                disabled={rename.isPending || name.trim() === me?.org?.name}
+              >
+                Save
+              </button>
+            </div>
+          )}
+        </form>
+      </Panel>
+      {orgs.length > 1 && (
+        <Panel
+          title="Your organizations"
+          sub="Each has its own projects and members; a tab shows one at a time"
+        >
+          {orgs.map((o) => (
+            <div key={o.id} className="kv" style={{ alignItems: 'center' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ color: 'var(--text)', fontSize: 13 }}>{o.name}</span>
+                <span className="mono dim" style={{ fontSize: 11.5 }}>
+                  {o.slug} · {o.role}
+                </span>
+              </span>
+              {o.id === me?.org?.id ? (
+                <span className="muted">current</span>
+              ) : (
+                <button type="button" className="btn btn-sm" onClick={() => void switchOrg(o.id)}>
+                  Switch
+                </button>
+              )}
+            </div>
+          ))}
+        </Panel>
+      )}
+      {me?.instanceAdmin && (
+        <Panel title="New organization" sub="You become its owner; invite its members from Members">
+          <NameForm
+            placeholder="Organization name, e.g. Acme"
+            button="Create organization"
+            onSubmit={(n) => create.mutate(n)}
+          />
+        </Panel>
+      )}
+    </>
+  );
+}
+
+function NameForm({
+  placeholder,
+  button,
+  onSubmit,
+}: {
+  placeholder: string;
+  button: string;
+  onSubmit: (name: string) => void;
+}) {
   const [name, setName] = useState('');
   return (
     <form
@@ -347,7 +608,14 @@ function NameForm({ placeholder, button, onSubmit }: { placeholder: string; butt
         setName('');
       }}
     >
-      <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={placeholder} aria-label={placeholder} style={{ maxWidth: 360 }} />
+      <input
+        className="input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        style={{ maxWidth: 360 }}
+      />
       <button type="submit" className="btn">
         {button}
       </button>
@@ -378,11 +646,20 @@ function RedactionSection({ toast }: { toast: Toaster }) {
     },
     onError: (e) => toast(errText(e)),
   });
-  const remove = useMutation({ mutationFn: (id: string) => api.deleteRule(project.id, id), onSuccess: refresh, onError: (e) => toast(errText(e)) });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteRule(project.id, id),
+    onSuccess: refresh,
+    onError: (e) => toast(errText(e)),
+  });
   return (
-    <Panel title="Redaction rules" sub="applied at ingest on top of the built-in rules (authorization, cookies, passwords, tokens, card numbers)">
+    <Panel
+      title="Redaction rules"
+      sub="applied at ingest on top of the built-in rules (authorization, cookies, passwords, tokens, card numbers)"
+    >
       {rules.isLoading && <Skeleton h={80} />}
-      {rules.data?.length === 0 && <Empty title="No custom rules">The built-in rules still apply.</Empty>}
+      {rules.data?.length === 0 && (
+        <Empty title="No custom rules">The built-in rules still apply.</Empty>
+      )}
       {rules.data?.map((r) => (
         <div key={r.id} className="kv" style={{ alignItems: 'center' }}>
           <span className="row" style={{ gap: 10 }}>
@@ -415,7 +692,14 @@ function RedactionSection({ toast }: { toast: Toaster }) {
             { id: 'regex', label: 'regex' },
           ]}
         />
-        <input className="input mono" value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder={RULE_HINTS[kind]} aria-label="Pattern" style={{ flex: '1 1 260px' }} />
+        <input
+          className="input mono"
+          value={pattern}
+          onChange={(e) => setPattern(e.target.value)}
+          placeholder={RULE_HINTS[kind]}
+          aria-label="Pattern"
+          style={{ flex: '1 1 260px' }}
+        />
         <button type="submit" className="btn">
           Add rule
         </button>
@@ -431,7 +715,10 @@ function ReplaySection({ toast }: { toast: Toaster }) {
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
-  const targets = useQuery({ queryKey: ['targets', project.id], queryFn: () => api.replayTargets(project.id) });
+  const targets = useQuery({
+    queryKey: ['targets', project.id],
+    queryFn: () => api.replayTargets(project.id),
+  });
   const refresh = () => void qc.invalidateQueries({ queryKey: ['targets', project.id] });
   const create = useMutation({
     mutationFn: () => api.createTarget(project.id, name.trim(), url.trim()),
@@ -442,10 +729,21 @@ function ReplaySection({ toast }: { toast: Toaster }) {
     },
     onError: (e) => toast(errText(e)),
   });
-  const remove = useMutation({ mutationFn: (id: string) => api.deleteTarget(project.id, id), onSuccess: refresh, onError: (e) => toast(errText(e)) });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteTarget(project.id, id),
+    onSuccess: refresh,
+    onError: (e) => toast(errText(e)),
+  });
   return (
-    <Panel title="Replay targets" sub="requests can only be replayed against these base URLs; auth headers are always stripped">
-      {targets.data?.length === 0 && <Empty title="No replay targets">Add a staging or local URL to enable “Replay” in the inspector.</Empty>}
+    <Panel
+      title="Replay targets"
+      sub="requests can only be replayed against these base URLs; auth headers are always stripped"
+    >
+      {targets.data?.length === 0 && (
+        <Empty title="No replay targets">
+          Add a staging or local URL to enable “Replay” in the inspector.
+        </Empty>
+      )}
       {targets.data?.map((t) => (
         <div key={t.id} className="kv" style={{ alignItems: 'center' }}>
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -467,8 +765,22 @@ function ReplaySection({ toast }: { toast: Toaster }) {
           if (name.trim() && url.trim()) create.mutate();
         }}
       >
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. staging" aria-label="Target name" style={{ flex: '1 1 160px' }} />
-        <input className="input mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://staging.example.com" aria-label="Base URL" style={{ flex: '2 1 260px' }} />
+        <input
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name, e.g. staging"
+          aria-label="Target name"
+          style={{ flex: '1 1 160px' }}
+        />
+        <input
+          className="input mono"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://staging.example.com"
+          aria-label="Base URL"
+          style={{ flex: '2 1 260px' }}
+        />
         <button type="submit" className="btn">
           Add target
         </button>
@@ -494,7 +806,8 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
   };
   const onError = (e: unknown) => toast(errText(e));
   const update = useMutation({
-    mutationFn: (a: { id: string; body: Parameters<typeof api.updateMember>[1] }) => api.updateMember(a.id, a.body),
+    mutationFn: (a: { id: string; body: Parameters<typeof api.updateMember>[1] }) =>
+      api.updateMember(a.id, a.body),
     onSuccess: refresh,
     onError,
   });
@@ -513,13 +826,20 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
 
   return (
     <>
-      <Panel title="Members" sub="roles apply to every project; “bodies” lets a member see request and response bodies and headers">
+      <Panel
+        title="Members"
+        sub="roles apply to every project; “bodies” lets a member see request and response bodies and headers"
+      >
         {members.isLoading && <Skeleton h={100} />}
         {members.data?.map((m) => {
           const self = m.id === me?.user.id;
           const locked = self || (m.role === 'owner' && !isOwner);
           return (
-            <div key={m.id} className="kv" style={{ alignItems: 'center', opacity: m.disabled ? 0.55 : 1 }}>
+            <div
+              key={m.id}
+              className="kv"
+              style={{ alignItems: 'center', opacity: m.disabled ? 0.55 : 1 }}
+            >
               <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                 <span style={{ color: 'var(--text)', fontSize: 13 }}>
                   {m.name || m.email} {self && <span className="dim">(you)</span>}
@@ -534,7 +854,9 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
                   aria-label={`Role for ${m.email}`}
                   value={m.role}
                   disabled={locked}
-                  onChange={(e) => update.mutate({ id: m.id, body: { role: e.target.value as Role } })}
+                  onChange={(e) =>
+                    update.mutate({ id: m.id, body: { role: e.target.value as Role } })
+                  }
                   style={{ width: 'auto', minHeight: 32 }}
                 >
                   {(locked ? ROLES : assignable).map((r) => (
@@ -543,16 +865,34 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
                     </option>
                   ))}
                 </select>
-                <label className="row" style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--font)' }}>
-                  <input type="checkbox" checked={m.canViewBodies} disabled={locked} onChange={(e) => update.mutate({ id: m.id, body: { canViewBodies: e.target.checked } })} />
+                <label
+                  className="row"
+                  style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'var(--font)' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={m.canViewBodies}
+                    disabled={locked}
+                    onChange={(e) =>
+                      update.mutate({ id: m.id, body: { canViewBodies: e.target.checked } })
+                    }
+                  />
                   bodies
                 </label>
                 {!locked && (
                   <>
-                    <button type="button" className="btn btn-sm" onClick={() => update.mutate({ id: m.id, body: { disabled: !m.disabled } })}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => update.mutate({ id: m.id, body: { disabled: !m.disabled } })}
+                    >
                       {m.disabled ? 'Enable' : 'Disable'}
                     </button>
-                    <button type="button" className="btn btn-sm" onClick={() => window.confirm(`Remove ${m.email}?`) && remove.mutate(m.id)}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => window.confirm(`Remove ${m.email}?`) && remove.mutate(m.id)}
+                    >
                       Remove
                     </button>
                   </>
@@ -575,7 +915,8 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
               <span style={{ color: 'var(--text)', fontSize: 13 }}>{i.email}</span>
               <span className="mono dim" style={{ fontSize: 11.5 }}>
                 {i.role}
-                {i.canViewBodies ? ' · bodies' : ''} · expires {fmtDateTime(Date.parse(i.expiresAt))}
+                {i.canViewBodies ? ' · bodies' : ''} · expires{' '}
+                {fmtDateTime(Date.parse(i.expiresAt))}
               </span>
             </span>
             <button type="button" className="btn btn-sm" onClick={() => revokeInvite.mutate(i.id)}>
@@ -591,8 +932,22 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
             if (email.trim()) invite.mutate();
           }}
         >
-          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teammate@example.com" aria-label="Email" style={{ flex: '2 1 240px' }} />
-          <select className="input" aria-label="Role" value={role} onChange={(e) => setRole(e.target.value as Role)} style={{ width: 'auto' }}>
+          <input
+            className="input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="teammate@example.com"
+            aria-label="Email"
+            style={{ flex: '2 1 240px' }}
+          />
+          <select
+            className="input"
+            aria-label="Role"
+            value={role}
+            onChange={(e) => setRole(e.target.value as Role)}
+            style={{ width: 'auto' }}
+          >
             {assignable.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -600,7 +955,8 @@ function MembersSection({ toast, isOwner }: { toast: Toaster; isOwner: boolean }
             ))}
           </select>
           <label className="row" style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
-            <input type="checkbox" checked={bodies} onChange={(e) => setBodies(e.target.checked)} /> can view bodies
+            <input type="checkbox" checked={bodies} onChange={(e) => setBodies(e.target.checked)} />{' '}
+            can view bodies
           </label>
           <button type="submit" className="btn">
             Create invite link
@@ -627,7 +983,12 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
     mutationFn: () =>
       api.createToken({
         name: name.trim(),
-        scopes: scope === 'admin' ? ['read', 'write', 'admin'] : scope === 'write' ? ['read', 'write'] : ['read'],
+        scopes:
+          scope === 'admin'
+            ? ['read', 'write', 'admin']
+            : scope === 'write'
+              ? ['read', 'write']
+              : ['read'],
         projectId: projectId || null,
         expiresInDays: days ? Number(days) : null,
       }),
@@ -638,14 +999,21 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
     },
     onError: (e) => toast(errText(e)),
   });
-  const revoke = useMutation({ mutationFn: api.revokeToken, onSuccess: refresh, onError: (e) => toast(errText(e)) });
+  const revoke = useMutation({
+    mutationFn: api.revokeToken,
+    onSuccess: refresh,
+    onError: (e) => toast(errText(e)),
+  });
   const scopes = [
     { id: 'read' as const, label: 'read' },
     ...(RANK[role] >= RANK.member ? [{ id: 'write' as const, label: 'write' }] : []),
     ...(RANK[role] >= RANK.admin ? [{ id: 'admin' as const, label: 'admin' }] : []),
   ];
   return (
-    <Panel title="API tokens" sub="personal tokens for scripts and CI: send as “Authorization: Bearer trs_api_…”">
+    <Panel
+      title="API tokens"
+      sub="personal tokens for scripts and CI: send as “Authorization: Bearer trs_api_…”"
+    >
       {secret && (
         <div style={{ padding: 18 }}>
           <SecretOnce label="New API token." value={secret} onDone={() => setSecret(null)} />
@@ -658,11 +1026,18 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
             <span style={{ color: 'var(--text)', fontSize: 13 }}>{t.name}</span>
             <span className="mono dim" style={{ fontSize: 11.5 }}>
               {t.prefix} · {t.scopes.join(', ')}
-              {t.projectId ? ` · ${projects.find((p) => p.id === t.projectId)?.name ?? 'one project'}` : ' · all projects'} · last used {when(t.lastUsedAt)}
+              {t.projectId
+                ? ` · ${projects.find((p) => p.id === t.projectId)?.name ?? 'one project'}`
+                : ' · all projects'}{' '}
+              · last used {when(t.lastUsedAt)}
               {t.expiresAt ? ` · expires ${fmtDateTime(Date.parse(t.expiresAt))}` : ''}
             </span>
           </span>
-          <button type="button" className="btn btn-sm" onClick={() => window.confirm(`Revoke “${t.name}”?`) && revoke.mutate(t.id)}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => window.confirm(`Revoke “${t.name}”?`) && revoke.mutate(t.id)}
+          >
             Revoke
           </button>
         </div>
@@ -675,9 +1050,22 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
           if (name.trim()) create.mutate();
         }}
       >
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Token name, e.g. ci" aria-label="Token name" style={{ flex: '2 1 200px' }} />
+        <input
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Token name, e.g. ci"
+          aria-label="Token name"
+          style={{ flex: '2 1 200px' }}
+        />
         <Segmented small label="Scope" value={scope} onChange={setScope} options={scopes} />
-        <select className="input" aria-label="Project" value={projectId} onChange={(e) => setProjectId(e.target.value)} style={{ width: 'auto' }}>
+        <select
+          className="input"
+          aria-label="Project"
+          value={projectId}
+          onChange={(e) => setProjectId(e.target.value)}
+          style={{ width: 'auto' }}
+        >
           <option value="">all projects</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -685,7 +1073,13 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
             </option>
           ))}
         </select>
-        <select className="input" aria-label="Expiry" value={days} onChange={(e) => setDays(e.target.value)} style={{ width: 'auto' }}>
+        <select
+          className="input"
+          aria-label="Expiry"
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          style={{ width: 'auto' }}
+        >
           <option value="30">30 days</option>
           <option value="90">90 days</option>
           <option value="365">1 year</option>
@@ -704,7 +1098,10 @@ function TokensSection({ toast, role }: { toast: Toaster; role: Role }) {
 function RetentionSection() {
   const r = useQuery({ queryKey: ['retention'], queryFn: api.retention });
   return (
-    <Panel title="Retention" sub="set in trailscope.toml or with TRAILSCOPE_RETENTION_* environment variables; applied at startup">
+    <Panel
+      title="Retention"
+      sub="set in trailscope.toml or with TRAILSCOPE_RETENTION_* environment variables; applied at startup"
+    >
       {r.data ? (
         <>
           <div className="kv">
@@ -756,7 +1153,16 @@ function AccountSection({ toast }: { toast: Toaster }) {
         </div>
         <div className="kv" style={{ alignItems: 'center' }}>
           <span>Theme</span>
-          <Segmented small label="Theme" value={theme} onChange={(t) => t !== theme && toggleTheme()} options={[{ id: 'dark', label: 'dark' }, { id: 'light', label: 'light' }]} />
+          <Segmented
+            small
+            label="Theme"
+            value={theme}
+            onChange={(t) => t !== theme && toggleTheme()}
+            options={[
+              { id: 'dark', label: 'dark' },
+              { id: 'light', label: 'light' },
+            ]}
+          />
         </div>
         <div className="row" style={{ padding: 18 }}>
           <button type="button" className="btn" onClick={() => void signOut()}>
@@ -773,10 +1179,25 @@ function AccountSection({ toast }: { toast: Toaster }) {
           }}
         >
           <Field label="Current password">
-            <input className="input" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+            <input
+              className="input"
+              type="password"
+              autoComplete="current-password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              required
+            />
           </Field>
           <Field label="New password">
-            <input className="input" type="password" autoComplete="new-password" minLength={10} value={next} onChange={(e) => setNext(e.target.value)} required />
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              required
+            />
           </Field>
           <div className="row" style={{ alignSelf: 'end' }}>
             <button type="submit" className="btn btn-primary" disabled={change.isPending}>

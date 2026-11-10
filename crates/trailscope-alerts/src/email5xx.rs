@@ -150,7 +150,8 @@ impl Engine {
         .await?;
         let mut out = HashMap::new();
         for r in rows {
-            let recipients = channels::recipients(&self.pool, &r.member_ids, &r.emails).await?;
+            let recipients =
+                channels::recipients(&self.pool, r.project_id, &r.member_ids, &r.emails).await?;
             if recipients.is_empty() {
                 continue;
             }

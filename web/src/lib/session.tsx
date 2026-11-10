@@ -1,5 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import { ApiError, api, setCsrf } from './api';
 import type { Me, Project } from './types';
@@ -15,6 +23,8 @@ interface SessionValue {
   refresh: () => Promise<void>;
   signedIn: (csrf: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Moves the session to another organization and reloads the app there. */
+  switchOrg: (id: string) => Promise<void>;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
 }
@@ -64,7 +74,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
   const [projectId, setProjectId] = useState<string | null>(() => stored('trailscope.project'));
   const [environment, setEnv] = useState<string | null>(() => stored('trailscope.environment'));
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => (stored('trailscope.theme') === 'light' ? 'light' : 'dark'));
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    stored('trailscope.theme') === 'light' ? 'light' : 'dark',
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -107,6 +119,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [qc]);
 
+  const switchOrg = useCallback(async (id: string) => {
+    await api.switchOrg(id);
+    // Projects, environments and every cached query belong to the old
+    // organization: start over on the live tail.
+    store('trailscope.project', null);
+    store('trailscope.environment', null);
+    window.location.assign('/live');
+  }, []);
+
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
       const next = t === 'dark' ? 'light' : 'dark';
@@ -126,6 +147,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refresh,
     signedIn,
     signOut,
+    switchOrg,
     theme,
     toggleTheme,
   };

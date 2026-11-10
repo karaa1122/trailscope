@@ -11,7 +11,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::auth::{Role, User, check_password_strength, create_session, hash_password};
+use crate::auth::{
+    OrgInfo, Role, User, check_password_strength, create_session, hash_password, load_caller,
+};
 use crate::error::{ApiError, ApiResult};
 use crate::users::{ClientIp, user_agent, valid_email};
 
@@ -48,12 +50,16 @@ pub struct SetupRequest {
     pub name: String,
     pub password: String,
     pub project_name: String,
+    /// The first organization's name; "Default" when left out.
+    #[serde(default)]
+    pub organization_name: String,
 }
 
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupResponse {
     pub user: User,
+    pub org: Option<OrgInfo>,
     pub project_id: Uuid,
     pub project_slug: String,
     /// The ingest key's plaintext. Shown once; store it now.
@@ -99,8 +105,9 @@ pub async fn complete(
     }
     let user_id = Uuid::now_v7();
     let name = req.name.trim().chars().take(100).collect::<String>();
+    // The first account runs the instance and owns its first organization.
     sqlx::query(
-        "INSERT INTO users (id, email, name, password_hash, role, can_view_bodies) VALUES ($1, $2, $3, $4, 'owner', TRUE)",
+        "INSERT INTO users (id, email, name, password_hash, instance_admin) VALUES ($1, $2, $3, $4, TRUE)",
     )
     .bind(user_id)
     .bind(&email)
@@ -110,20 +117,45 @@ pub async fn complete(
     .await?;
     tx.commit().await?;
 
-    let project = admin::create_project(&state.pool, project_name).await?;
+    let org_name = match req.organization_name.trim() {
+        "" => "Default".to_string(),
+        n => n.chars().take(100).collect(),
+    };
+    // Projects created before setup (by the demo, say) live in the first
+    // organization; reuse it rather than starting a second one.
+    let existing: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM organizations ORDER BY created_at, id LIMIT 1")
+            .fetch_optional(&state.pool)
+            .await?;
+    let org = match existing {
+        Some(id) => {
+            sqlx::query("UPDATE organizations SET name = $2 WHERE id = $1")
+                .bind(id)
+                .bind(&org_name)
+                .execute(&state.pool)
+                .await?;
+            id
+        }
+        None => admin::create_org(&state.pool, &org_name).await?.id,
+    };
+    admin::add_member(&state.pool, org, user_id, Role::Owner.as_str(), true).await?;
+    let project = admin::create_project(&state.pool, org, project_name).await?;
     let key = admin::create_ingest_key(&state.pool, project.id, "default", Some(user_id)).await?;
-    let session = create_session(&state, user_id, &user_agent(&headers), &ip.to_string()).await?;
+    let session = create_session(
+        &state,
+        user_id,
+        Some(org),
+        &user_agent(&headers),
+        &ip.to_string(),
+    )
+    .await?;
+    let (user, org, _) = load_caller(&state, user_id, Some(org)).await?;
     tracing::info!(%email, project = %project.slug, "setup complete");
     Ok((
         jar.add(session.cookie),
         Json(SetupResponse {
-            user: User {
-                id: user_id,
-                email,
-                name,
-                role: Role::Owner,
-                can_view_bodies: true,
-            },
+            user,
+            org,
             project_id: project.id,
             project_slug: project.slug,
             ingest_key: key.token,

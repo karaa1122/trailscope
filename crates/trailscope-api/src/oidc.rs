@@ -1,6 +1,7 @@
 //! Optional single sign-on with OpenID Connect: the authorization code flow
 //! with PKCE. Users are matched by their OIDC subject, then by verified email;
-//! unknown users from `oidc.auto_create_domains` get a viewer account.
+//! unknown users from `oidc.auto_create_domains` get a viewer account in the
+//! instance's first organization.
 
 use std::time::{Duration, Instant};
 
@@ -321,12 +322,18 @@ pub async fn callback(
     };
     match finish(&state, &cfg, code, &pending).await {
         Ok(user_id) => {
-            let session =
-                match create_session(&state, user_id, &user_agent(&headers), &ip.to_string()).await
-                {
-                    Ok(s) => s,
-                    Err(_) => return fail(jar, &state, "could not start a session; try again"),
-                };
+            let session = match create_session(
+                &state,
+                user_id,
+                None,
+                &user_agent(&headers),
+                &ip.to_string(),
+            )
+            .await
+            {
+                Ok(s) => s,
+                Err(_) => return fail(jar, &state, "could not start a session; try again"),
+            };
             (
                 jar.add(pending_cookie(&state, String::new(), 0))
                     .add(session.cookie),
@@ -526,8 +533,8 @@ async fn find_or_create(
                     }
                     let id = Uuid::now_v7();
                     sqlx::query(
-                        "INSERT INTO users (id, email, name, password_hash, role, can_view_bodies, oidc_subject) \
-                         VALUES ($1, $2, $3, NULL, 'viewer', FALSE, $4)",
+                        "INSERT INTO users (id, email, name, password_hash, oidc_subject) \
+                         VALUES ($1, $2, $3, NULL, $4)",
                     )
                     .bind(id)
                     .bind(email)
@@ -536,7 +543,14 @@ async fn find_or_create(
                     .execute(&state.pool)
                     .await
                     .map_err(db)?;
-                    tracing::info!(%email, "created a viewer account from single sign-on");
+                    // Automatic accounts join the instance's first organization.
+                    let org = trailscope_core::admin::default_org(&state.pool)
+                        .await
+                        .map_err(db)?;
+                    trailscope_core::admin::add_member(&state.pool, org.id, id, "viewer", false)
+                        .await
+                        .map_err(db)?;
+                    tracing::info!(%email, org = %org.slug, "created a viewer account from single sign-on");
                     Existing {
                         id,
                         disabled: false,

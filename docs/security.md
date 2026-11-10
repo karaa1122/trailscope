@@ -13,9 +13,10 @@ Trailscope stores what your APIs receive and send, so it is built to keep as lit
 
 ## Who sees what
 
-- **Roles:** owner, admin, member, viewer. Viewers read and save their views; members also edit alert rules and replay requests; admins manage projects, keys, members, channels and settings; only owners can create or change owners, and there is always at least one.
+- **Organizations:** projects, members, invites and API tokens belong to one organization, and every project-scoped request checks that the project is in the caller's current organization (otherwise `404`). A test walks every project-scoped route in the OpenAPI document as an admin of another organization and expects `403` or `404` (`cross_tenant_isolation` in `crates/trailscope-api/tests/api.rs`). Alert recipients must be members of the project's organization. Server-wide settings (SMTP) are limited to instance admins.
+- **Roles** (per organization): owner, admin, member, viewer. Viewers read and save their views; members also edit alert rules and replay requests; admins manage projects, keys, members, channels and settings; only owners can create or change owners, and there is always at least one.
 - **Can view bodies** is a separate per-member permission. Without it, bodies and headers are hidden in the UI and the API, and queries can't filter on them.
-- **API tokens** have scopes (read, write, admin; admin only for admins), act with their creator's role, and can be bound to one project. Only their SHA-256 hash is stored; the token is shown once.
+- **API tokens** have scopes (read, write, admin; admin only for admins), act with their creator's role in the organization they were created in, and can be bound to one project. Only their SHA-256 hash is stored; the token is shown once.
 - **Ingest keys** are write-only per project: they can send data and read the project's SDK settings, nothing else. Only their hash is stored.
 
 ## Signing in

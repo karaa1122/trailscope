@@ -9,6 +9,7 @@ pub mod journeys;
 pub mod live;
 pub mod oidc;
 pub mod openapi;
+pub mod orgs;
 pub mod overview;
 pub mod projects;
 pub mod query;

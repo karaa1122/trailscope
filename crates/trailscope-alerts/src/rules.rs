@@ -422,7 +422,14 @@ pub async fn notify_channels(
             payload: json!({ "text": msg.text, "html": msg.telegram, "body": msg.body }),
         };
         if kind == ChannelKind::Email {
-            for to in channels::recipients(pool, &ch.config.member_ids, &ch.config.emails).await? {
+            for to in channels::recipients(
+                pool,
+                rule.project_id,
+                &ch.config.member_ids,
+                &ch.config.emails,
+            )
+            .await?
+            {
                 items.push(NewNotification {
                     target: to.clone(),
                     payload: serde_json::to_value(Email {

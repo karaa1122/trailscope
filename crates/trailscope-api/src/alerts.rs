@@ -437,11 +437,15 @@ mod lettre_address {
     pub use trailscope_alerts::smtp::Address;
 }
 
-async fn check_members(state: &AppState, ids: &[Uuid]) -> ApiResult<()> {
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM users WHERE id = ANY($1)")
-        .bind(ids)
-        .fetch_one(&state.pool)
-        .await?;
+/// Every ID must be a member of the caller's organization.
+async fn check_members(state: &AppState, auth: &Auth, ids: &[Uuid]) -> ApiResult<()> {
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM memberships WHERE org_id = $1 AND user_id = ANY($2)",
+    )
+    .bind(auth.org_id()?)
+    .bind(ids)
+    .fetch_one(&state.pool)
+    .await?;
     if n as usize != ids.len() {
         return Err(ApiError::bad_request("unknown member"));
     }
@@ -511,7 +515,7 @@ pub async fn create_channel(
             config.chat_id = c.chat_id.trim().to_string();
         }
         ChannelKind::Email => {
-            check_members(&state, &c.member_ids).await?;
+            check_members(&state, &auth, &c.member_ids).await?;
             config.member_ids = c.member_ids.clone();
             config.emails = clean_emails(&c.emails)?;
             if config.member_ids.is_empty() && config.emails.is_empty() {
@@ -607,8 +611,13 @@ pub async fn test_channel(
         ch.name
     );
     if kind == ChannelKind::Email {
-        let to =
-            channels::recipients(&state.pool, &ch.config.member_ids, &ch.config.emails).await?;
+        let to = channels::recipients(
+            &state.pool,
+            ch.project_id,
+            &ch.config.member_ids,
+            &ch.config.emails,
+        )
+        .await?;
         let html = format!("<p>{}</p>", render::esc(&text));
         return send_emails(
             &state,
@@ -770,9 +779,13 @@ async fn email_rule_out(state: &AppState, project: Uuid) -> ApiResult<EmailRuleO
     .fetch_one(&state.pool)
     .await?;
     let members: Vec<(Uuid, String, String)> = sqlx::query_as(
-        "SELECT id, email, name FROM users WHERE id = ANY($1) AND NOT disabled ORDER BY name, email",
+        "SELECT u.id, u.email, u.name FROM users u \
+         JOIN memberships m ON m.user_id = u.id \
+         JOIN projects p ON p.org_id = m.org_id \
+         WHERE p.id = $2 AND u.id = ANY($1) AND NOT u.disabled AND NOT m.disabled ORDER BY u.name, u.email",
     )
     .bind(&r.member_ids)
+    .bind(project)
     .fetch_all(&state.pool)
     .await?;
     let mut recipients: Vec<Recipient> = members
@@ -849,7 +862,7 @@ pub async fn put_email_rule(
     let mut members = r.member_ids.clone();
     members.sort();
     members.dedup();
-    check_members(&state, &members).await?;
+    check_members(&state, &auth, &members).await?;
     let emails = clean_emails(&r.emails)?;
     sqlx::query(
         "INSERT INTO email_rules (project_id, enabled, filter, member_ids, emails, updated_at) VALUES ($1, $2, $3, $4, $5, now()) \
@@ -970,7 +983,7 @@ async fn smtp_out(state: &AppState) -> ApiResult<SmtpOut> {
 
 #[utoipa::path(get, path = "/api/v1/settings/smtp", tag = "alerts", responses((status = 200, body = SmtpOut)))]
 pub async fn get_smtp(State(state): State<AppState>, auth: Auth) -> ApiResult<Json<SmtpOut>> {
-    auth.require(Role::Admin, Scope::Admin)?;
+    auth.require_instance_admin()?;
     Ok(Json(smtp_out(&state).await?))
 }
 
@@ -995,7 +1008,7 @@ pub async fn put_smtp(
     auth: Auth,
     Json(s): Json<SmtpInput>,
 ) -> ApiResult<Json<SmtpOut>> {
-    auth.require(Role::Admin, Scope::Admin)?;
+    auth.require_instance_admin()?;
     if Security::parse(&s.security).is_none() {
         return Err(ApiError::bad_request(
             "security must be starttls, tls or none",
@@ -1045,7 +1058,7 @@ pub async fn test_smtp(
     auth: Auth,
     Json(t): Json<SmtpTestInput>,
 ) -> ApiResult<Json<SendResult>> {
-    auth.require(Role::Admin, Scope::Admin)?;
+    auth.require_instance_admin()?;
     let to = clean_emails(std::slice::from_ref(&t.to))?;
     let text = "This is a test email from Trailscope. Your SMTP settings work.";
     let html = format!("<p style=\"font-family:sans-serif\">{text}</p>");

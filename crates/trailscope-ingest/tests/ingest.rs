@@ -33,7 +33,8 @@ async fn harness(tweak: impl FnOnce(&mut Config)) -> Option<Harness> {
     ch::migrate(&cfg).await.unwrap();
     let pool = pg::connect(&cfg.postgres).await.unwrap();
     pg::migrate(&pool).await.unwrap();
-    let project = admin::create_project(&pool, "Test").await.unwrap();
+    let org = admin::default_org(&pool).await.unwrap();
+    let project = admin::create_project(&pool, org.id, "Test").await.unwrap();
     let key = admin::create_ingest_key(&pool, project.id, "test", None)
         .await
         .unwrap()

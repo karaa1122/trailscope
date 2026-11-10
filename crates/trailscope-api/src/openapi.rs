@@ -9,8 +9,8 @@ use utoipa_axum::routes;
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    AppState, alerts, errors, inspector, journeys, live, oidc, overview, projects, query, setup,
-    users, views,
+    AppState, alerts, errors, inspector, journeys, live, oidc, orgs, overview, projects, query,
+    setup, users, views,
 };
 
 #[derive(OpenApi)]
@@ -65,6 +65,10 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(users::create_invite, users::list_invites))
         .routes(routes!(users::delete_invite))
         .routes(routes!(users::accept_invite))
+        .routes(routes!(users::lookup_invite))
+        .routes(routes!(orgs::list, orgs::create))
+        .routes(routes!(orgs::update_current))
+        .routes(routes!(orgs::switch))
         .routes(routes!(users::list_tokens, users::create_token))
         .routes(routes!(users::revoke_token))
         .routes(routes!(projects::list, projects::create))

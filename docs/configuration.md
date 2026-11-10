@@ -149,7 +149,7 @@ Optional single sign-on with any OpenID Connect provider (Google, Microsoft Entr
 | `client_id` | `TRAILSCOPE_OIDC_CLIENT_ID` | empty | |
 | `client_secret` | `TRAILSCOPE_OIDC_CLIENT_SECRET` | empty | |
 | `display_name` | `TRAILSCOPE_OIDC_DISPLAY_NAME` | empty | Label on the sign-in button ("Sign in with …") |
-| `auto_create_domains` | `TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS` | `[]` | Email domains whose users get a `viewer` account on first sign-in, e.g. `'["example.com"]'` |
+| `auto_create_domains` | `TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS` | `[]` | Email domains whose users get a `viewer` account in the instance's first organization on first sign-in, e.g. `'["example.com"]'` |
 
 Register `<server.public_url>/api/v1/auth/oidc/callback` as the redirect URI at the provider, with the scopes `openid email profile`. On sign-in, Trailscope matches the provider's subject to a member, then the email address (which must not be marked unverified), and remembers the subject. Someone without an account is signed in only if their email domain is in `auto_create_domains`; everyone else needs an invite first. Disabled members can't sign in either way.
 

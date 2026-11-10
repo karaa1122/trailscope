@@ -6,8 +6,13 @@
 //!   `X-CSRF-Token`.
 //! - API tokens: `Authorization: Bearer trs_api_…` with scopes (`read`,
 //!   `write`, `admin`), optionally bound to one project. No CSRF needed.
-//! - Roles: owner > admin > member > viewer, plus `can_view_bodies`, which
-//!   owners always have.
+//! - Organizations (decision 070): every caller acts in one organization at
+//!   a time: a session's current organization, or the organization an API
+//!   token was created in. Projects, members, invites and tokens belong to an
+//!   organization; `check_project` refuses projects of other organizations.
+//! - Roles are per organization: owner > admin > member > viewer, plus
+//!   `can_view_bodies`, which owners always have. Instance admins manage
+//!   server-wide settings (SMTP) and create organizations.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -80,6 +85,8 @@ impl Scope {
     }
 }
 
+/// The signed-in user, with their role in the current organization (viewer
+/// without access when they belong to none).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct User {
     pub id: Uuid,
@@ -87,6 +94,14 @@ pub struct User {
     pub name: String,
     pub role: Role,
     pub can_view_bodies: bool,
+}
+
+/// The organization a request acts in.
+#[derive(Debug, Clone, Serialize, ToSchema, sqlx::FromRow)]
+pub struct OrgInfo {
+    pub id: Uuid,
+    pub slug: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -105,12 +120,24 @@ pub enum Method_ {
 #[derive(Debug, Clone)]
 pub struct Auth {
     pub user: User,
+    /// The current organization; `None` when the user belongs to none.
+    pub org: Option<OrgInfo>,
+    /// May manage server-wide settings and create organizations.
+    pub instance_admin: bool,
+    /// The current organization's projects.
+    projects: Vec<Uuid>,
     pub via: Method_,
 }
 
 impl Auth {
-    /// Requires at least `role`, and for API tokens the matching scope.
+    /// Requires membership of an organization with at least `role`, and for
+    /// API tokens the matching scope.
     pub fn require(&self, role: Role, scope: Scope) -> ApiResult<()> {
+        if self.org.is_none() {
+            return Err(ApiError::forbidden(
+                "you aren't a member of any organization yet",
+            ));
+        }
         if self.user.role < role {
             return Err(ApiError::forbidden(format!(
                 "this needs the {} role or higher",
@@ -131,12 +158,53 @@ impl Auth {
         Ok(())
     }
 
+    /// Server-wide settings: instance admins, and for API tokens the admin scope.
+    pub fn require_instance_admin(&self) -> ApiResult<()> {
+        if !self.instance_admin {
+            return Err(ApiError::forbidden(
+                "this is a server-wide setting; only instance admins can change it",
+            ));
+        }
+        if let Method_::Token { scopes, .. } = &self.via
+            && !scopes.iter().any(|s| s == "admin")
+        {
+            return Err(ApiError::forbidden(
+                "this API token lacks the `admin` scope",
+            ));
+        }
+        Ok(())
+    }
+
+    /// The current organization's ID.
+    pub fn org_id(&self) -> ApiResult<Uuid> {
+        self.org
+            .as_ref()
+            .map(|o| o.id)
+            .ok_or_else(|| ApiError::forbidden("you aren't a member of any organization yet"))
+    }
+
+    /// The projects this caller may see: the current organization's, or the
+    /// one project an API token is bound to.
+    pub fn visible_projects(&self) -> Vec<Uuid> {
+        match &self.via {
+            Method_::Token {
+                project: Some(p), ..
+            } => self.projects.iter().copied().filter(|x| x == p).collect(),
+            _ => self.projects.clone(),
+        }
+    }
+
     pub fn can_view_bodies(&self) -> bool {
         self.user.role == Role::Owner || self.user.can_view_bodies
     }
 
-    /// API tokens bound to a project can only see that project.
+    /// The project must belong to the current organization (otherwise it is
+    /// reported as not found), and API tokens bound to a project can only see
+    /// that project.
     pub fn check_project(&self, project: Uuid) -> ApiResult<()> {
+        if !self.projects.contains(&project) {
+            return Err(ApiError::not_found("project"));
+        }
         if let Method_::Token {
             project: Some(p), ..
         } = &self.via
@@ -157,29 +225,100 @@ impl Auth {
     }
 }
 
+/// The user, their current membership and its projects, from one query.
 #[derive(sqlx::FromRow)]
-struct UserRow {
-    id: Uuid,
+struct CallerRow {
+    user_id: Uuid,
     email: String,
     name: String,
-    role: String,
-    can_view_bodies: bool,
     disabled: bool,
+    instance_admin: bool,
+    org_id: Option<Uuid>,
+    org_slug: Option<String>,
+    org_name: Option<String>,
+    role: Option<String>,
+    can_view_bodies: Option<bool>,
+    projects: Option<Vec<Uuid>>,
 }
 
-impl UserRow {
-    fn into_user(self) -> Option<User> {
+impl CallerRow {
+    fn into_parts(self) -> Option<(User, Option<OrgInfo>, bool, Vec<Uuid>)> {
         if self.disabled {
             return None;
         }
-        Some(User {
-            id: self.id,
+        let role = self.role.as_deref().and_then(Role::parse);
+        let org = match (self.org_id, self.org_slug, self.org_name, role) {
+            (Some(id), Some(slug), Some(name), Some(_)) => Some(OrgInfo { id, slug, name }),
+            _ => None,
+        };
+        let user = User {
+            id: self.user_id,
             email: self.email,
             name: self.name,
-            role: Role::parse(&self.role)?,
-            can_view_bodies: self.can_view_bodies,
-        })
+            role: role.filter(|_| org.is_some()).unwrap_or(Role::Viewer),
+            can_view_bodies: org.is_some() && self.can_view_bodies.unwrap_or(false),
+        };
+        let projects = if org.is_some() {
+            self.projects.unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        Some((user, org, self.instance_admin, projects))
     }
+}
+
+/// Columns of the membership join shared by the session and token queries.
+/// `{org}` is the SQL expression for the organization to prefer.
+const MEMBERSHIP_JOIN: &str = "LEFT JOIN LATERAL ( \
+       SELECT o.id AS org_id, o.slug AS org_slug, o.name AS org_name, m.role, m.can_view_bodies, \
+              ARRAY(SELECT p.id FROM projects p WHERE p.org_id = o.id) AS projects \
+       FROM memberships m JOIN organizations o ON o.id = m.org_id \
+       WHERE m.user_id = u.id AND NOT m.disabled AND {filter} \
+       ORDER BY COALESCE(o.id = {org}, FALSE) DESC, m.created_at, o.id LIMIT 1 \
+     ) mem ON TRUE";
+
+/// A user with their role in `org` (or, when `None`, the organization they
+/// last worked in, else their oldest membership). Used to answer sign-in,
+/// invite and switch requests.
+pub async fn load_caller(
+    state: &AppState,
+    user_id: Uuid,
+    org: Option<Uuid>,
+) -> ApiResult<(User, Option<OrgInfo>, bool)> {
+    let sql = format!(
+        "SELECT u.id AS user_id, u.email, u.name, u.disabled, u.instance_admin, mem.* \
+         FROM users u {} WHERE u.id = $1",
+        MEMBERSHIP_JOIN
+            .replace("{filter}", "TRUE")
+            .replace("{org}", "COALESCE($2, u.last_org_id)")
+    );
+    let row: Option<CallerRow> = sqlx::query_as(sqlx::AssertSqlSafe(sql))
+        .bind(user_id)
+        .bind(org)
+        .fetch_optional(&state.pool)
+        .await?;
+    let (user, org, instance_admin, _) = row
+        .and_then(CallerRow::into_parts)
+        .ok_or_else(ApiError::unauthorized)?;
+    Ok((user, org, instance_admin))
+}
+
+/// The user's organizations, for the switcher.
+pub async fn user_orgs(state: &AppState, user_id: Uuid) -> ApiResult<Vec<(OrgInfo, Role)>> {
+    let rows: Vec<(Uuid, String, String, String)> = sqlx::query_as(
+        "SELECT o.id, o.slug, o.name, m.role FROM memberships m \
+         JOIN organizations o ON o.id = m.org_id \
+         WHERE m.user_id = $1 AND NOT m.disabled ORDER BY lower(o.name), o.id",
+    )
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(id, slug, name, role)| {
+            Role::parse(&role).map(|r| (OrgInfo { id, slug, name }, r))
+        })
+        .collect())
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
@@ -218,23 +357,38 @@ impl FromRequestParts<AppState> for Auth {
         let Some(raw) = cookie_value(&parts.headers, SESSION_COOKIE) else {
             return Err(ApiError::unauthorized());
         };
-        let row: Option<(String, String, UserRow)> = sqlx::query_as::<_, (String, String, Uuid, String, String, String, bool, bool)>(
-            "SELECT s.id, s.csrf_token, u.id, u.email, u.name, u.role, u.can_view_bodies, u.disabled \
-             FROM sessions s JOIN users u ON u.id = s.user_id \
+        let sql = format!(
+            "SELECT s.id AS sid, s.csrf_token, s.org_id AS session_org, u.id AS user_id, u.email, u.name, \
+                    u.disabled, u.instance_admin, mem.* \
+             FROM sessions s JOIN users u ON u.id = s.user_id {} \
              WHERE s.id = $1 AND s.expires_at > now()",
-        )
-        .bind(hash_token(&raw))
-        .fetch_optional(&state.pool)
-        .await?
-        .map(|(sid, csrf, id, email, name, role, can_view_bodies, disabled)| {
-            (sid, csrf, UserRow { id, email, name, role, can_view_bodies, disabled })
-        });
-        let Some((sid, csrf, user)) = row else {
+            MEMBERSHIP_JOIN
+                .replace("{filter}", "TRUE")
+                .replace("{org}", "COALESCE(s.org_id, u.last_org_id)")
+        );
+        let row: Option<(String, String, Option<Uuid>, CallerRowSql)> =
+            sqlx::query_as::<_, CallerRowSql>(sqlx::AssertSqlSafe(sql))
+                .bind(hash_token(&raw))
+                .fetch_optional(&state.pool)
+                .await?
+                .map(|r| (r.sid.clone(), r.csrf_token.clone(), r.session_org, r));
+        let Some((sid, csrf, session_org, row)) = row else {
             return Err(ApiError::unauthorized());
         };
-        let Some(user) = user.into_user() else {
+        let Some((user, org, instance_admin, projects)) = row.caller.into_parts() else {
             return Err(ApiError::unauthorized());
         };
+        // The session's organization went away (left or removed): remember
+        // the one it falls back to.
+        if let Some(o) = &org
+            && session_org != Some(o.id)
+        {
+            let _ = sqlx::query("UPDATE sessions SET org_id = $2 WHERE id = $1")
+                .bind(&sid)
+                .bind(o.id)
+                .execute(&state.pool)
+                .await;
+        }
         if !matches!(parts.method, Method::GET | Method::HEAD | Method::OPTIONS) {
             let sent = parts
                 .headers
@@ -247,37 +401,62 @@ impl FromRequestParts<AppState> for Auth {
         }
         Ok(Auth {
             user,
+            org,
+            instance_admin,
+            projects,
             via: Method_::Session { id: sid, csrf },
         })
     }
+}
+
+/// A session row plus the caller columns.
+#[derive(sqlx::FromRow)]
+struct CallerRowSql {
+    sid: String,
+    csrf_token: String,
+    session_org: Option<Uuid>,
+    #[sqlx(flatten)]
+    caller: CallerRow,
+}
+
+/// An API token row plus the caller columns.
+#[derive(sqlx::FromRow)]
+struct TokenRowSql {
+    token_id: Uuid,
+    scopes: Vec<String>,
+    token_project: Option<Uuid>,
+    #[sqlx(flatten)]
+    caller: CallerRow,
 }
 
 async fn token_auth(state: &AppState, token: &str) -> ApiResult<Auth> {
     if !token.starts_with(API_TOKEN_PREFIX) {
         return Err(ApiError::unauthorized());
     }
-    let row = sqlx::query_as::<_, (Uuid, Vec<String>, Option<Uuid>, Uuid, String, String, String, bool, bool)>(
-        "SELECT t.id, t.scopes, t.project_id, u.id, u.email, u.name, u.role, u.can_view_bodies, u.disabled \
-         FROM api_tokens t JOIN users u ON u.id = t.user_id \
+    // A token acts in the organization it was created in, with its owner's
+    // current role there; it stops working when that membership ends.
+    let sql = format!(
+        "SELECT t.id AS token_id, t.scopes, t.project_id AS token_project, u.id AS user_id, u.email, u.name, \
+                u.disabled, u.instance_admin, mem.* \
+         FROM api_tokens t JOIN users u ON u.id = t.user_id {} \
          WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now())",
-    )
-    .bind(hash_token(token))
-    .fetch_optional(&state.pool)
-    .await?;
-    let Some((token_id, scopes, project, id, email, name, role, can_view_bodies, disabled)) = row
-    else {
+        MEMBERSHIP_JOIN
+            .replace("{filter}", "o.id = t.org_id")
+            .replace("{org}", "t.org_id")
+    );
+    let row: Option<TokenRowSql> = sqlx::query_as(sqlx::AssertSqlSafe(sql))
+        .bind(hash_token(token))
+        .fetch_optional(&state.pool)
+        .await?;
+    let Some(row) = row else {
         return Err(ApiError::unauthorized());
     };
-    let user = UserRow {
-        id,
-        email,
-        name,
-        role,
-        can_view_bodies,
-        disabled,
+    let (token_id, scopes, project) = (row.token_id, row.scopes, row.token_project);
+    let (user, org, instance_admin, projects) =
+        row.caller.into_parts().ok_or_else(ApiError::unauthorized)?;
+    if org.is_none() {
+        return Err(ApiError::unauthorized());
     }
-    .into_user()
-    .ok_or_else(ApiError::unauthorized)?;
     let pool = state.pool.clone();
     tokio::spawn(async move {
         let _ = sqlx::query("UPDATE api_tokens SET last_used_at = now() WHERE id = $1")
@@ -287,6 +466,9 @@ async fn token_auth(state: &AppState, token: &str) -> ApiResult<Auth> {
     });
     Ok(Auth {
         user,
+        org,
+        instance_admin,
+        projects,
         via: Method_::Token { scopes, project },
     })
 }
@@ -339,9 +521,12 @@ pub struct NewSession {
     pub csrf: String,
 }
 
+/// Starts a browser session in `org` (or, when `None`, the organization the
+/// user last worked in).
 pub async fn create_session(
     state: &AppState,
     user_id: Uuid,
+    org: Option<Uuid>,
     user_agent: &str,
     ip: &str,
 ) -> ApiResult<NewSession> {
@@ -349,8 +534,8 @@ pub async fn create_session(
     let csrf = generate_token("");
     let ttl = state.config.server.session_ttl_hours;
     sqlx::query(
-        "INSERT INTO sessions (id, user_id, csrf_token, user_agent, ip, expires_at) \
-         VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6))",
+        "INSERT INTO sessions (id, user_id, csrf_token, user_agent, ip, expires_at, org_id) \
+         VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6), $7)",
     )
     .bind(hash_token(&token))
     .bind(user_id)
@@ -358,6 +543,7 @@ pub async fn create_session(
     .bind(user_agent.chars().take(512).collect::<String>())
     .bind(ip)
     .bind(i32::try_from(ttl).unwrap_or(i32::MAX))
+    .bind(org)
     .execute(&state.pool)
     .await?;
     sqlx::query("UPDATE users SET last_login_at = now() WHERE id = $1")

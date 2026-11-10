@@ -3,11 +3,19 @@ import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import { Logo } from '../components/icons';
-import { Toast, copyText, useToast } from '../components/ui';
+import { Skeleton, Toast, copyText, useToast } from '../components/ui';
 import { ApiError, api, liveUrl } from '../lib/api';
 import { useSession } from '../lib/session';
 
-function AuthCard({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
+export function AuthCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="auth-page">
       <div className="panel auth-card">
@@ -17,7 +25,11 @@ function AuthCard({ title, subtitle, children }: { title: string; subtitle?: Rea
         </div>
         <div>
           <h1 style={{ margin: '4px 0 6px', fontSize: 20 }}>{title}</h1>
-          {subtitle && <p className="muted" style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>{subtitle}</p>}
+          {subtitle && (
+            <p className="muted" style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
+              {subtitle}
+            </p>
+          )}
         </div>
         {children}
       </div>
@@ -36,7 +48,9 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // Single sign-on failures come back as /login?error=…
-  const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('error'));
+  const [error, setError] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get('error'),
+  );
   const [busy, setBusy] = useState(false);
   const oidc = status.data?.oidc;
 
@@ -61,14 +75,32 @@ export function Login() {
 
   return (
     <AuthCard title="Sign in">
-      <form onSubmit={(e) => void submit(e)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <form
+        onSubmit={(e) => void submit(e)}
+        style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+      >
         <label className="field">
           Email
-          <input className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+          <input
+            className="input"
+            type="email"
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
         </label>
         <label className="field">
           Password
-          <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input
+            className="input"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </label>
         {error && (
           <span className="err-text" role="alert" style={{ fontSize: 13 }}>
@@ -91,6 +123,11 @@ export function Login() {
 export function InviteAccept({ token }: { token: string }) {
   const navigate = useNavigate();
   const { signedIn } = useSession();
+  const invite = useQuery({
+    queryKey: ['invite', token],
+    queryFn: () => api.lookupInvite(token),
+    retry: false,
+  });
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -105,27 +142,78 @@ export function InviteAccept({ token }: { token: string }) {
       setError(errMsg(err));
     }
   };
+  if (invite.isLoading) {
+    return (
+      <AuthCard title="Join Trailscope">
+        <Skeleton h={120} />
+      </AuthCard>
+    );
+  }
+  if (!invite.data) {
+    return (
+      <AuthCard
+        title="This invite doesn't work"
+        subtitle="It may have expired or been used already. Ask the person who invited you for a new link."
+      >
+        <a className="btn" href="/login">
+          Go to sign-in
+        </a>
+      </AuthCard>
+    );
+  }
+  const { email, role, organization, existingAccount } = invite.data;
   return (
-    <AuthCard title="Join Trailscope" subtitle="You've been invited. Choose a name and a password to finish.">
-      <form onSubmit={(e) => void submit(e)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <AuthCard
+      title={`Join ${organization}`}
+      subtitle={
+        existingAccount
+          ? `You already have a Trailscope account as ${email}. Enter its password to join ${organization} as ${role}.`
+          : `You've been invited to ${organization} as ${role}. Choose a name and a password to finish.`
+      }
+    >
+      <form
+        onSubmit={(e) => void submit(e)}
+        style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+      >
+        {!existingAccount && (
+          <label className="field">
+            Name
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </label>
+        )}
         <label className="field">
-          Name
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          {existingAccount ? 'Password' : 'Password (at least 10 characters)'}
+          <input
+            className="input"
+            type="password"
+            autoComplete={existingAccount ? 'current-password' : 'new-password'}
+            minLength={existingAccount ? undefined : 10}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus={existingAccount}
+          />
         </label>
-        <label className="field">
-          Password (at least 10 characters)
-          <input className="input" type="password" autoComplete="new-password" minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        {error && <span className="err-text" role="alert">{error}</span>}
+        {error && (
+          <span className="err-text" role="alert">
+            {error}
+          </span>
+        )}
         <button type="submit" className="btn btn-primary">
-          Create account
+          {existingAccount ? `Join ${organization}` : 'Create account'}
         </button>
       </form>
     </AuthCard>
   );
 }
 
-type Framework = 'express' | 'fastify' | 'nestjs' | 'fastapi' | 'django' | 'laravel' | 'spring' | 'http';
+type Framework =
+  'express' | 'fastify' | 'nestjs' | 'fastapi' | 'django' | 'laravel' | 'spring' | 'http';
 
 const FRAMEWORKS: { id: Framework; label: string }[] = [
   { id: 'express', label: 'Express' },
@@ -164,7 +252,13 @@ export function Setup() {
   const navigate = useNavigate();
   const { signedIn, refresh } = useSession();
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState({ email: '', name: '', password: '', projectName: 'My API' });
+  const [form, setForm] = useState({
+    email: '',
+    name: '',
+    password: '',
+    organizationName: '',
+    projectName: 'My API',
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ key: string; projectId: string } | null>(null);
@@ -175,7 +269,9 @@ export function Setup() {
 
   useEffect(() => {
     if (step !== 3 || !result) return;
-    const es = new EventSource(liveUrl(result.projectId, '', 'sql', null), { withCredentials: true });
+    const es = new EventSource(liveUrl(result.projectId, '', 'sql', null), {
+      withCredentials: true,
+    });
     es.addEventListener('request', () => {
       setReceived(true);
       es.close();
@@ -210,26 +306,71 @@ export function Setup() {
 
   if (step === 0) {
     return (
-      <AuthCard title="Set up Trailscope" subtitle="Create the owner account and your first project. You can invite your team afterwards.">
+      <AuthCard
+        title="Set up Trailscope"
+        subtitle="Create the owner account and your first project. You can invite your team afterwards."
+      >
         {steps}
-        <form onSubmit={(e) => void create(e)} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <form
+          onSubmit={(e) => void create(e)}
+          style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+        >
           <label className="field">
             Your email
-            <input className="input" type="email" autoComplete="username" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoFocus />
+            <input
+              className="input"
+              type="email"
+              autoComplete="username"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+              autoFocus
+            />
           </label>
           <label className="field">
             Your name
-            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input
+              className="input"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
           </label>
           <label className="field">
             Password (at least 10 characters)
-            <input className="input" type="password" autoComplete="new-password" minLength={10} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+            />
+          </label>
+          <label className="field">
+            Organization
+            <input
+              className="input"
+              value={form.organizationName}
+              onChange={(e) => setForm({ ...form, organizationName: e.target.value })}
+              placeholder="Your company or team (optional)"
+              maxLength={100}
+            />
           </label>
           <label className="field">
             First project
-            <input className="input" value={form.projectName} onChange={(e) => setForm({ ...form, projectName: e.target.value })} required />
+            <input
+              className="input"
+              value={form.projectName}
+              onChange={(e) => setForm({ ...form, projectName: e.target.value })}
+              required
+            />
           </label>
-          {error && <span className="err-text" role="alert">{error}</span>}
+          {error && (
+            <span className="err-text" role="alert">
+              {error}
+            </span>
+          )}
           <button type="submit" className="btn btn-primary" disabled={busy}>
             {busy ? 'Creating…' : 'Create owner and project'}
           </button>
@@ -239,13 +380,30 @@ export function Setup() {
   }
   if (step === 1 && result) {
     return (
-      <AuthCard title="Your ingest key" subtitle="SDKs use this key to send events. It's shown only once; store it in your secrets manager now. You can create more keys later.">
+      <AuthCard
+        title="Your ingest key"
+        subtitle="SDKs use this key to send events. It's shown only once; store it in your secrets manager now. You can create more keys later."
+      >
         {steps}
         <div className="row" style={{ gap: 8 }}>
-          <code className="input mono" style={{ display: 'flex', alignItems: 'center', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+          <code
+            className="input mono"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              overflowX: 'auto',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {result.key}
           </code>
-          <button type="button" className="btn" onClick={() => void copyText(result.key).then((ok) => setToast(ok ? 'Key copied' : 'Copy failed'))}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void copyText(result.key).then((ok) => setToast(ok ? 'Key copied' : 'Copy failed'))
+            }
+          >
             Copy
           </button>
         </div>
@@ -263,11 +421,22 @@ export function Setup() {
           {steps}
           <h1 style={{ margin: 0, fontSize: 20 }}>Send your first event</h1>
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            Add the SDK for your framework. Requests start showing up in the live tail within a couple of seconds.
+            Add the SDK for your framework. Requests start showing up in the live tail within a
+            couple of seconds.
           </p>
-          <div className="segmented" role="group" aria-label="Framework" style={{ flexWrap: 'wrap' }}>
+          <div
+            className="segmented"
+            role="group"
+            aria-label="Framework"
+            style={{ flexWrap: 'wrap' }}
+          >
             {FRAMEWORKS.map((f) => (
-              <button key={f.id} type="button" aria-pressed={fw === f.id} onClick={() => setFw(f.id)}>
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={fw === f.id}
+                onClick={() => setFw(f.id)}
+              >
                 {f.label}
               </button>
             ))}
@@ -276,10 +445,23 @@ export function Setup() {
             {snippet(fw, endpoint, result.key)}
           </pre>
           <div className="row">
-            <button type="button" className="btn" onClick={() => void copyText(snippet(fw, endpoint, result.key)).then((ok) => setToast(ok ? 'Copied' : 'Copy failed'))}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                void copyText(snippet(fw, endpoint, result.key)).then((ok) =>
+                  setToast(ok ? 'Copied' : 'Copy failed'),
+                )
+              }
+            >
               Copy snippet
             </button>
-            <button type="button" className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setStep(3)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => setStep(3)}
+            >
               Next
             </button>
           </div>
@@ -292,17 +474,24 @@ export function Setup() {
     <AuthCard title={received ? 'First event received' : 'Waiting for the first event…'}>
       {steps}
       {received ? (
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--accent)' }}>✓ Trailscope is receiving data from your service.</p>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--accent)' }}>
+          ✓ Trailscope is receiving data from your service.
+        </p>
       ) : (
         <p className="muted" style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
-          Start your service with the SDK installed and make a request. No app handy? Generate demo traffic:
+          Start your service with the SDK installed and make a request. No app handy? Generate demo
+          traffic:
           <br />
           <code className="mono" style={{ color: 'var(--text)' }}>
             trailscope demo --url {endpoint} --key {result?.key.slice(0, 18)}…
           </code>
         </p>
       )}
-      <button type="button" className={`btn${received ? ' btn-primary' : ''}`} onClick={() => void navigate({ to: '/live' })}>
+      <button
+        type="button"
+        className={`btn${received ? ' btn-primary' : ''}`}
+        onClick={() => void navigate({ to: '/live' })}
+      >
         {received ? 'Open the live tail' : 'Skip for now'}
       </button>
     </AuthCard>

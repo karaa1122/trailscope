@@ -18,9 +18,15 @@ With a session, every `POST`, `PUT`, `PATCH` and `DELETE` must send the CSRF tok
 
 Failed sign-ins are rate limited: 8 per email and 30 per client IP in 15 minutes, after which the response is `429`. Behind a reverse proxy, set `server.trust_proxy = true` so the client IP comes from `X-Forwarded-For`.
 
+### Organizations
+
+Projects, members, invites and API tokens belong to an **organization**. A person can belong to several organizations, with a role in each, and a browser session works in one at a time: everything the API returns, from the project list to query results, is limited to that organization. A project of another organization is answered as `404`, even for someone who is a member there too. `POST /api/v1/orgs/{id}/switch` moves the session to another of your organizations, and is remembered for the next sign-in. An API token always acts in the organization it was created in.
+
+`GET /api/v1/auth/me` returns the current organization (`org`), every organization you belong to (`orgs`, with your role in each) and `instanceAdmin`. **Instance admins** (the person who ran setup, and on upgraded installs everyone who was an owner) manage server-wide settings (SMTP) and create organizations; everything else is per organization. An install that never creates a second organization works exactly as before, with all its projects and members in one organization.
+
 ### Roles
 
-Roles are install-wide: a member can see every project.
+Roles are per organization: a member sees every project of their organization, and nothing of others.
 
 | Role | Can |
 |---|---|
@@ -39,7 +45,7 @@ Roles are install-wide: a member can see every project.
 - `write` — also views and replays;
 - `admin` — also administration, and only allowed for admins.
 
-A token bound to a project can only see that project. A token can never act beyond its owner's role.
+A token bound to a project can only see that project. A token can never act beyond its owner's role in its organization, and stops working when its owner leaves that organization.
 
 ## Errors
 
@@ -66,7 +72,8 @@ A token bound to a project can only see that project. A token can never act beyo
 |---|---|
 | Setup | `GET /api/v1/setup` (also says whether single sign-on is on), `POST /api/v1/setup` |
 | Auth | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`, `POST /api/v1/auth/password`; single sign-on: `GET /api/v1/auth/oidc/start` and `/callback` (browser redirects, see [configuration.md](configuration.md#oidc)) |
-| Members | `GET /api/v1/members`, `PATCH`/`DELETE /api/v1/members/{id}`, `POST`/`GET /api/v1/invites`, `POST /api/v1/invites/accept` |
+| Organizations | `GET`/`POST /api/v1/orgs`, `PATCH /api/v1/orgs/current`, `POST /api/v1/orgs/{id}/switch` |
+| Members | `GET /api/v1/members`, `PATCH`/`DELETE /api/v1/members/{id}`, `POST`/`GET /api/v1/invites`, `GET /api/v1/invites/lookup`, `POST /api/v1/invites/accept`. Members, invites and removals are per organization; someone who already has an account accepts an invite with its password, and removing the last membership of a member who isn't an instance admin deletes the account |
 | Tokens | `GET`/`POST /api/v1/tokens`, `DELETE /api/v1/tokens/{id}` |
 | Projects | `GET`/`POST /api/v1/projects`, `GET`/`PATCH`/`DELETE /api/v1/projects/{id}`, plus `/keys`, `/redaction-rules`, `/replay-targets`, `/environments`, `/services` and `/releases` under each project |
 | Query | `POST /api/v1/query/validate`, `/requests`, `/histogram`, `/facets`, `/group`; `GET /api/v1/schema`, `/api/v1/values`, `/api/v1/keys` |

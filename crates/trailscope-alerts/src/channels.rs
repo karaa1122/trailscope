@@ -82,15 +82,22 @@ pub async fn load(pool: &PgPool, ids: &[Uuid]) -> Result<Vec<ChannelRow>, sqlx::
     .await
 }
 
-/// Email addresses for a list of members (active accounts only) plus plain addresses.
+/// Email addresses for a list of members plus plain addresses. Only active
+/// members of the project's organization count, so someone who left it stops
+/// getting its alerts.
 pub async fn recipients(
     pool: &PgPool,
+    project_id: Uuid,
     member_ids: &[Uuid],
     emails: &[String],
 ) -> Result<Vec<String>, sqlx::Error> {
     let mut out: Vec<String> = sqlx::query_scalar(
-        "SELECT email FROM users WHERE id = ANY($1) AND NOT disabled ORDER BY email",
+        "SELECT u.email FROM users u \
+         JOIN memberships m ON m.user_id = u.id \
+         JOIN projects p ON p.org_id = m.org_id \
+         WHERE p.id = $1 AND u.id = ANY($2) AND NOT u.disabled AND NOT m.disabled ORDER BY u.email",
     )
+    .bind(project_id)
     .bind(member_ids)
     .fetch_all(pool)
     .await?;

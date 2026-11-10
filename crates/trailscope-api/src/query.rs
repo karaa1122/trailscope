@@ -245,6 +245,9 @@ pub async fn validate(
     Json(req): Json<ValidateRequest>,
 ) -> ApiResult<Json<ValidateResponse>> {
     auth.require(Role::Viewer, Scope::Read)?;
+    if let Some(project) = req.project {
+        auth.check_project(project)?;
+    }
     let ctx = Ctx {
         table: req.table.into(),
         allow_sensitive: auth.can_view_bodies(),

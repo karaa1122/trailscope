@@ -669,3 +669,689 @@ async fn full_api_flow() {
         .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
 }
+
+/// Organizations (decision 070): a member of one organization can't read,
+/// list, change or query anything of another, route by route. The route
+/// table is checked against the OpenAPI document, so a new project-scoped
+/// route fails this test until it is added here.
+#[tokio::test]
+async fn cross_tenant_isolation() {
+    let Some(app) = app().await else {
+        eprintln!("skipping: TRAILSCOPE_TEST_* not set");
+        return;
+    };
+    let anon = Client::default();
+    let session = |cookie: Option<String>, v: &Value| Client {
+        cookie,
+        csrf: v["csrfToken"].as_str().map(str::to_string),
+        bearer: None,
+    };
+
+    // Alpha: set up by A, who is an instance admin.
+    let (s, v, cookie) = app
+        .call(&anon, Method::POST, "/api/v1/setup", Some(json!({
+            "email": "a@example.com", "password": "correct horse battery", "projectName": "Alpha API",
+            "organizationName": "Alpha"
+        })))
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let a = session(cookie, &v);
+    let alpha = v["org"]["id"].as_str().unwrap().to_string();
+    let pa = v["projectId"].as_str().unwrap().to_string();
+    assert_eq!(v["org"]["name"], "Alpha");
+
+    // Beta: created by A, with its own project and an admin B who belongs only to Beta.
+    let (s, v) = app.post(&a, "/api/v1/orgs", json!({"name": "Beta"})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let beta = v["id"].as_str().unwrap().to_string();
+    let (s, v) = app
+        .post(&a, "/api/v1/projects", json!({"name": "Beta API"}))
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let pb = v["project"]["id"].as_str().unwrap().to_string();
+    let (s, v) = app
+        .post(
+            &a,
+            "/api/v1/invites",
+            json!({"email": "b@example.com", "role": "admin", "canViewBodies": true}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = app
+        .get(
+            &anon,
+            &format!(
+                "/api/v1/invites/lookup?token={}",
+                v["token"].as_str().unwrap()
+            ),
+        )
+        .await;
+    assert_eq!(
+        (s, v["organization"].clone(), v["existingAccount"].clone()),
+        (StatusCode::OK, json!("Beta"), json!(false))
+    );
+    let (_, v) = app
+        .post(
+            &a,
+            "/api/v1/invites",
+            json!({"email": "b2@example.com", "role": "viewer"}),
+        )
+        .await;
+    let beta_invite_token = v["token"].as_str().unwrap().to_string();
+    let (s, v) = app
+        .post(
+            &a,
+            "/api/v1/invites",
+            json!({"email": "b@example.com", "role": "admin", "canViewBodies": true}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v, cookie) = app
+        .call(
+            &anon,
+            Method::POST,
+            "/api/v1/invites/accept",
+            Some(json!({"token": v["token"], "password": "b password long"})),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let b = session(cookie, &v);
+    assert_eq!(v["org"]["id"], json!(beta));
+    assert!(!beta_invite_token.is_empty());
+
+    // Back in Alpha, A invites C, who belongs only to Alpha.
+    let (s, _) = app
+        .post(&a, &format!("/api/v1/orgs/{alpha}/switch"), json!({}))
+        .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, v) = app
+        .post(
+            &a,
+            "/api/v1/invites",
+            json!({"email": "c@example.com", "role": "member"}),
+        )
+        .await;
+    let (s, v, _) = app
+        .call(
+            &anon,
+            Method::POST,
+            "/api/v1/invites/accept",
+            Some(json!({"token": v["token"], "password": "c password long"})),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let c_id = v["user"]["id"].as_str().unwrap().to_string();
+
+    // Things in Alpha for B to go after.
+    seed(&app, &pa).await;
+    let (_, v) = app.get(&a, &format!("/api/v1/projects/{pa}/keys")).await;
+    let key_a = v[0]["id"].as_str().unwrap().to_string();
+    let (s, v) = app
+        .post(
+            &a,
+            &format!("/api/v1/projects/{pa}/redaction-rules"),
+            json!({"kind": "body_key", "pattern": "ssn"}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let redaction_a = v["id"].as_str().unwrap().to_string();
+    let (s, v) = app
+        .post(
+            &a,
+            &format!("/api/v1/projects/{pa}/replay-targets"),
+            json!({"name": "staging", "baseUrl": "http://127.0.0.1:9"}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let target_a = v["id"].as_str().unwrap().to_string();
+    let rule = |p: &str| {
+        json!({
+            "project": p, "name": "5xx", "kind": "count",
+            "query": {"table": "requests", "input": {"mode": "sql", "text": "status >= 500"}},
+            "threshold": 10, "windowMinutes": 5
+        })
+    };
+    let (s, v) = app.post(&a, "/api/v1/alerts/rules", rule(&pa)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let rule_a = v["id"].as_str().unwrap().to_string();
+    let channel = |p: &str| json!({"project": p, "name": "hook", "kind": "webhook", "url": "http://127.0.0.1:9/hook"});
+    let (s, v) = app.post(&a, "/api/v1/alerts/channels", channel(&pa)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let channel_a = v["channel"]["id"].as_str().unwrap().to_string();
+    let view = |p: &str| json!({"project": p, "name": "Errors", "query": {"mode": "search", "text": "status:5xx"}, "shared": true, "timeRange": {"relative": "1h"}});
+    let (s, v) = app.post(&a, "/api/v1/views", view(&pa)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let view_a = v["id"].as_str().unwrap().to_string();
+    let (s, v) = app
+        .post(
+            &a,
+            "/api/v1/tokens",
+            json!({"name": "alpha ci", "scopes": ["read"]}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let token_a_id = v["id"].as_str().unwrap().to_string();
+    let a_token = Client {
+        bearer: v["token"].as_str().map(str::to_string),
+        ..Client::default()
+    };
+
+    let (from, to) = (now_ms() - 3_600_000, now_ms());
+    let q = |p: &str, extra: Value| {
+        let mut body = json!({"project": p, "from": from, "to": to, "query": {"mode": "sql", "text": "status >= 500"}});
+        body.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        body
+    };
+    let email_rule = |p: &str| json!({"project": p, "enabled": false, "filter": "status >= 500", "memberIds": [], "emails": []});
+
+    // (method, OpenAPI path, URI aimed at Alpha, body). Every project-scoped route is listed.
+    let foreign: Vec<(Method, &str, String, Option<Value>)> = vec![
+        (
+            Method::POST,
+            "/api/v1/query/validate",
+            "/api/v1/query/validate".into(),
+            Some(json!({"project": pa, "query": {"mode": "sql", "text": "status = 1"}})),
+        ),
+        (
+            Method::POST,
+            "/api/v1/query/requests",
+            "/api/v1/query/requests".into(),
+            Some(q(&pa, json!({"limit": 5}))),
+        ),
+        (
+            Method::POST,
+            "/api/v1/query/histogram",
+            "/api/v1/query/histogram".into(),
+            Some(q(&pa, json!({"buckets": 10}))),
+        ),
+        (
+            Method::POST,
+            "/api/v1/query/facets",
+            "/api/v1/query/facets".into(),
+            Some(q(&pa, json!({"fields": [{"column": "service"}]}))),
+        ),
+        (
+            Method::POST,
+            "/api/v1/query/group",
+            "/api/v1/query/group".into(),
+            Some(q(&pa, json!({"by": {"column": "service"}}))),
+        ),
+        (
+            Method::GET,
+            "/api/v1/values",
+            format!("/api/v1/values?project={pa}&table=requests&column=service"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/keys",
+            format!("/api/v1/keys?project={pa}&table=requests&map=attributes"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/requests/{request_id}",
+            format!("/api/v1/requests/req000?project={pa}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/requests/{request_id}/curl",
+            format!("/api/v1/requests/req000/curl?project={pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/requests/{request_id}/replay",
+            "/api/v1/requests/req000/replay".into(),
+            Some(json!({"project": pa, "targetId": target_a})),
+        ),
+        (
+            Method::GET,
+            "/api/v1/live",
+            format!("/api/v1/live?project={pa}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/views",
+            format!("/api/v1/views?project={pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/views",
+            "/api/v1/views".into(),
+            Some(view(&pa)),
+        ),
+        (
+            Method::PUT,
+            "/api/v1/views/{id}",
+            format!("/api/v1/views/{view_a}"),
+            Some(view(&pa)),
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/views/{id}",
+            format!("/api/v1/views/{view_a}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/overview",
+            format!("/api/v1/overview?project={pa}&minutes=30"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/routes/heatmap",
+            format!("/api/v1/routes/heatmap?project={pa}&minutes=30"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/routes/series",
+            format!("/api/v1/routes/series?project={pa}&route=/x&minutes=30"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/errors",
+            format!("/api/v1/errors?project={pa}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/errors/{fingerprint}",
+            format!("/api/v1/errors/1?project={pa}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/journeys",
+            format!("/api/v1/journeys?project={pa}&key=user_id&value=u1"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/alerts/rules",
+            format!("/api/v1/alerts/rules?project={pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/alerts/rules",
+            "/api/v1/alerts/rules".into(),
+            Some(rule(&pa)),
+        ),
+        (
+            Method::PUT,
+            "/api/v1/alerts/rules/{id}",
+            format!("/api/v1/alerts/rules/{rule_a}"),
+            Some(rule(&pa)),
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/alerts/rules/{id}",
+            format!("/api/v1/alerts/rules/{rule_a}?project={pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/alerts/rules/preview",
+            "/api/v1/alerts/rules/preview".into(),
+            Some(rule(&pa)),
+        ),
+        (
+            Method::GET,
+            "/api/v1/alerts/channels",
+            format!("/api/v1/alerts/channels?project={pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/alerts/channels",
+            "/api/v1/alerts/channels".into(),
+            Some(channel(&pa)),
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/alerts/channels/{id}",
+            format!("/api/v1/alerts/channels/{channel_a}?project={pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/alerts/channels/{id}/test",
+            format!("/api/v1/alerts/channels/{channel_a}/test?project={pa}"),
+            Some(json!({})),
+        ),
+        (
+            Method::GET,
+            "/api/v1/alerts/email-rule",
+            format!("/api/v1/alerts/email-rule?project={pa}"),
+            None,
+        ),
+        (
+            Method::PUT,
+            "/api/v1/alerts/email-rule",
+            "/api/v1/alerts/email-rule".into(),
+            Some(email_rule(&pa)),
+        ),
+        (
+            Method::POST,
+            "/api/v1/alerts/email-rule/test",
+            format!("/api/v1/alerts/email-rule/test?project={pa}"),
+            Some(json!({})),
+        ),
+        (
+            Method::GET,
+            "/api/v1/alerts/history",
+            format!("/api/v1/alerts/history?project={pa}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/alerts/mutes",
+            format!("/api/v1/alerts/mutes?project={pa}"),
+            None,
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/alerts/mutes/{fingerprint}",
+            format!("/api/v1/alerts/mutes/1?project={pa}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}",
+            format!("/api/v1/projects/{pa}"),
+            None,
+        ),
+        (
+            Method::PATCH,
+            "/api/v1/projects/{id}",
+            format!("/api/v1/projects/{pa}"),
+            Some(json!({"name": "taken"})),
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}/environments",
+            format!("/api/v1/projects/{pa}/environments"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}/services",
+            format!("/api/v1/projects/{pa}/services"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}/releases",
+            format!("/api/v1/projects/{pa}/releases"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}/keys",
+            format!("/api/v1/projects/{pa}/keys"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/projects/{id}/keys",
+            format!("/api/v1/projects/{pa}/keys"),
+            Some(json!({"name": "stolen"})),
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/projects/{id}/keys/{key_id}",
+            format!("/api/v1/projects/{pa}/keys/{key_a}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}/redaction-rules",
+            format!("/api/v1/projects/{pa}/redaction-rules"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/projects/{id}/redaction-rules",
+            format!("/api/v1/projects/{pa}/redaction-rules"),
+            Some(json!({"kind": "body_key", "pattern": "x"})),
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/projects/{id}/redaction-rules/{rule_id}",
+            format!("/api/v1/projects/{pa}/redaction-rules/{redaction_a}"),
+            None,
+        ),
+        (
+            Method::GET,
+            "/api/v1/projects/{id}/replay-targets",
+            format!("/api/v1/projects/{pa}/replay-targets"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/projects/{id}/replay-targets",
+            format!("/api/v1/projects/{pa}/replay-targets"),
+            Some(json!({"name": "x", "baseUrl": "http://127.0.0.1:9"})),
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/projects/{id}/replay-targets/{target_id}",
+            format!("/api/v1/projects/{pa}/replay-targets/{target_a}"),
+            None,
+        ),
+        (
+            Method::DELETE,
+            "/api/v1/projects/{id}",
+            format!("/api/v1/projects/{pa}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/tokens",
+            "/api/v1/tokens".into(),
+            Some(json!({"name": "x", "scopes": ["read"], "projectId": pa})),
+        ),
+    ];
+
+    // Coverage: every operation with a `project` parameter, a request body
+    // with a `project` field, or a /projects/{id} path is in the table.
+    let (_, doc) = app.get(&a, "/api/openapi.json").await;
+    let listed: std::collections::HashSet<(String, String)> = foreign
+        .iter()
+        .map(|(m, p, _, _)| (m.as_str().to_ascii_lowercase(), (*p).to_string()))
+        .collect();
+    let mut missing = Vec::new();
+    for (path, ops) in doc["paths"].as_object().unwrap() {
+        for (method, op) in ops.as_object().unwrap() {
+            let param = op["parameters"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|p| p["name"] == "project");
+            let body = op["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+                .as_str()
+                .and_then(|r| r.rsplit('/').next())
+                .is_some_and(|name| {
+                    doc["components"]["schemas"][name]["properties"]["project"].is_object()
+                });
+            if (param || body || path.starts_with("/api/v1/projects/{id}"))
+                && !listed.contains(&(method.clone(), path.clone()))
+            {
+                missing.push(format!("{} {path}", method.to_uppercase()));
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "project-scoped routes missing from the isolation table: {missing:?}"
+    );
+
+    // B (Beta admin) gets nothing of Alpha: 403 or 404, never success or a
+    // validation error that would hide a missing check.
+    for (method, path, uri, body) in &foreign {
+        let (s, v, _) = app.call(&b, method.clone(), uri, body.clone()).await;
+        assert!(
+            s == StatusCode::NOT_FOUND || s == StatusCode::FORBIDDEN,
+            "{method} {path} as Beta's admin on Alpha's project answered {s}: {v}"
+        );
+    }
+    // The same reads on B's own project work, so the requests above are valid.
+    for (method, path, uri, _) in foreign.iter().filter(|(m, p, _, _)| {
+        *m == Method::GET
+            && !p.contains("{request_id}")
+            && !p.ends_with("/live")
+            && !p.contains("{fingerprint}")
+    }) {
+        let own = uri.replace(&pa, &pb);
+        let (s, v, _) = app.call(&b, method.clone(), &own, None).await;
+        assert_eq!(
+            s,
+            StatusCode::OK,
+            "{method} {path} on Beta's own project: {v}"
+        );
+    }
+    // Alpha's rows don't leak into Beta's queries either.
+    let (s, v) = app
+        .post(&b, "/api/v1/query/requests", q(&pb, json!({"limit": 5})))
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["rows"].as_array().unwrap().len(), 0, "{v}");
+
+    // Organization-level data.
+    let (_, v) = app.get(&b, "/api/v1/projects").await;
+    let ids: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|p| p["id"].as_str())
+        .collect();
+    assert_eq!(ids, vec![pb.as_str()]);
+    let (_, v) = app.get(&b, "/api/v1/members").await;
+    let emails: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|m| m["email"].as_str())
+        .collect();
+    assert!(!emails.contains(&"c@example.com"), "{emails:?}");
+    assert!(emails.contains(&"b@example.com"), "{emails:?}");
+    let (s, _, _) = app
+        .call(
+            &b,
+            Method::PATCH,
+            &format!("/api/v1/members/{c_id}"),
+            Some(json!({"role": "viewer"})),
+        )
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = app
+        .call(&b, Method::DELETE, &format!("/api/v1/members/{c_id}"), None)
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, v) = app.get(&b, "/api/v1/invites").await;
+    assert!(
+        v.as_array()
+            .unwrap()
+            .iter()
+            .all(|i| i["email"] != "c@example.com"),
+        "{v}"
+    );
+    let (s, _, _) = app
+        .call(
+            &b,
+            Method::DELETE,
+            &format!("/api/v1/tokens/{token_a_id}"),
+            None,
+        )
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, v) = app
+        .post(
+            &b,
+            "/api/v1/alerts/channels",
+            json!({"project": pb, "name": "mail", "kind": "email", "memberIds": [c_id]}),
+        )
+        .await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "an Alpha member as a Beta recipient: {v}"
+    );
+    let mut with_c = email_rule(&pb);
+    with_c["memberIds"] = json!([c_id]);
+    let (s, _, _) = app
+        .call(&b, Method::PUT, "/api/v1/alerts/email-rule", Some(with_c))
+        .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = app
+        .post(&b, &format!("/api/v1/orgs/{alpha}/switch"), json!({}))
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, v) = app.get(&b, "/api/v1/orgs").await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+
+    // Server-wide settings and new organizations are for instance admins.
+    let (s, _) = app.get(&b, "/api/v1/settings/smtp").await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = app.post(&b, "/api/v1/orgs", json!({"name": "Gamma"})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    // A belongs to both, but a session works in one at a time.
+    let (_, v) = app.get(&a, "/api/v1/projects").await;
+    assert!(
+        v.as_array().unwrap().iter().all(|p| p["id"] != json!(pb)),
+        "{v}"
+    );
+    let (s, _) = app
+        .get(&a, &format!("/api/v1/overview?project={pb}&minutes=30"))
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    // A token created in Alpha stays in Alpha.
+    let (s, _) = app.get(&a_token, &format!("/api/v1/projects/{pb}")).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = app.get(&a_token, &format!("/api/v1/projects/{pa}")).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = app
+        .post(&a, &format!("/api/v1/orgs/{beta}/switch"), json!({}))
+        .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = app
+        .get(&a, &format!("/api/v1/overview?project={pb}&minutes=30"))
+        .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = app
+        .get(&a, &format!("/api/v1/overview?project={pa}&minutes=30"))
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    // Alpha's things are all still there after B's attempts.
+    let (s, _) = app
+        .post(&a, &format!("/api/v1/orgs/{alpha}/switch"), json!({}))
+        .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = app.get(&a, &format!("/api/v1/projects/{pa}")).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, v) = app.get(&a, &format!("/api/v1/projects/{pa}/keys")).await;
+    assert!(
+        v.as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k["id"] == json!(key_a) && k["revokedAt"].is_null()),
+        "{v}"
+    );
+    let (_, v) = app
+        .get(&a, &format!("/api/v1/alerts/rules?project={pa}"))
+        .await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    let (_, v) = app.get(&a, &format!("/api/v1/views?project={pa}")).await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+}

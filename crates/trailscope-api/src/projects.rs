@@ -56,20 +56,12 @@ async fn load_project(state: &AppState, id: Uuid) -> ApiResult<Project> {
 pub async fn list(State(state): State<AppState>, auth: Auth) -> ApiResult<Json<Vec<ProjectOut>>> {
     auth.require(Role::Viewer, Scope::Read)?;
     let rows: Vec<Project> = sqlx::query_as(
-        "SELECT id, slug, name, settings, created_at FROM projects ORDER BY created_at",
+        "SELECT id, slug, name, settings, created_at FROM projects WHERE id = ANY($1) ORDER BY created_at",
     )
+    .bind(auth.visible_projects())
     .fetch_all(&state.pool)
     .await?;
-    let only = match &auth.via {
-        crate::auth::Method_::Token { project, .. } => *project,
-        crate::auth::Method_::Session { .. } => None,
-    };
-    Ok(Json(
-        rows.into_iter()
-            .filter(|p| only.is_none_or(|o| o == p.id))
-            .map(ProjectOut::from)
-            .collect(),
-    ))
+    Ok(Json(rows.into_iter().map(ProjectOut::from).collect()))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -99,7 +91,7 @@ pub async fn create(
             "give the project a name (up to 100 characters)",
         ));
     }
-    let project = admin::create_project(&state.pool, name).await?;
+    let project = admin::create_project(&state.pool, auth.org_id()?, name).await?;
     let key =
         admin::create_ingest_key(&state.pool, project.id, "default", Some(auth.user.id)).await?;
     Ok(Json(ProjectCreated {
@@ -168,6 +160,7 @@ pub async fn delete(
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
     auth.require(Role::Owner, Scope::Admin)?;
+    auth.check_project(id)?;
     let key = state.project_key(id).await?;
     sqlx::query("DELETE FROM projects WHERE id = $1")
         .bind(id)

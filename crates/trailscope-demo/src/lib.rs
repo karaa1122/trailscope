@@ -92,13 +92,15 @@ pub async fn run(
     demo(&args, &client, shutdown).await
 }
 
-/// Ensures a "Demo" project exists and mints a fresh ingest key for it.
+/// Ensures a "Demo" project exists in the instance's first organization and
+/// mints a fresh ingest key for it.
 async fn bootstrap_key(config: &Config) -> anyhow::Result<String> {
     let pool = pg::connect(&config.postgres).await?;
     pg::migrate(&pool).await?;
-    let project = match admin::project_by_slug(&pool, "demo").await? {
+    let org = admin::default_org(&pool).await?;
+    let project = match admin::project_by_slug(&pool, org.id, "demo").await? {
         Some(p) => p,
-        None => admin::create_project(&pool, "Demo").await?,
+        None => admin::create_project(&pool, org.id, "Demo").await?,
     };
     let stamp = time::OffsetDateTime::now_utc().unix_timestamp();
     let key = admin::create_ingest_key(&pool, project.id, &format!("demo {stamp}"), None).await?;

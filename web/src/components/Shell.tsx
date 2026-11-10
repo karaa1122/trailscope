@@ -85,7 +85,11 @@ function Rail({ pathname }: { pathname: string }) {
           to={n.to}
           aria-label={n.label}
           title={n.label}
-          className={isActive(pathname, n.to) || (n.to === '/explore' && pathname.startsWith('/requests/')) ? 'active' : undefined}
+          className={
+            isActive(pathname, n.to) || (n.to === '/explore' && pathname.startsWith('/requests/'))
+              ? 'active'
+              : undefined
+          }
         >
           <n.icon size={18} />
         </Link>
@@ -137,10 +141,20 @@ function Sidebar({ pathname }: { pathname: string }) {
 
       <section aria-label="Services" className="services">
         <h2 className="section-title">Services</h2>
-        {services.data?.length === 0 && <span className="dim" style={{ padding: '0 10px', fontSize: 12 }}>No traffic yet</span>}
+        {services.data?.length === 0 && (
+          <span className="dim" style={{ padding: '0 10px', fontSize: 12 }}>
+            No traffic yet
+          </span>
+        )}
         {services.data?.map((s) => {
           const color =
-            s.health === 'failing' ? 'var(--err)' : s.health === 'degraded' ? 'var(--warn)' : s.health === 'idle' ? 'var(--faint)' : 'var(--accent)';
+            s.health === 'failing'
+              ? 'var(--err)'
+              : s.health === 'degraded'
+                ? 'var(--warn)'
+                : s.health === 'idle'
+                  ? 'var(--faint)'
+                  : 'var(--accent)';
           const note =
             s.health === 'failing' || s.health === 'degraded'
               ? `5xx ${fmtPct(s.errorRate)}`
@@ -148,12 +162,28 @@ function Sidebar({ pathname }: { pathname: string }) {
                 ? 'idle'
                 : `${fmtCompact(s.requests / 15)}/m`;
           return (
-            <Link key={s.service} to="/explore" search={{ q: `service:${s.service}`, mode: 'search' }} className="service">
-              <span className="dot" style={{ width: 7, height: 7, background: color }} aria-hidden="true" />
+            <Link
+              key={s.service}
+              to="/explore"
+              search={{ q: `service:${s.service}`, mode: 'search' }}
+              className="service"
+            >
+              <span
+                className="dot"
+                style={{ width: 7, height: 7, background: color }}
+                aria-hidden="true"
+              />
               <span className="mono">{s.service}</span>
               <span
                 className="service-note"
-                style={{ color: s.health === 'failing' ? 'var(--err-text)' : s.health === 'degraded' ? 'var(--warn)' : undefined }}
+                style={{
+                  color:
+                    s.health === 'failing'
+                      ? 'var(--err-text)'
+                      : s.health === 'degraded'
+                        ? 'var(--warn)'
+                        : undefined,
+                }}
               >
                 {note}
               </span>
@@ -163,15 +193,20 @@ function Sidebar({ pathname }: { pathname: string }) {
       </section>
 
       <div className="hints">
-        <kbd>/</kbd> search · <kbd>J</kbd> <kbd>K</kbd> move · <kbd>↵</kbd> inspect · <kbd>Space</kbd> pause ·{' '}
-        <kbd>⌘K</kbd> commands
+        <kbd>/</kbd> search · <kbd>J</kbd> <kbd>K</kbd> move · <kbd>↵</kbd> inspect ·{' '}
+        <kbd>Space</kbd> pause · <kbd>⌘K</kbd> commands
       </div>
     </aside>
   );
 }
 
 function ProjectSwitcher({ serviceCount }: { serviceCount: number }) {
-  const { projects, project, environment, setProject, setEnvironment } = useSession();
+  const { me, projects, project, environment, setProject, setEnvironment, switchOrg } =
+    useSession();
+  const navigate = useNavigate();
+  const orgs = me?.orgs ?? [];
+  // The organization is only worth showing once there is a choice to make.
+  const showOrgs = orgs.length > 1 || !!me?.instanceAdmin;
   const envs = useQuery({
     queryKey: ['environments', project?.id],
     queryFn: () => api.environments(project?.id ?? ''),
@@ -184,14 +219,30 @@ function ProjectSwitcher({ serviceCount }: { serviceCount: number }) {
         <button
           type="button"
           className="btn"
-          style={{ justifyContent: 'flex-start', gap: 10, padding: '0 12px', borderColor: 'var(--line-mid)', width: '100%' }}
+          style={{
+            justifyContent: 'flex-start',
+            gap: 10,
+            padding: '0 12px',
+            borderColor: 'var(--line-mid)',
+            width: '100%',
+          }}
         >
           <span className="dot" style={{ background: 'var(--accent)' }} aria-hidden="true" />
-          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.25, minWidth: 0, flex: 1 }}>
+          <span
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              lineHeight: 1.25,
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
             <span style={{ fontWeight: 500 }} className="ellipsis">
               {environment ?? 'all environments'}
             </span>
             <span className="dim ellipsis" style={{ fontSize: 11 }}>
+              {orgs.length > 1 && me?.org ? `${me.org.name} · ` : ''}
               {project?.name ?? 'No project'}
             </span>
           </span>
@@ -217,6 +268,32 @@ function ProjectSwitcher({ serviceCount }: { serviceCount: number }) {
               {p.name} {project?.id === p.id && <span className="nav-hint">✓</span>}
             </Dropdown.Item>
           ))}
+          {showOrgs && (
+            <>
+              <MenuLabel>Organization</MenuLabel>
+              {orgs.map((o) => (
+                <Dropdown.Item
+                  key={o.id}
+                  className="menu-item"
+                  onSelect={() => {
+                    if (o.id !== me?.org?.id) void switchOrg(o.id);
+                  }}
+                >
+                  {o.name} {me?.org?.id === o.id && <span className="nav-hint">✓</span>}
+                </Dropdown.Item>
+              ))}
+              {me?.instanceAdmin && (
+                <Dropdown.Item
+                  className="menu-item"
+                  onSelect={() =>
+                    void navigate({ to: '/settings', search: { tab: 'organization' } })
+                  }
+                >
+                  <span className="dim">New organization…</span>
+                </Dropdown.Item>
+              )}
+            </>
+          )}
         </Dropdown.Content>
       </Dropdown.Portal>
     </Dropdown.Root>
