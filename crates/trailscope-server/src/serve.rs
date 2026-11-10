@@ -103,6 +103,12 @@ pub async fn run(config: Config, role: Role, shutdown: CancellationToken) -> any
         keys = Some(started.keys);
     }
     if role.api() {
+        let admin_token = config.admin_token.trim();
+        if !admin_token.is_empty() && admin_token.len() < trailscope_api::console::MIN_ADMIN_TOKEN {
+            tracing::warn!(
+                "TRAILSCOPE_ADMIN_TOKEN is shorter than 32 characters; the management API stays off"
+            );
+        }
         let state = trailscope_api::AppState::new(
             config.clone(),
             ch.clone(),

@@ -38,7 +38,7 @@ Each milestone ends with everything building, linting and its tests passing (cro
 
 ### C3 · Plans, metering and limits (about 1.5 weeks) · partly done (decision 071)
 
-Done: plans as editable data in an admin console (not code), metering into `usage_daily`, the hard monthly limit and suspension at ingest, project and member caps, the usage panel in Settings, hand-kept invoices. Left: per-plan retention, the 80%/100% emails, the per-organization token bucket, and ClickHouse reconciliation of the counters.
+Done: plans as editable tiers of limits (data, not code), metering into `usage_daily`, the hard monthly limit and suspension at ingest, project and member caps, the usage panel in Settings, and a management API for them (decision 072). Prices, invoices and the admin dashboard live in the private `trailscope-admin` repository. Left: per-plan retention, the 80%/100% emails, the per-organization token bucket, and ClickHouse reconciliation of the counters.
 
 - `plans` are code, not data: Free (1M events a month, 7 days, 3 days of bodies, 2 projects, 3 members), Team (10M, 30 days, 7 days of bodies, unlimited projects and members), Business (50M, 90 days, 14 days of bodies, SSO). An event is a request, a job run or a log line; spans and errors inside a request are free.
 - Metering: the ingest pipeline counts accepted events per organization and flushes the counters to Postgres (`usage_daily (org_id, day, events, bytes)`) every 10 s; a ClickHouse rollup per project and day is the source for reconciliation.

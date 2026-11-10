@@ -48,11 +48,6 @@ export function Onboarding() {
           Switch to {o.name}
         </button>
       ))}
-      {me?.instanceAdmin && (
-        <a href="/admin" className="btn btn-sm">
-          Admin console
-        </a>
-      )}
       <button
         type="button"
         className="btn btn-sm"

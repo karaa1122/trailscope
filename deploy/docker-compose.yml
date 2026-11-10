@@ -42,6 +42,8 @@ services:
       TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS: ${TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS:-}
       # Optional: enforce plan limits per organization (docs/configuration.md#cloud).
       TRAILSCOPE_CLOUD_ENABLED: ${TRAILSCOPE_CLOUD_ENABLED:-}
+      # Optional: turns on the management API (docs/configuration.md#management-api).
+      TRAILSCOPE_ADMIN_TOKEN: ${TRAILSCOPE_ADMIN_TOKEN:-}
     depends_on:
       clickhouse:
         condition: service_healthy

@@ -161,7 +161,13 @@ Hosted, multi-tenant mode (Trailscope Cloud). Every install counts accepted even
 |---|---|---|---|
 | `enabled` | `TRAILSCOPE_CLOUD_ENABLED` | `false` | Enforce each organization's plan: ingest refuses a suspended organization (`403`) and one past a plan's hard monthly limit (`429` with `Retry-After` until the next month, UTC); the API refuses projects and invites beyond the plan's caps. The organization's members see their plan and usage under Settings → Organization |
 
-Plans are edited by instance admins in the admin console (`/admin`): Free (1M events a month, stops at the limit, 2 projects, 3 members), Team (10M) and Business (50M) come preinstalled, with prices in IQD left at 0 for the operator to set. An event is a request, a job run or a log line; spans are free. Limits are checked from memory and refreshed every 5 seconds, so an organization can go a few seconds' worth of traffic past its limit.
+Plans are tiers of limits, managed through the management API (below): Free (1M events a month, stops at the limit, 2 projects, 3 members), Team (10M) and Business (50M) come preinstalled. Prices and billing aren't part of Trailscope; they belong in the operator's own tools. An event is a request, a job run or a log line; spans are free. Limits are checked from memory and refreshed every 5 seconds, so an organization can go a few seconds' worth of traffic past its limit.
+
+## Management API
+
+| Key | Env | Default | Description |
+|---|---|---|---|
+| `admin_token` | `TRAILSCOPE_ADMIN_TOKEN` | empty | Turns on the management API under `/api/v1/admin` (every organization, its plan, limits, suspension, owner invites; plans), answered only to `Authorization: Bearer <token>`. Use 32 characters or more (`openssl rand -hex 32`); empty or shorter leaves it off. Meant for the operator's own tools, such as a separate admin dashboard; sessions and API tokens never reach it |
 
 ## `[log]`
 

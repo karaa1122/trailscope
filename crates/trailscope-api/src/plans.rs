@@ -1,6 +1,7 @@
-//! Plans and usage on the API side (decision 071): the project and member caps
-//! (enforced only with `cloud.enabled`) and the usage numbers shown in the
-//! admin console and in Settings → Organization.
+//! Plans and usage on the API side (decisions 071, 072): a plan is a tier of
+//! limits; the project and member caps are enforced only with
+//! `cloud.enabled`, and the usage numbers feed the management API and
+//! Settings → Organization.
 
 use std::collections::HashMap;
 
@@ -21,8 +22,6 @@ pub const MONTH_START: &str = "date_trunc('month', now() AT TIME ZONE 'UTC')::da
 pub struct Plan {
     pub id: String,
     pub name: String,
-    /// Monthly price in Iraqi dinars.
-    pub price_iqd: i64,
     /// Requests, job runs and log lines per month; `null` = unlimited.
     pub events_per_month: Option<i64>,
     /// Stop accepting at the limit (otherwise the excess is overage).
@@ -33,7 +32,7 @@ pub struct Plan {
     pub position: i32,
 }
 
-pub const PLAN_COLUMNS: &str = "p.id, p.name, p.price_iqd, p.events_per_month, p.hard_limit, \
+pub const PLAN_COLUMNS: &str = "p.id, p.name, p.events_per_month, p.hard_limit, \
      p.max_projects, p.max_members, p.archived, p.position";
 
 /// The organization's plan.

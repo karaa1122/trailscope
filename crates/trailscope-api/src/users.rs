@@ -488,21 +488,21 @@ pub async fn create_invite(
             &req.email,
             req.role,
             req.can_view_bodies,
-            auth.user.id,
+            Some(auth.user.id),
         )
         .await?,
     ))
 }
 
-/// Creates an invite link to `org` (any role, including owner: the admin
-/// console invites a new organization's first owner this way).
+/// Creates an invite link to `org` (any role, including owner: the
+/// management API invites a new organization's first owner this way).
 pub(crate) async fn issue_invite(
     state: &AppState,
     org: Uuid,
     email: &str,
     role: Role,
     can_view_bodies: bool,
-    created_by: Uuid,
+    created_by: Option<Uuid>,
 ) -> ApiResult<InviteCreated> {
     let email = email.trim().to_lowercase();
     if !valid_email(&email) {

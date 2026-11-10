@@ -577,15 +577,7 @@ function OrganizationSection({ toast, isAdmin }: { toast: Toaster; isAdmin: bool
         </Panel>
       )}
       {me?.instanceAdmin && (
-        <Panel
-          title="New organization"
-          sub={
-            <>
-              For yourself: you become its owner. For a customer, use the{' '}
-              <a href="/admin">admin console</a>.
-            </>
-          }
-        >
+        <Panel title="New organization" sub="You become its owner; invite its members from Members">
           <NameForm
             placeholder="Organization name, e.g. Acme"
             button="Create organization"

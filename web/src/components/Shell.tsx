@@ -99,7 +99,7 @@ function Rail({ pathname }: { pathname: string }) {
 }
 
 function Sidebar({ pathname }: { pathname: string }) {
-  const { me, project, environment } = useSession();
+  const { project, environment } = useSession();
   const services = useQuery({
     queryKey: ['services', project?.id, environment],
     queryFn: () => api.services(project?.id ?? '', environment),
@@ -139,12 +139,6 @@ function Sidebar({ pathname }: { pathname: string }) {
             ) : null}
           </Link>
         ))}
-        {me?.instanceAdmin && (
-          <Link to="/admin">
-            <IconGrid />
-            Admin console
-          </Link>
-        )}
       </nav>
 
       <section aria-label="Services" className="services">

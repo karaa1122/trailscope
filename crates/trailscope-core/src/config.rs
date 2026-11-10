@@ -53,6 +53,12 @@ pub struct Config {
     /// kept in Postgres, which protects less: set it in production.
     #[serde(deserialize_with = "lenient_string")]
     pub secret_key: String,
+    /// Unlocks the management API under `/api/v1/admin` (organizations, their
+    /// plans and limits) as `Authorization: Bearer <token>`, for an operator's
+    /// own tools (`TRAILSCOPE_ADMIN_TOKEN`). Empty, or shorter than 32
+    /// characters, leaves the management API off.
+    #[serde(deserialize_with = "lenient_string")]
+    pub admin_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

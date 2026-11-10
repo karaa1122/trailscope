@@ -1,6 +1,4 @@
 import type {
-  AdminOrg,
-  AdminOrgDetail,
   AlertChannel,
   AlertRule,
   ApiToken,
@@ -14,9 +12,7 @@ import type {
   HistogramResponse,
   IngestKey,
   Invite,
-  InviteCreated,
   InviteInfo,
-  Invoice,
   Journey,
   Me,
   Member,
@@ -25,8 +21,6 @@ import type {
   Org,
   OrgUsage,
   Overview,
-  PlanInput,
-  PlanWithCount,
   Project,
   QueryInput,
   RedactionRule,
@@ -151,40 +145,6 @@ export const api = {
   renameOrg: (name: string) => patch<undefined>('/api/v1/orgs/current', { name }),
   switchOrg: (id: string) => post<undefined>(`/api/v1/orgs/${id}/switch`, {}),
   orgUsage: () => get<OrgUsage>('/api/v1/orgs/current/usage'),
-
-  // Admin console (instance admins only).
-  admin: {
-    orgs: () => get<AdminOrg[]>('/api/v1/admin/orgs'),
-    createOrg: (body: { name: string; planId: string; ownerEmail?: string }) =>
-      post<{ org: AdminOrg; invite: InviteCreated | null }>('/api/v1/admin/orgs', body),
-    org: (id: string) => get<AdminOrgDetail>(`/api/v1/admin/orgs/${id}`),
-    updateOrg: (
-      id: string,
-      body: { name?: string; planId?: string; suspended?: boolean; note?: string },
-    ) => patch<AdminOrg>(`/api/v1/admin/orgs/${id}`, body),
-    invite: (id: string, body: { email: string; role: Role; canViewBodies?: boolean }) =>
-      post<InviteCreated>(`/api/v1/admin/orgs/${id}/invites`, body),
-    join: (id: string) => post<undefined>(`/api/v1/admin/orgs/${id}/join`, {}),
-    plans: () => get<PlanWithCount[]>('/api/v1/admin/plans'),
-    createPlan: (body: PlanInput & { id: string }) =>
-      post<PlanWithCount>('/api/v1/admin/plans', body),
-    updatePlan: (id: string, body: PlanInput) =>
-      put<PlanWithCount>(`/api/v1/admin/plans/${id}`, body),
-    invoices: (params: { org?: string; status?: string } = {}) =>
-      get<Invoice[]>(`/api/v1/admin/invoices${qs(params)}`),
-    createInvoice: (body: {
-      orgId: string;
-      planId: string;
-      periodStart: string;
-      periodEnd: string;
-      amountIqd: number;
-      note?: string;
-    }) => post<Invoice>('/api/v1/admin/invoices', body),
-    updateInvoice: (
-      id: string,
-      body: { status?: Invoice['status']; note?: string; applyPlan?: boolean },
-    ) => patch<Invoice>(`/api/v1/admin/invoices/${id}`, body),
-  },
 
   projects: () => get<Project[]>('/api/v1/projects'),
   environments: (project: string) => get<string[]>(`/api/v1/projects/${project}/environments`),

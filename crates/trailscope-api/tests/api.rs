@@ -80,9 +80,13 @@ impl App {
     }
 }
 
+/// The management API's token in tests.
+const ADMIN_TOKEN: &str = "test-admin-token-0123456789abcdef0123";
+
 async fn app() -> Option<App> {
     let env = testing::env().await?;
-    let cfg = env.config;
+    let mut cfg = env.config;
+    cfg.admin_token = ADMIN_TOKEN.to_string();
     ch::migrate(&cfg).await.unwrap();
     let pool = pg::connect(&cfg.postgres).await.unwrap();
     pg::migrate(&pool).await.unwrap();
@@ -1195,9 +1199,9 @@ async fn cross_tenant_isolation() {
         "project-scoped routes missing from the isolation table: {missing:?}"
     );
 
-    // The admin console (decision 071): every /api/v1/admin route refuses
-    // someone who isn't an instance admin, and API tokens, even an instance
-    // admin's. Bodies are valid, so a 403 can't hide behind a 422.
+    // The management API (decisions 071, 072) answers only the admin token:
+    // no session (not even an instance admin's), no API token, no wrong
+    // token. Bodies are valid, so a refusal can't hide behind a 422.
     let nil = "00000000-0000-0000-0000-000000000000";
     let admin_body = |method: &str, path: &str| -> Option<Value> {
         match (method, path) {
@@ -1208,12 +1212,12 @@ async fn cross_tenant_isolation() {
             }
             ("post", "/api/v1/admin/plans") => Some(json!({"id": "x", "name": "X"})),
             ("put", "/api/v1/admin/plans/{id}") => Some(json!({"name": "X"})),
-            ("post", "/api/v1/admin/invoices") => Some(json!({
-                "orgId": nil, "planId": "free", "periodStart": "2026-11-01",
-                "periodEnd": "2026-11-30", "amountIqd": 1
-            })),
             _ => Some(json!({})),
         }
+    };
+    let wrong = Client {
+        bearer: Some("w".repeat(48)),
+        ..Client::default()
     };
     let mut admin_ops = 0;
     for (path, ops) in doc["paths"].as_object().unwrap() {
@@ -1225,22 +1229,27 @@ async fn cross_tenant_isolation() {
             let uri = path.replace("{id}", nil);
             for (who, c) in [
                 ("Beta's admin", &b),
-                ("an instance admin's token", &a_token),
+                ("an instance admin's session", &a),
+                ("an instance admin's API token", &a_token),
+                ("a wrong admin token", &wrong),
             ] {
                 let (s, v, _) = app.call(c, m.clone(), &uri, admin_body(method, path)).await;
-                assert_eq!(
-                    s,
-                    StatusCode::FORBIDDEN,
+                assert!(
+                    s == StatusCode::UNAUTHORIZED || s == StatusCode::FORBIDDEN,
                     "{method} {path} as {who} answered {s}: {v}"
                 );
             }
             admin_ops += 1;
         }
     }
-    assert!(admin_ops >= 12, "only {admin_ops} admin operations found");
-    // An instance admin sees every organization, and one made for a customer
-    // doesn't make them a member.
-    let (s, v) = app.get(&a, "/api/v1/admin/orgs").await;
+    assert!(admin_ops >= 8, "only {admin_ops} admin operations found");
+    // With the admin token: every organization, and one made for a customer
+    // with an owner invite, without making anyone else a member.
+    let operator = Client {
+        bearer: Some(ADMIN_TOKEN.to_string()),
+        ..Client::default()
+    };
+    let (s, v) = app.get(&operator, "/api/v1/admin/orgs").await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let names: Vec<&str> = v
         .as_array()
@@ -1254,13 +1263,14 @@ async fn cross_tenant_isolation() {
     );
     let (s, v) = app
         .post(
-            &a,
+            &operator,
             "/api/v1/admin/orgs",
             json!({"name": "Gamma", "planId": "team", "ownerEmail": "owner@gamma.example"}),
         )
         .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["org"]["planId"], "team");
+    assert_eq!(v["org"]["members"], 0);
     assert!(v["invite"]["url"].as_str().unwrap().contains("/invite/"));
     let (_, mine) = app.get(&a, "/api/v1/orgs").await;
     assert!(
