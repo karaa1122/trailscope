@@ -79,21 +79,6 @@ jobs:
       - run: pnpm --filter @trailscope/web test
       - run: pnpm --filter @trailscope/web build
 
-  website:
-    name: Website (typecheck, build)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Also fails on a docs link to a page that doesn't exist (scripts/sync-docs.mjs).
-      - run: pnpm --filter trailscope-website typecheck
-      - run: pnpm --filter trailscope-website build
-
   node-sdk:
     name: Node SDKs
     runs-on: ubuntu-latest

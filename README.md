@@ -191,5 +191,5 @@ Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for
 
 ## License
 
-- The server, web UI and website: [AGPL-3.0](LICENSE). You can run, change and self-host Trailscope freely; if you offer a modified Trailscope to others over a network, you share your changes under the same license.
+- The server and web UI: [AGPL-3.0](LICENSE). You can run, change and self-host Trailscope freely; if you offer a modified Trailscope to others over a network, you share your changes under the same license.
 - The SDKs (`sdks/`) and the examples (`examples/`): Apache-2.0, so adding Trailscope to your application never puts your code under the AGPL.
