@@ -40,6 +40,8 @@ services:
       TRAILSCOPE_OIDC_CLIENT_SECRET: ${TRAILSCOPE_OIDC_CLIENT_SECRET:-}
       TRAILSCOPE_OIDC_DISPLAY_NAME: ${TRAILSCOPE_OIDC_DISPLAY_NAME:-}
       TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS: ${TRAILSCOPE_OIDC_AUTO_CREATE_DOMAINS:-}
+      # Optional: enforce plan limits per organization (docs/configuration.md#cloud).
+      TRAILSCOPE_CLOUD_ENABLED: ${TRAILSCOPE_CLOUD_ENABLED:-}
     depends_on:
       clickhouse:
         condition: service_healthy
