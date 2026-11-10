@@ -8,7 +8,7 @@ An open-source, self-hosted API request logging tool: a Rust server with ClickHo
 
 - Original brief: [docs/agents/spec.md](docs/agents/spec.md). It defines the milestones M0–M8, the data model, the query language, the UI and the performance targets.
 - Follow-up brief (SMTP email on 5xx): [docs/agents/spec-email-notifications.md](docs/agents/spec-email-notifications.md).
-- Plan for the hosted, multi-tenant Trailscope Cloud (milestones C1–C7; C1 organizations done on branch `feat/organizations`, decision 070): [docs/agents/spec-cloud.md](docs/agents/spec-cloud.md).
+- Plan for the hosted, multi-tenant Trailscope Cloud (milestones C1–C7; C1 organizations done, decision 070): [docs/agents/spec-cloud.md](docs/agents/spec-cloud.md).
 - Visual reference for the UI: [design/](design/) (HTML mockups; match them).
 - Every judgement call goes in [docs/DECISIONS.md](docs/DECISIONS.md) (context, choice, alternatives).
 
@@ -34,7 +34,7 @@ An open-source, self-hosted API request logging tool: a Rust server with ClickHo
 | M7 SDKs | done | `@trailscope/express`, `@trailscope/fastify`, `@trailscope/nestjs`, Python `trailscope` (Django, ASGI, Celery, logging handler); `examples/`; overhead benchmarks (all < 0.05 ms p99 added); docs/sdk-*.md |
 | M8 Harden and ship | done | OTLP/HTTP receiver, OIDC sign-in, performance verified on 102M requests, README and docs, release workflow (GHCR, npm via changesets, PyPI), Dependabot |
 
-Since M8: SDKs for Java (decision 063) and PHP/Laravel (decision 064); Explore also reads jobs and log events (decision 058); replay looks only at whether the request body was cut (decision 059); empty `TRAILSCOPE_*` variables count as unset, so the compose files pass the SMTP and OIDC settings through (decision 060). The project was renamed from Logbox, its working name, to Trailscope (decision 062). The website (landing page, planned Cloud pricing with a waitlist, and the docs built from `docs/`) lives in `website/` and is served from trailscope.pro (decision 065).
+Since M8: SDKs for Java (decision 063) and PHP/Laravel (decision 064); Explore also reads jobs and log events (decision 058); replay looks only at whether the request body was cut (decision 059); empty `TRAILSCOPE_*` variables count as unset, so the compose files pass the SMTP and OIDC settings through (decision 060). The project was renamed from Logbox, its working name, to Trailscope (decision 062). The website (landing page, planned Cloud pricing with a waitlist, and the docs built from `docs/`) lives in `website/` and is served from trailscope.pro (decision 065). Organizations (decision 070, Cloud milestone C1): one Trailscope serves several companies, each with its own projects, members, invites and API tokens; users can belong to several and switch, and instance admins manage server-wide settings and create organizations.
 
 ## Running it locally
 

@@ -20,7 +20,7 @@ Today cloud.trailscope.pro runs one ordinary single-company install for the owne
 
 Each milestone ends with everything building, linting and its tests passing (cross-tenant tests are mandatory from C1 on, whatever the general test policy), then a commit.
 
-### C1 · Organizations (about 2 weeks) · done on branch `feat/organizations` (decision 070)
+### C1 · Organizations (about 2 weeks) · done (decision 070)
 
 - Postgres: `organizations (id, slug, name, plan, created_at, …)`, `memberships (org_id, user_id, role, can_view_bodies)` replacing `users.role` and `users.can_view_bodies`; `org_id` on `projects`, `invites`, `api_tokens`, `alert_channels`, `email_rules` and organization-level `settings`. A migration creates one organization ("Default"), moves every project, user, invite and token into it, and copies each user's role into their membership.
 - Sessions carry the current organization; a user can belong to several and switch in the UI (organization switcher in the shell, hidden with one organization). API tokens belong to one organization.
