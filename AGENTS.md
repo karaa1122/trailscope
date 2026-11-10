@@ -94,7 +94,7 @@ Roughly in priority order:
 3. **Journeys on low-cardinality keys** read every matching row (about 0.7 s over 7 days for a key with a few hundred values on 100M requests); a per-key rollup or a capped, time-ordered read would help.
 4. The ingest benchmark numbers come from an older development machine; rerun `trailscope demo --load` to refresh them.
 5. Journey header: when the 2,000-item cap is hit, "Quiet since" refers to the last loaded item, not the real last activity.
-6. **Website:** the waitlist has no notification; read signups with `sudo python3 /opt/trailscope-waitlist/waitlist.py export --db /var/lib/trailscope-waitlist/waitlist.db` on the server.
+6. **Website:** each new waitlist signup is emailed to hello@ through Resend when `RESEND_API_KEY` is in `/etc/trailscope-waitlist.env` on the server (root-only); all signups: `sudo python3 /opt/trailscope-waitlist/waitlist.py export --db /var/lib/trailscope-waitlist/waitlist.db`.
 
 ## Getting oriented
 

@@ -5,6 +5,7 @@ Runs behind nginx on 127.0.0.1 (see ../deploy/). Standard library only, so the
 server needs nothing but python3.
 
     waitlist.py serve  --db /var/lib/trailscope-waitlist/waitlist.db [--port 8790]
+                       [--notify-to me@example.com --notify-from "Waitlist <list@example.com>"]
     waitlist.py export --db /var/lib/trailscope-waitlist/waitlist.db   # CSV on stdout
     waitlist.py delete --db ... someone@example.com                    # on request
 
@@ -12,6 +13,10 @@ Requests come as JSON from the page's script (answered with JSON) or as a plain
 form post without JavaScript (answered with a redirect to /thanks/ or
 /waitlist-error/). Nothing but the submitted fields and the time is stored; the
 client address is used only for the in-memory rate limit.
+
+With --notify-to and RESEND_API_KEY in the environment (systemd reads it from
+/etc/trailscope-waitlist.env), each new signup is also emailed to the owner
+through Resend's API, in the background; the key is never logged.
 """
 
 from __future__ import annotations
@@ -19,11 +24,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sqlite3
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -36,6 +44,15 @@ PLANS = {"free", "team", "business", "unsure"}
 VOLUMES = {"unsure", "<1m", "1-10m", "10-50m", "50m+"}
 RATE_LIMIT = 10  # submissions per address
 RATE_WINDOW = 3600.0  # seconds
+RESEND_URL = "https://api.resend.com/emails"
+PLAN_NAMES = {"free": "Free", "team": "Team", "business": "Business", "unsure": "not sure yet"}
+VOLUME_NAMES = {
+    "unsure": "not sure",
+    "<1m": "under 1 million",
+    "1-10m": "1-10 million",
+    "10-50m": "10-50 million",
+    "50m+": "over 50 million",
+}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS signups (
@@ -55,9 +72,11 @@ class Store:
         self._db.execute(SCHEMA)
         self._lock = threading.Lock()
 
-    def add(self, email: str, plan: str, volume: str) -> None:
+    def add(self, email: str, plan: str, volume: str) -> tuple[bool, int]:
+        """Stores or updates a signup; returns (whether it is new, total signups)."""
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with self._lock:
+            known = self._db.execute("SELECT 1 FROM signups WHERE email = ?", (email,)).fetchone()
             self._db.execute(
                 "INSERT INTO signups (email, plan, volume, created_at, updated_at)"
                 " VALUES (?, ?, ?, ?, ?)"
@@ -65,6 +84,8 @@ class Store:
                 " volume = excluded.volume, updated_at = excluded.updated_at",
                 (email, plan, volume, now, now),
             )
+            total = self._db.execute("SELECT count(*) FROM signups").fetchone()[0]
+            return known is None, int(total)
 
     def rows(self) -> list[tuple[str, str, str, str, str]]:
         with self._lock:
@@ -77,6 +98,54 @@ class Store:
     def delete(self, email: str) -> int:
         with self._lock:
             return self._db.execute("DELETE FROM signups WHERE email = ?", (email,)).rowcount
+
+
+class Notifier:
+    """Emails the owner about new signups through Resend's API, off the request thread."""
+
+    def __init__(self, api_key: str, to: str, sender: str) -> None:
+        self._api_key = api_key
+        self._to = to
+        self._sender = sender
+
+    def new_signup(self, email: str, plan: str, volume: str, total: int) -> None:
+        args = (email, plan, volume, total)
+        threading.Thread(target=self._send, args=args, daemon=True).start()
+
+    def _send(self, email: str, plan: str, volume: str, total: int) -> None:
+        text = (
+            f"{email} joined the Trailscope Cloud waitlist.\n\n"
+            f"Plan: {PLAN_NAMES.get(plan, plan)}\n"
+            f"Requests per month: {VOLUME_NAMES.get(volume, volume)}\n"
+            f"Signups so far: {total}\n\n"
+            "Reply to this email to write to them directly.\n"
+        )
+        payload = {
+            "from": self._sender,
+            "to": [self._to],
+            "reply_to": email,
+            "subject": f"Waitlist: {email} ({PLAN_NAMES.get(plan, plan)})",
+            "text": text,
+        }
+        request = urllib.request.Request(
+            RESEND_URL,
+            data=json.dumps(payload).encode(),
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "trailscope-waitlist",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                response.read()
+        except urllib.error.HTTPError as e:
+            detail = e.read(300).decode("utf-8", "replace")
+            message = f"waitlist: notification failed: HTTP {e.code} {detail}"
+            print(message, file=sys.stderr, flush=True)
+        except (urllib.error.URLError, OSError) as e:
+            print(f"waitlist: notification failed: {e}", file=sys.stderr, flush=True)
 
 
 class RateLimiter:
@@ -116,7 +185,9 @@ def validate(fields: dict[str, str]) -> tuple[str, str, str]:
     return email, plan if plan in PLANS else "unsure", volume if volume in VOLUMES else "unsure"
 
 
-def make_handler(store: Store, limiter: RateLimiter) -> type[BaseHTTPRequestHandler]:
+def make_handler(
+    store: Store, limiter: RateLimiter, notifier: Notifier | None
+) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "trailscope-waitlist"
         sys_version = ""
@@ -180,12 +251,14 @@ def make_handler(store: Store, limiter: RateLimiter) -> type[BaseHTTPRequestHand
                 self._reply(HTTPStatus.BAD_REQUEST, False, message)
                 return
             try:
-                store.add(email, plan, volume)
+                new, total = store.add(email, plan, volume)
             except sqlite3.Error as e:
                 print(f"waitlist: storing a signup failed: {e}", file=sys.stderr, flush=True)
                 self._reply(HTTPStatus.INTERNAL_SERVER_ERROR, False, "Please try again later.")
                 return
             self._reply(HTTPStatus.OK, True)
+            if new and notifier is not None:
+                notifier.new_signup(email, plan, volume, total)
 
     return Handler
 
@@ -197,6 +270,8 @@ def main() -> None:
     serve.add_argument("--db", required=True)
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8790)
+    serve.add_argument("--notify-to", help="email each new signup to this address")
+    serve.add_argument("--notify-from", help='sender, e.g. "Waitlist <waitlist@example.com>"')
     export = sub.add_parser("export", help="print all signups as CSV")
     export.add_argument("--db", required=True)
     delete = sub.add_parser("delete", help="remove one email address")
@@ -213,8 +288,14 @@ def main() -> None:
         removed = store.delete(args.email.strip().lower())
         print(f"removed {removed} signup(s)")
     else:
-        server = ThreadingHTTPServer((args.host, args.port), make_handler(store, RateLimiter()))
-        print(f"waitlist: listening on {args.host}:{args.port}", flush=True)
+        api_key = os.environ.get("RESEND_API_KEY", "").strip()
+        notifier = None
+        if args.notify_to and args.notify_from and api_key:
+            notifier = Notifier(api_key, args.notify_to, args.notify_from)
+        handler = make_handler(store, RateLimiter(), notifier)
+        server = ThreadingHTTPServer((args.host, args.port), handler)
+        state = f"on, to {args.notify_to}" if notifier else "off"
+        print(f"waitlist: listening on {args.host}:{args.port}; notifications {state}", flush=True)
         server.serve_forever()
 
 

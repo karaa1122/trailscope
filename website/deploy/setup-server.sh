@@ -29,7 +29,7 @@ trap 'rm -rf "$STAGING"' EXIT
 sudo install -d -o "$USER" -g "$USER" "/var/www/$DOMAIN" "/var/www/$DOMAIN/releases"
 
 sudo install -D -m 0644 "$STAGING/waitlist.py" /opt/trailscope-waitlist/waitlist.py
-sudo install -m 0644 "$STAGING/trailscope-waitlist.service" /etc/systemd/system/trailscope-waitlist.service
+sed "s/__DOMAIN__/$DOMAIN/g" "$STAGING/trailscope-waitlist.service" | sudo tee /etc/systemd/system/trailscope-waitlist.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --quiet trailscope-waitlist
 sudo systemctl restart trailscope-waitlist

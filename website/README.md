@@ -28,6 +28,13 @@ When the domain's A records point at the server, add HTTPS once:
 ssh $TRAILSCOPE_SITE_HOST 'sudo certbot --nginx -d trailscope.pro -d www.trailscope.pro'
 ```
 
+Each new signup is emailed to `hello@<domain>` (Reply-To set to the person) through Resend when the server has a key; the service reads it from a root-only file:
+
+```bash
+ssh $TRAILSCOPE_SITE_HOST 'sudo install -m 600 /dev/null /etc/trailscope-waitlist.env && sudo nano /etc/trailscope-waitlist.env'   # RESEND_API_KEY=re_...
+website/deploy/setup-server.sh   # restarts the service with it
+```
+
 Waitlist signups, as CSV:
 
 ```bash

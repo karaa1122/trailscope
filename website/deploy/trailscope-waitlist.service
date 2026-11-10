@@ -3,7 +3,9 @@ Description=Trailscope Cloud waitlist endpoint (website)
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/trailscope-waitlist/waitlist.py serve --db /var/lib/trailscope-waitlist/waitlist.db --host 127.0.0.1 --port 8790
+# Optional: RESEND_API_KEY=re_… (root-only file) turns on an email to hello@ for each new signup.
+EnvironmentFile=-/etc/trailscope-waitlist.env
+ExecStart=/usr/bin/python3 /opt/trailscope-waitlist/waitlist.py serve --db /var/lib/trailscope-waitlist/waitlist.db --host 127.0.0.1 --port 8790 --notify-to hello@__DOMAIN__ --notify-from "Trailscope waitlist <waitlist@__DOMAIN__>"
 DynamicUser=yes
 StateDirectory=trailscope-waitlist
 StateDirectoryMode=0700
