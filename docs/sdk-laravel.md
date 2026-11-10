@@ -4,8 +4,8 @@ Request logging for Laravel, job events for Laravel queues, a log channel and Oc
 
 | | Supported |
 |---|---|
-| PHP | 8.2 to 8.5 (Laravel 13 needs 8.3) |
-| Laravel | 12 and 13, the versions Laravel still supports |
+| PHP | 8.1 to 8.5 (Laravel 11 and 12 need 8.2, Laravel 13 needs 8.3) |
+| Laravel | 10 to 13. Laravel 10 and 11 no longer get security fixes from Laravel, so plan the upgrade; Trailscope keeps working on them meanwhile |
 | Extensions | `json`; `curl` and `zlib` recommended (without them batches go through PHP streams, uncompressed) |
 
 ```bash
