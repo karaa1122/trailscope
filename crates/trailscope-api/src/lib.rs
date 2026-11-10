@@ -2,6 +2,7 @@
 
 pub mod alerts;
 pub mod auth;
+pub mod console;
 pub mod error;
 pub mod errors;
 pub mod inspector;
@@ -11,6 +12,7 @@ pub mod oidc;
 pub mod openapi;
 pub mod orgs;
 pub mod overview;
+pub mod plans;
 pub mod projects;
 pub mod query;
 pub mod setup;

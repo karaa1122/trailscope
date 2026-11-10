@@ -1195,6 +1195,83 @@ async fn cross_tenant_isolation() {
         "project-scoped routes missing from the isolation table: {missing:?}"
     );
 
+    // The admin console (decision 071): every /api/v1/admin route refuses
+    // someone who isn't an instance admin, and API tokens, even an instance
+    // admin's. Bodies are valid, so a 403 can't hide behind a 422.
+    let nil = "00000000-0000-0000-0000-000000000000";
+    let admin_body = |method: &str, path: &str| -> Option<Value> {
+        match (method, path) {
+            ("get", _) => None,
+            ("post", "/api/v1/admin/orgs") => Some(json!({"name": "Gamma"})),
+            ("post", "/api/v1/admin/orgs/{id}/invites") => {
+                Some(json!({"email": "x@example.com", "role": "viewer"}))
+            }
+            ("post", "/api/v1/admin/plans") => Some(json!({"id": "x", "name": "X"})),
+            ("put", "/api/v1/admin/plans/{id}") => Some(json!({"name": "X"})),
+            ("post", "/api/v1/admin/invoices") => Some(json!({
+                "orgId": nil, "planId": "free", "periodStart": "2026-11-01",
+                "periodEnd": "2026-11-30", "amountIqd": 1
+            })),
+            _ => Some(json!({})),
+        }
+    };
+    let mut admin_ops = 0;
+    for (path, ops) in doc["paths"].as_object().unwrap() {
+        if !path.starts_with("/api/v1/admin/") {
+            continue;
+        }
+        for method in ops.as_object().unwrap().keys() {
+            let m = Method::from_bytes(method.to_uppercase().as_bytes()).unwrap();
+            let uri = path.replace("{id}", nil);
+            for (who, c) in [
+                ("Beta's admin", &b),
+                ("an instance admin's token", &a_token),
+            ] {
+                let (s, v, _) = app.call(c, m.clone(), &uri, admin_body(method, path)).await;
+                assert_eq!(
+                    s,
+                    StatusCode::FORBIDDEN,
+                    "{method} {path} as {who} answered {s}: {v}"
+                );
+            }
+            admin_ops += 1;
+        }
+    }
+    assert!(admin_ops >= 12, "only {admin_ops} admin operations found");
+    // An instance admin sees every organization, and one made for a customer
+    // doesn't make them a member.
+    let (s, v) = app.get(&a, "/api/v1/admin/orgs").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let names: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|o| o["name"].as_str())
+        .collect();
+    assert!(
+        names.contains(&"Alpha") && names.contains(&"Beta"),
+        "{names:?}"
+    );
+    let (s, v) = app
+        .post(
+            &a,
+            "/api/v1/admin/orgs",
+            json!({"name": "Gamma", "planId": "team", "ownerEmail": "owner@gamma.example"}),
+        )
+        .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["org"]["planId"], "team");
+    assert!(v["invite"]["url"].as_str().unwrap().contains("/invite/"));
+    let (_, mine) = app.get(&a, "/api/v1/orgs").await;
+    assert!(
+        !mine
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|o| o["name"] == "Gamma"),
+        "{mine}"
+    );
+
     // B (Beta admin) gets nothing of Alpha: 403 or 404, never success or a
     // validation error that would hide a missing check.
     for (method, path, uri, body) in &foreign {

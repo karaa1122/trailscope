@@ -91,7 +91,9 @@ pub async fn create(
             "give the project a name (up to 100 characters)",
         ));
     }
-    let project = admin::create_project(&state.pool, auth.org_id()?, name).await?;
+    let org = auth.org_id()?;
+    crate::plans::check_project_cap(&state, org).await?;
+    let project = admin::create_project(&state.pool, org, name).await?;
     let key =
         admin::create_ingest_key(&state.pool, project.id, "default", Some(auth.user.id)).await?;
     Ok(Json(ProjectCreated {

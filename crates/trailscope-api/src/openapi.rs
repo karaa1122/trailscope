@@ -9,8 +9,8 @@ use utoipa_axum::routes;
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
-    AppState, alerts, errors, inspector, journeys, live, oidc, orgs, overview, projects, query,
-    setup, users, views,
+    AppState, alerts, console, errors, inspector, journeys, live, oidc, orgs, overview, projects,
+    query, setup, users, views,
 };
 
 #[derive(OpenApi)]
@@ -19,13 +19,14 @@ use crate::{
         title = "Trailscope API",
         description = "Query, inspect and administer Trailscope. Authenticate with a session cookie \
                        (plus `X-CSRF-Token` on writes) or `Authorization: Bearer trs_api_…`.",
-        license(name = "Apache-2.0", identifier = "Apache-2.0")
+        license(name = "AGPL-3.0-only", identifier = "AGPL-3.0-only")
     ),
     modifiers(&SecuritySchemes),
     tags(
         (name = "setup"), (name = "auth"), (name = "members"), (name = "tokens"),
         (name = "projects"), (name = "query"), (name = "inspector"), (name = "live"), (name = "views"),
-        (name = "overview"), (name = "errors"), (name = "journeys"), (name = "alerts")
+        (name = "overview"), (name = "errors"), (name = "journeys"), (name = "alerts"),
+        (name = "organizations"), (name = "admin")
     )
 )]
 struct ApiDoc;
@@ -69,6 +70,15 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(orgs::list, orgs::create))
         .routes(routes!(orgs::update_current))
         .routes(routes!(orgs::switch))
+        .routes(routes!(orgs::usage))
+        .routes(routes!(console::list_orgs, console::create_org))
+        .routes(routes!(console::get_org, console::update_org))
+        .routes(routes!(console::invite))
+        .routes(routes!(console::join))
+        .routes(routes!(console::list_plans, console::create_plan))
+        .routes(routes!(console::update_plan))
+        .routes(routes!(console::list_invoices, console::create_invoice))
+        .routes(routes!(console::update_invoice))
         .routes(routes!(users::list_tokens, users::create_token))
         .routes(routes!(users::revoke_token))
         .routes(routes!(projects::list, projects::create))

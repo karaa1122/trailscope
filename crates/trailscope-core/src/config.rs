@@ -28,6 +28,7 @@ const SECTIONS: &[&str] = &[
     "alerts",
     "smtp",
     "oidc",
+    "cloud",
     "log",
 ];
 
@@ -45,6 +46,7 @@ pub struct Config {
     pub alerts: AlertsConfig,
     pub smtp: SmtpConfig,
     pub oidc: OidcConfig,
+    pub cloud: CloudConfig,
     pub log: LogConfig,
     /// Encrypts stored secrets (SMTP password, channel tokens) and signs mute
     /// links (`TRAILSCOPE_SECRET_KEY`). When empty, a random key is generated and
@@ -342,6 +344,17 @@ impl OidcConfig {
     pub fn enabled(&self) -> bool {
         !self.issuer.is_empty() && !self.client_id.is_empty()
     }
+}
+
+/// Hosted, multi-tenant mode (decision 071). Off by default: self-hosted
+/// Trailscope still meters usage per organization, but never enforces plan
+/// limits.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CloudConfig {
+    /// Enforce each organization's plan: the monthly event cap at ingest, and
+    /// the project and member caps in the API (`TRAILSCOPE_CLOUD_ENABLED`).
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

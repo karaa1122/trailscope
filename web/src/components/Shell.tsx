@@ -99,7 +99,7 @@ function Rail({ pathname }: { pathname: string }) {
 }
 
 function Sidebar({ pathname }: { pathname: string }) {
-  const { project, environment } = useSession();
+  const { me, project, environment } = useSession();
   const services = useQuery({
     queryKey: ['services', project?.id, environment],
     queryFn: () => api.services(project?.id ?? '', environment),
@@ -123,6 +123,8 @@ function Sidebar({ pathname }: { pathname: string }) {
 
       <ProjectSwitcher serviceCount={services.data?.length ?? 0} />
 
+      <PlanNotice />
+
       <nav aria-label="Main" className="nav">
         {NAV.map((n) => (
           <Link key={n.to} to={n.to} className={isActive(pathname, n.to) ? 'active' : undefined}>
@@ -137,6 +139,12 @@ function Sidebar({ pathname }: { pathname: string }) {
             ) : null}
           </Link>
         ))}
+        {me?.instanceAdmin && (
+          <Link to="/admin">
+            <IconGrid />
+            Admin console
+          </Link>
+        )}
       </nav>
 
       <section aria-label="Services" className="services">
@@ -197,6 +205,36 @@ function Sidebar({ pathname }: { pathname: string }) {
         <kbd>Space</kbd> pause · <kbd>⌘K</kbd> commands
       </div>
     </aside>
+  );
+}
+
+/** On the Cloud: a warning when the organization is suspended or has used its
+ * plan's events for the month. */
+function PlanNotice() {
+  const { me } = useSession();
+  const usage = useQuery({
+    queryKey: ['org-usage', me?.org?.id],
+    queryFn: api.orgUsage,
+    enabled: !!me?.cloud && !!me.org,
+    refetchInterval: 5 * 60_000,
+  });
+  const u = usage.data;
+  if (!u || !u.enforced) return null;
+  const limit = u.plan.eventsPerMonth;
+  const over = u.plan.hardLimit && limit !== null && u.eventsThisMonth >= limit;
+  if (!u.suspended && !over) return null;
+  return (
+    <Link
+      to="/settings"
+      search={{ tab: 'organization' }}
+      className="panel panel-pad"
+      role="status"
+      style={{ fontSize: 12.5, lineHeight: 1.45, borderColor: 'var(--err)', color: 'var(--text)' }}
+    >
+      {u.suspended
+        ? 'This organization is suspended: new data is refused. Contact the Trailscope operator.'
+        : `The ${u.plan.name} plan's ${fmtCompact(limit ?? 0)} events for this month are used: new data is refused until next month.`}
+    </Link>
   );
 }
 

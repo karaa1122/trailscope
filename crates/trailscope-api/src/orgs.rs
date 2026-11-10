@@ -157,7 +157,7 @@ pub async fn switch(
 }
 
 /// Points the caller's session (and their next sign-in) at `org`.
-async fn switch_to(state: &AppState, auth: &Auth, org: Uuid) -> ApiResult<()> {
+pub(crate) async fn switch_to(state: &AppState, auth: &Auth, org: Uuid) -> ApiResult<()> {
     if let Method_::Session { id, .. } = &auth.via {
         sqlx::query("UPDATE sessions SET org_id = $2 WHERE id = $1")
             .bind(id)
@@ -171,4 +171,65 @@ async fn switch_to(state: &AppState, auth: &Auth, org: Uuid) -> ApiResult<()> {
         .execute(&state.pool)
         .await?;
     Ok(())
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUsage {
+    pub id: Uuid,
+    pub name: String,
+    /// Requests, job runs and log lines stored this month; `null` when unknown.
+    pub events_this_month: Option<i64>,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgUsage {
+    pub plan: crate::plans::Plan,
+    /// Accepted events this calendar month (UTC).
+    pub events_this_month: i64,
+    pub projects: Vec<ProjectUsage>,
+    pub members: i64,
+    pub suspended: bool,
+    /// Whether the plan's limits are enforced on this server.
+    pub enforced: bool,
+}
+
+/// The current organization's plan and this month's usage.
+#[utoipa::path(get, path = "/api/v1/orgs/current/usage", tag = "organizations", responses((status = 200, body = OrgUsage)))]
+pub async fn usage(State(state): State<AppState>, auth: Auth) -> ApiResult<Json<OrgUsage>> {
+    auth.require(Role::Viewer, Scope::Read)?;
+    let org = auth.org_id()?;
+    let plan = crate::plans::org_plan(&state, org).await?;
+    let events_this_month = crate::plans::month_events(&state, org).await?;
+    let (members, suspended): (i64, bool) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM memberships WHERE org_id = $1 AND NOT disabled), \
+                (SELECT suspended_at IS NOT NULL FROM organizations WHERE id = $1)",
+    )
+    .bind(org)
+    .fetch_one(&state.pool)
+    .await?;
+    let rows: Vec<(Uuid, String)> =
+        sqlx::query_as("SELECT id, name FROM projects WHERE id = ANY($1) ORDER BY created_at")
+            .bind(auth.visible_projects())
+            .fetch_all(&state.pool)
+            .await?;
+    let ids: Vec<Uuid> = rows.iter().map(|r| r.0).collect();
+    let counts = crate::plans::project_month_events(&state, &ids).await;
+    let known = !counts.is_empty();
+    Ok(Json(OrgUsage {
+        plan,
+        events_this_month,
+        projects: rows
+            .into_iter()
+            .map(|(id, name)| ProjectUsage {
+                events_this_month: known.then(|| counts.get(&id).copied().unwrap_or(0)),
+                id,
+                name,
+            })
+            .collect(),
+        members,
+        suspended,
+        enforced: state.config.cloud.enabled,
+    }))
 }

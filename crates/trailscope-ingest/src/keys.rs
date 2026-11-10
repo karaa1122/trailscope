@@ -21,6 +21,8 @@ const MAX_ENTRIES: usize = 10_000;
 #[derive(Debug)]
 pub struct ProjectCtx {
     pub project_id: Uuid,
+    /// The organization the project belongs to (usage and plan limits).
+    pub org_id: Uuid,
     /// `project_id` as stored in ClickHouse.
     pub project_key: String,
     pub key_id: Uuid,
@@ -90,15 +92,15 @@ impl KeyCache {
     }
 
     async fn load(&self, hash: &str) -> Result<Option<Arc<ProjectCtx>>, sqlx::Error> {
-        let row: Option<(Uuid, Uuid, Json<ProjectSettings>)> = sqlx::query_as(
-            "SELECT k.id, k.project_id, p.settings \
+        let row: Option<(Uuid, Uuid, Uuid, Json<ProjectSettings>)> = sqlx::query_as(
+            "SELECT k.id, k.project_id, p.org_id, p.settings \
              FROM ingest_keys k JOIN projects p ON p.id = k.project_id \
              WHERE k.key_hash = $1 AND k.revoked_at IS NULL",
         )
         .bind(hash)
         .fetch_optional(&self.pool)
         .await?;
-        let Some((key_id, project_id, Json(settings))) = row else {
+        let Some((key_id, project_id, org_id, Json(settings))) = row else {
             return Ok(None);
         };
         let rules: Vec<(String, String)> =
@@ -125,6 +127,7 @@ impl KeyCache {
         });
         Ok(Some(Arc::new(ProjectCtx {
             project_id,
+            org_id,
             project_key: project_id.to_string(),
             key_id,
             redactor: Redactor::from_rules(&rules, settings.mask_ip),

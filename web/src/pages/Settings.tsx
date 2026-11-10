@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 
 import { Empty, SecretOnce, Segmented, Skeleton, Toast, useToast } from '../components/ui';
 import { ApiError, api } from '../lib/api';
-import { fmtAgo, fmtDateTime } from '../lib/format';
+import { fmtAgo, fmtDateTime, fmtInt } from '../lib/format';
 import { useProject, useSession } from '../lib/session';
 import type { Project, ProjectSettings, RedactionRule, Role } from '../lib/types';
 import { NotificationsSection } from './SettingsNotifications';
@@ -517,6 +517,7 @@ function OrganizationSection({ toast, isAdmin }: { toast: Toaster; isAdmin: bool
   const orgs = me?.orgs ?? [];
   return (
     <>
+      {me?.cloud && <PlanUsagePanel />}
       <Panel title="Organization" sub="Projects, members, invites and API tokens belong to it">
         <form
           style={formStyle}
@@ -576,7 +577,15 @@ function OrganizationSection({ toast, isAdmin }: { toast: Toaster; isAdmin: bool
         </Panel>
       )}
       {me?.instanceAdmin && (
-        <Panel title="New organization" sub="You become its owner; invite its members from Members">
+        <Panel
+          title="New organization"
+          sub={
+            <>
+              For yourself: you become its owner. For a customer, use the{' '}
+              <a href="/admin">admin console</a>.
+            </>
+          }
+        >
           <NameForm
             placeholder="Organization name, e.g. Acme"
             button="Create organization"
@@ -585,6 +594,61 @@ function OrganizationSection({ toast, isAdmin }: { toast: Toaster; isAdmin: bool
         </Panel>
       )}
     </>
+  );
+}
+
+/** The organization's plan and this month's usage (Cloud). */
+function PlanUsagePanel() {
+  const usage = useQuery({ queryKey: ['org-usage'], queryFn: api.orgUsage });
+  const u = usage.data;
+  if (!u) return null;
+  const limit = u.plan.eventsPerMonth;
+  const ratio = limit ? u.eventsThisMonth / limit : 0;
+  const color = ratio >= 1 ? 'var(--err)' : ratio >= 0.8 ? 'var(--warn)' : 'var(--accent)';
+  return (
+    <Panel
+      title={`${u.plan.name} plan`}
+      sub={u.suspended ? 'suspended: new data is refused' : 'usage this month (UTC)'}
+    >
+      <div className="kv">
+        <span>Events (requests, job runs, log lines)</span>
+        <span className="mono">
+          {fmtInt(u.eventsThisMonth)} / {limit === null ? 'unlimited' : fmtInt(limit)}
+        </span>
+      </div>
+      {limit !== null && (
+        <div style={{ padding: '4px 16px 12px' }}>
+          <div className="bar" aria-hidden="true" style={{ marginBottom: 8 }}>
+            <span style={{ width: `${Math.min(100, ratio * 100)}%`, background: color }} />
+          </div>
+          <span className="dim" style={{ fontSize: 12 }}>
+            {u.plan.hardLimit
+              ? 'New data is refused once the limit is reached, until the next month.'
+              : 'Events above the limit are counted as overage.'}
+          </span>
+        </div>
+      )}
+      <div className="kv">
+        <span>Projects</span>
+        <span className="mono">
+          {u.projects.length} / {u.plan.maxProjects ?? 'unlimited'}
+        </span>
+      </div>
+      <div className="kv">
+        <span>Members</span>
+        <span className="mono">
+          {u.members} / {u.plan.maxMembers ?? 'unlimited'}
+        </span>
+      </div>
+      {u.projects.map((p) => (
+        <div key={p.id} className="kv">
+          <span className="dim">{p.name}</span>
+          <span className="mono dim">
+            {p.eventsThisMonth === null ? '—' : fmtInt(p.eventsThisMonth)}
+          </span>
+        </div>
+      ))}
+    </Panel>
   );
 }
 

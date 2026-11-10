@@ -187,6 +187,8 @@ pub struct MeResponse {
     pub orgs: Vec<OrgMembership>,
     /// May manage server-wide settings and create organizations.
     pub instance_admin: bool,
+    /// Hosted mode: plans and their limits apply.
+    pub cloud: bool,
     pub csrf_token: Option<String>,
     pub oidc: OidcInfo,
 }
@@ -230,6 +232,7 @@ pub async fn me(State(state): State<AppState>, auth: Auth) -> ApiResult<Json<MeR
         org: auth.org.clone(),
         orgs,
         instance_admin: auth.instance_admin,
+        cloud: state.config.cloud.enabled,
         user,
         oidc: OidcInfo {
             enabled: state.config.oidc.enabled(),
@@ -473,15 +476,37 @@ pub async fn create_invite(
     Json(req): Json<CreateInvite>,
 ) -> ApiResult<Json<InviteCreated>> {
     auth.require(Role::Admin, Scope::Admin)?;
-    let org = auth.org_id()?;
-    let email = req.email.trim().to_lowercase();
-    if !valid_email(&email) {
-        return Err(ApiError::bad_request("enter a valid email address"));
-    }
     if req.role == Role::Owner {
         return Err(ApiError::bad_request(
             "invite as admin, then promote to owner",
         ));
+    }
+    Ok(Json(
+        issue_invite(
+            &state,
+            auth.org_id()?,
+            &req.email,
+            req.role,
+            req.can_view_bodies,
+            auth.user.id,
+        )
+        .await?,
+    ))
+}
+
+/// Creates an invite link to `org` (any role, including owner: the admin
+/// console invites a new organization's first owner this way).
+pub(crate) async fn issue_invite(
+    state: &AppState,
+    org: Uuid,
+    email: &str,
+    role: Role,
+    can_view_bodies: bool,
+    created_by: Uuid,
+) -> ApiResult<InviteCreated> {
+    let email = email.trim().to_lowercase();
+    if !valid_email(&email) {
+        return Err(ApiError::bad_request("enter a valid email address"));
     }
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM memberships m JOIN users u ON u.id = m.user_id \
@@ -494,6 +519,7 @@ pub async fn create_invite(
     if exists {
         return Err(ApiError::conflict("that person is already a member"));
     }
+    crate::plans::check_member_cap(state, org).await?;
     let token = generate_token("");
     let hash = hash_token(&token);
     sqlx::query(
@@ -503,17 +529,17 @@ pub async fn create_invite(
     .bind(&hash)
     .bind(org)
     .bind(&email)
-    .bind(req.role.as_str())
-    .bind(req.can_view_bodies)
-    .bind(auth.user.id)
+    .bind(role.as_str())
+    .bind(can_view_bodies)
+    .bind(created_by)
     .execute(&state.pool)
     .await?;
     let base = state.config.server.public_url.trim_end_matches('/');
-    Ok(Json(InviteCreated {
+    Ok(InviteCreated {
         id: hash[..16].to_string(),
         url: format!("{base}/invite/{token}"),
         token,
-    }))
+    })
 }
 
 #[derive(Serialize, ToSchema, sqlx::FromRow)]

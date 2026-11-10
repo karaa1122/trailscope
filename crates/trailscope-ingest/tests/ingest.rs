@@ -245,3 +245,103 @@ async fn answers_429_when_the_queue_is_full() {
     h.writer.await.unwrap();
     assert_eq!(wait_for_rows(&h.ch, "events", 5).await, 5);
 }
+
+#[tokio::test]
+async fn plan_limits_refuse_one_organization_and_meter_the_rest() {
+    let Some(mut env) = testing::env().await else {
+        return;
+    };
+    env.config.ingest.flush_interval_ms = 50;
+    env.config.cloud.enabled = true;
+    let cfg = env.config;
+    ch::migrate(&cfg).await.unwrap();
+    let pool = pg::connect(&cfg.postgres).await.unwrap();
+    pg::migrate(&pool).await.unwrap();
+    sqlx::query("INSERT INTO plans (id, name, events_per_month, hard_limit) VALUES ('tiny', 'Tiny', 10, TRUE)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut keys = Vec::new();
+    let mut orgs = Vec::new();
+    for name in ["Capped", "Paused", "Open"] {
+        let org = admin::create_org(&pool, name).await.unwrap();
+        let project = admin::create_project(&pool, org.id, "App").await.unwrap();
+        keys.push(
+            admin::create_ingest_key(&pool, project.id, "k", None)
+                .await
+                .unwrap()
+                .token,
+        );
+        orgs.push(org.id);
+    }
+    let (capped, paused, open) = (orgs[0], orgs[1], orgs[2]);
+    sqlx::query("UPDATE organizations SET plan_id = 'tiny' WHERE id = $1")
+        .bind(capped)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO usage_daily (org_id, day, events) VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 10)")
+        .bind(capped)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE organizations SET suspended_at = now() WHERE id = $1")
+        .bind(paused)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let ch = ClickHouse::new(&cfg);
+    let bus = LiveBus::local(&cfg.live);
+    let stop = CancellationToken::new();
+    let started = trailscope_ingest::start(&cfg, &ch, pool.clone(), bus.clone(), stop.clone());
+    let h = Harness {
+        router: started.router,
+        key: keys[2].clone(),
+        ch,
+        bus,
+        stop,
+        writer: started.writer,
+    };
+    // Two requests and a log line count; the span is free.
+    let batch = ndjson(&[
+        json!({"type":"request","service":"api","method":"GET","path":"/a","status":200,"durationMs":3}),
+        json!({"type":"request","service":"api","method":"GET","path":"/b","status":200,"durationMs":4}),
+        json!({"type":"event","service":"api","name":"log"}),
+        json!({"type":"span","traceId":"t1","spanId":"s1","service":"api","name":"db","kind":"db","durationMs":1}),
+    ]);
+
+    // The limits load just after start.
+    let mut refused = None;
+    for _ in 0..60 {
+        let (s, v, retry) = post(&h, batch.clone(), false, Some(&keys[0])).await;
+        if s == StatusCode::TOO_MANY_REQUESTS {
+            refused = Some((v, retry));
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let (body, retry) = refused.expect("the capped organization was never refused");
+    assert!(body["error"].as_str().unwrap().contains("month"), "{body}");
+    let secs: u64 = retry.unwrap().parse().unwrap();
+    assert!((60..=32 * 86_400).contains(&secs), "Retry-After {secs}");
+
+    let (s, v, _) = post(&h, batch.clone(), false, Some(&keys[1])).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+
+    // Another organization on the same server is unaffected, and metered.
+    for _ in 0..2 {
+        let (s, v, _) = post(&h, batch.clone(), false, None).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+    h.stop.cancel();
+    h.writer.await.unwrap();
+    let events: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(events), 0)::bigint FROM usage_daily WHERE org_id = $1",
+    )
+    .bind(open)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(events, 6);
+}

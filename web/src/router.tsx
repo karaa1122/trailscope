@@ -12,6 +12,7 @@ import { Skeleton } from './components/ui';
 import { api } from './lib/api';
 import { parseQuerySearch } from './lib/query';
 import { useSession } from './lib/session';
+import { AdminInvoices, AdminOrgPage, AdminOrgs, AdminPlans, AdminShell } from './pages/Admin';
 import { Alerts, type AlertsTab } from './pages/Alerts';
 import { InviteAccept, Login, Setup } from './pages/Auth';
 import { ErrorGroupPage, Errors, type ErrorsSearch } from './pages/Errors';
@@ -72,6 +73,50 @@ function Guard() {
 }
 
 const appRoute = createRoute({ getParentRoute: () => rootRoute, id: 'app', component: Guard });
+
+/** The admin console works across organizations, so it doesn't need one. */
+function AdminGuard() {
+  const { me, loading } = useSession();
+  if (loading) {
+    return (
+      <div style={{ padding: 40 }}>
+        <Skeleton h={180} />
+      </div>
+    );
+  }
+  if (!me) return <Navigate to="/login" />;
+  if (!me.instanceAdmin) return <Navigate to="/" />;
+  return <AdminShell />;
+}
+
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin',
+  component: AdminGuard,
+});
+const adminOrgsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/',
+  component: AdminOrgs,
+});
+const adminOrgRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/orgs/$orgId',
+  component: function AdminOrgRoute() {
+    const { orgId } = adminOrgRoute.useParams();
+    return <AdminOrgPage key={orgId} orgId={orgId} />;
+  },
+});
+const adminPlansRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/plans',
+  component: AdminPlans,
+});
+const adminInvoicesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/invoices',
+  component: AdminInvoices,
+});
 
 const indexRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -210,6 +255,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   setupRoute,
   inviteRoute,
+  adminRoute.addChildren([adminOrgsRoute, adminOrgRoute, adminPlansRoute, adminInvoicesRoute]),
   appRoute.addChildren([
     indexRoute,
     liveRoute,

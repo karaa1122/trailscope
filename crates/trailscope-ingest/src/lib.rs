@@ -12,6 +12,7 @@ pub mod normalize;
 pub mod otlp;
 pub mod pipeline;
 pub mod redact;
+pub mod usage;
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -35,6 +36,7 @@ use trailscope_core::wire::{IngestResponse, ItemError, WireItem, WireRelease};
 use crate::keys::{KeyCache, ProjectCtx};
 use crate::normalize::Limits;
 use crate::pipeline::{Batch, ClickHouseSink, PushError, Queue, WriterConfig};
+use crate::usage::{Block, Usage};
 
 /// Bodies above this are processed on the blocking pool so big batches don't
 /// stall other requests on the same worker thread.
@@ -44,6 +46,7 @@ const BLOCKING_THRESHOLD: usize = 64 * 1024;
 pub struct IngestState {
     queue: Arc<Queue>,
     keys: Arc<KeyCache>,
+    usage: Arc<Usage>,
     pool: PgPool,
     cfg: trailscope_core::config::IngestConfig,
     retention_days: u32,
@@ -55,11 +58,13 @@ pub struct IngestState {
 pub struct Started {
     pub router: Router,
     pub keys: Arc<KeyCache>,
+    /// Finishes after the queue is drained and usage is flushed.
     pub writer: JoinHandle<()>,
 }
 
-/// Builds the ingest router and spawns the writer. Cancel `writer_stop` only
-/// after the HTTP server has stopped accepting requests, then await `writer`.
+/// Builds the ingest router and spawns the writer and the usage meter. Cancel
+/// `writer_stop` only after the HTTP server has stopped accepting requests,
+/// then await `writer`.
 pub fn start(
     config: &Config,
     ch: &ClickHouse,
@@ -69,6 +74,8 @@ pub fn start(
 ) -> Started {
     let (queue, rx) = Queue::new(config.ingest.queue_capacity, config.ingest.max_queue_bytes);
     let keys = Arc::new(KeyCache::new(pool.clone()));
+    let usage = Usage::new(pool.clone(), config.cloud.enabled);
+    let meter = tokio::spawn(usage::run(usage.clone(), writer_stop.clone()));
     let writer = tokio::spawn(pipeline::run_writer(
         ClickHouseSink {
             // Row types are covered by integration tests; skip per-insert schema checks.
@@ -85,9 +92,14 @@ pub fn start(
         },
         writer_stop,
     ));
+    let writer = tokio::spawn(async move {
+        let _ = writer.await;
+        let _ = meter.await;
+    });
     let state = IngestState {
         queue,
         keys: keys.clone(),
+        usage,
         pool,
         cfg: config.ingest.clone(),
         retention_days: config.retention.days,
@@ -201,6 +213,38 @@ fn too_busy(retry_after: u64) -> IngestError {
     }
 }
 
+/// Refuses batches of a suspended organization or one past a hard monthly
+/// limit (only when `cloud.enabled`). A `429` makes the SDKs back off and
+/// drop quietly, so the customer's service is never slowed down.
+fn plan_check(state: &IngestState, ctx: &ProjectCtx) -> Result<(), IngestError> {
+    match state.usage.check(ctx.org_id) {
+        None => Ok(()),
+        Some(Block::Suspended) => {
+            metrics::counter!("trailscope_ingest_refused_total", "reason" => "suspended")
+                .increment(1);
+            Err(error(
+                StatusCode::FORBIDDEN,
+                "this organization is suspended; contact the Trailscope operator",
+            ))
+        }
+        Some(Block::OverLimit) => {
+            metrics::counter!("trailscope_ingest_refused_total", "reason" => "limit").increment(1);
+            Err(IngestError {
+                retry_after: Some(usage::secs_to_next_month(time::OffsetDateTime::now_utc())),
+                ..error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "this organization has used its plan's events for the month",
+                )
+            })
+        }
+    }
+}
+
+/// Events that count against a plan: requests, job runs and log lines.
+fn billable(batch: &Batch) -> u64 {
+    (batch.requests.len() + batch.events.len()) as u64
+}
+
 async fn ingest(State(state): State<IngestState>, headers: HeaderMap, body: Bytes) -> Response {
     let started = Instant::now();
     let resp = ingest_inner(&state, &headers, body).await;
@@ -216,6 +260,10 @@ async fn ingest_inner(state: &IngestState, headers: &HeaderMap, body: Bytes) -> 
         Ok(c) => c,
         Err(r) => return r.into_response(),
     };
+    if let Err(e) = plan_check(state, &ctx) {
+        return e.into_response();
+    }
+    let wire_bytes = body.len() as u64;
     // Cheap early refusal before spending CPU on a batch we can't take.
     if state.queue.is_full() {
         return too_busy(state.cfg.retry_after_secs).into_response();
@@ -252,6 +300,7 @@ async fn ingest_inner(state: &IngestState, headers: &HeaderMap, body: Bytes) -> 
     };
 
     let accepted = batch.len();
+    let events = billable(&batch);
     match state.queue.try_push(batch) {
         Ok(()) => {}
         Err(PushError::Full) => return too_busy(state.cfg.retry_after_secs).into_response(),
@@ -259,6 +308,7 @@ async fn ingest_inner(state: &IngestState, headers: &HeaderMap, body: Bytes) -> 
             return error(StatusCode::SERVICE_UNAVAILABLE, "shutting down").into_response();
         }
     }
+    state.usage.record(ctx.org_id, events, wire_bytes);
     metrics::counter!("trailscope_ingest_items_total", "result" => "accepted")
         .increment(accepted as u64);
     metrics::counter!("trailscope_ingest_items_total", "result" => "rejected")
@@ -459,6 +509,10 @@ async fn otlp_inner(
         Ok(c) => c,
         Err(r) => return r.into_response(),
     };
+    if let Err(e) = plan_check(state, &ctx) {
+        return e.into_response();
+    }
+    let wire_bytes = body.len() as u64;
     if state.queue.is_full() {
         return too_busy(state.cfg.retry_after_secs).into_response();
     }
@@ -498,6 +552,7 @@ async fn otlp_inner(
     };
     let accepted = batch.len();
     if accepted > 0 {
+        let events = billable(&batch);
         match state.queue.try_push(batch) {
             Ok(()) => {}
             Err(PushError::Full) => return too_busy(state.cfg.retry_after_secs).into_response(),
@@ -505,6 +560,7 @@ async fn otlp_inner(
                 return error(StatusCode::SERVICE_UNAVAILABLE, "shutting down").into_response();
             }
         }
+        state.usage.record(ctx.org_id, events, wire_bytes);
     }
     metrics::counter!("trailscope_ingest_items_total", "result" => "accepted")
         .increment(accepted as u64);

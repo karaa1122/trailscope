@@ -153,6 +153,16 @@ Optional single sign-on with any OpenID Connect provider (Google, Microsoft Entr
 
 Register `<server.public_url>/api/v1/auth/oidc/callback` as the redirect URI at the provider, with the scopes `openid email profile`. On sign-in, Trailscope matches the provider's subject to a member, then the email address (which must not be marked unverified), and remembers the subject. Someone without an account is signed in only if their email domain is in `auto_create_domains`; everyone else needs an invite first. Disabled members can't sign in either way.
 
+## `[cloud]`
+
+Hosted, multi-tenant mode (Trailscope Cloud). Every install counts accepted events per organization, so the admin console shows usage; only with this on are plan limits enforced.
+
+| Key | Env | Default | Description |
+|---|---|---|---|
+| `enabled` | `TRAILSCOPE_CLOUD_ENABLED` | `false` | Enforce each organization's plan: ingest refuses a suspended organization (`403`) and one past a plan's hard monthly limit (`429` with `Retry-After` until the next month, UTC); the API refuses projects and invites beyond the plan's caps. The organization's members see their plan and usage under Settings → Organization |
+
+Plans are edited by instance admins in the admin console (`/admin`): Free (1M events a month, stops at the limit, 2 projects, 3 members), Team (10M) and Business (50M) come preinstalled, with prices in IQD left at 0 for the operator to set. An event is a request, a job run or a log line; spans are free. Limits are checked from memory and refreshed every 5 seconds, so an organization can go a few seconds' worth of traffic past its limit.
+
 ## `[log]`
 
 | Key | Env | Default | Description |

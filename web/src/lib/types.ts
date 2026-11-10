@@ -34,6 +34,8 @@ export interface Me {
   orgs: OrgMembership[];
   /** May manage server-wide settings (SMTP) and create organizations. */
   instanceAdmin: boolean;
+  /** Hosted mode: plans and their limits apply. */
+  cloud: boolean;
   csrfToken: string | null;
   oidc: { enabled: boolean; displayName: string };
 }
@@ -510,4 +512,99 @@ export interface Mute {
   mutedUntil: string | null;
   forever: boolean;
   lastSeenAt: string;
+}
+
+// ---- plans, usage and the admin console (decision 071) ----
+
+export interface Plan {
+  id: string;
+  name: string;
+  /** Monthly price in Iraqi dinars. */
+  priceIqd: number;
+  /** Requests, job runs and log lines per month; null = unlimited. */
+  eventsPerMonth: number | null;
+  /** Stop accepting at the limit (otherwise the excess is overage). */
+  hardLimit: boolean;
+  maxProjects: number | null;
+  maxMembers: number | null;
+  archived: boolean;
+  position: number;
+}
+
+export interface PlanWithCount extends Plan {
+  /** Organizations on this plan. */
+  orgs: number;
+}
+
+export type PlanInput = Omit<Plan, 'id' | 'position'>;
+
+export interface OrgUsage {
+  plan: Plan;
+  eventsThisMonth: number;
+  projects: { id: string; name: string; eventsThisMonth: number | null }[];
+  members: number;
+  suspended: boolean;
+  /** The plan's limits are enforced on this server. */
+  enforced: boolean;
+}
+
+export interface AdminOrg {
+  id: string;
+  slug: string;
+  name: string;
+  planId: string;
+  planName: string;
+  suspended: boolean;
+  createdAt: string;
+  note: string;
+  members: number;
+  projects: number;
+  eventsThisMonth: number;
+  eventsLimit: number | null;
+  hardLimit: boolean;
+  owners: string[];
+  openInvoices: number;
+}
+
+export interface InviteCreated {
+  id: string;
+  url: string;
+  token: string;
+}
+
+export interface Invoice {
+  id: string;
+  orgId: string;
+  orgName: string;
+  planId: string;
+  planName: string;
+  periodStart: string;
+  periodEnd: string;
+  amountIqd: number;
+  status: 'open' | 'paid' | 'void';
+  note: string;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminOrgDetail {
+  org: AdminOrg;
+  members: {
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    disabled: boolean;
+    lastLoginAt: string | null;
+  }[];
+  projects: {
+    id: string;
+    name: string;
+    slug: string;
+    createdAt: string;
+    eventsThisMonth: number | null;
+  }[];
+  invites: { email: string; role: Role; expiresAt: string }[];
+  usage: { day: string; events: number; bytes: number }[];
+  invoices: Invoice[];
 }
