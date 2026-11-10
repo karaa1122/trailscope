@@ -144,6 +144,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { php: "8.1", laravel: "10" }
+          - { php: "8.2", laravel: "11" }
           - { php: "8.2", laravel: "12" }
           - { php: "8.5", laravel: "12" }
           - { php: "8.3", laravel: "13" }
@@ -159,9 +161,12 @@ jobs:
           coverage: none
       - name: Pin Laravel ${{ matrix.laravel }}
         run: |
+          # Every Laravel 10 and 11 release has open security advisories (both are past
+          # their support), which Composer refuses by default; we only analyse against them.
+          if [ "${{ matrix.laravel }}" -lt 12 ]; then composer config policy.advisories.block false; fi
           composer require --dev --no-update "laravel/framework:^${{ matrix.laravel }}.0"
           # Pint needs PHP 8.3+
-          if [ "${{ matrix.php }}" = "8.2" ]; then composer remove --dev --no-update laravel/pint; fi
+          case "${{ matrix.php }}" in 8.1|8.2) composer remove --dev --no-update laravel/pint ;; esac
       - run: composer update --no-interaction --no-progress --prefer-dist
       - run: composer syntax
       - run: vendor/bin/pint --test
