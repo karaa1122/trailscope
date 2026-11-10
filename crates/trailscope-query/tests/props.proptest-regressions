@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc e391cb27f81e922d56f83826cfd0451e768b6d5e8b9f5618ff942e0c2d75a815 # shrinks to e = Compare { left: Column(Column { name: "status", ch_type: "UInt16", kind: Number, description: "HTTP status code", filterable: true, facetable: true, groupable: true, sensitive: false, free_text: false, live: true }), op: Lt, right: Literal(Int(-1)) }
+cc 097477a88b13abae5342a337d1c9921271118437bb5fda35fc4ab1b4785928cb # environment LIKE '' printed as `environment:` (empty search value)

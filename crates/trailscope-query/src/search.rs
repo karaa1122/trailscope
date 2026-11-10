@@ -474,7 +474,9 @@ fn search_term(e: &Expr, ctx: &Ctx) -> Option<String> {
             case_insensitive: false,
         } => {
             let f = field_name(expr)?;
-            if pattern.contains(['_', '\\', '*', '"', ' ']) {
+            // Search syntax has no empty value, and a value without `*` reads
+            // back as `=`, so those patterns stay in SQL form.
+            if !pattern.contains('%') || pattern.contains(['_', '\\', '*', '"', ' ']) {
                 return None;
             }
             Some(format!(
