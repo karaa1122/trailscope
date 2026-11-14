@@ -46,7 +46,7 @@ Trailscope::setAttribute('plan', 'pro');
 
 Exceptions go through Laravel's exception reporting. A reported exception is attached to the current request, and kept only if the response is a 5xx (type, message and stack). Exceptions Laravel doesn't report (validation errors, 404s, `abort()`) carry no error details; a 5xx without details is grouped as `HTTP <status>`. Outside a request or a job (console commands, scheduled tasks), a reported exception becomes an error event. Laravel also logs every reported exception. When the request or job already carries that exception, the `trailscope` log channel drops the log line, so the error isn't counted twice.
 
-Request bodies are read only when the capture policy keeps them, and at most `max_body_bytes + 1` bytes are read. For multipart forms, the parsed fields are kept and files are listed by name, size and type, never their content. Streamed and file responses are skipped.
+Request bodies are read only when the capture policy keeps them, and at most `max_body_bytes + 1` bytes are read. For multipart forms, the parsed fields are kept and files are listed by name, size and type, never their content. Streamed and file responses are skipped. A response your app already compressed (`Content-Encoding: gzip` or `deflate`, for example from its own compression middleware) is decoded before it's captured, up to `max_body_bytes + 1` bytes; other encodings, such as `br`, are skipped. The response size stays the compressed size on the wire.
 
 To change options, publish the config file:
 
