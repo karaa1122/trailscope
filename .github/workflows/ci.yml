@@ -172,3 +172,4 @@ jobs:
       - run: vendor/bin/pint --test
         if: matrix.php == '8.5' && matrix.laravel == '13'
       - run: composer analyse
+      - run: composer test

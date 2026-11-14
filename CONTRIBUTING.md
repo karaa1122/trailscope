@@ -29,6 +29,7 @@ cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace                 # integration tests use the dev databases via scripts/dev/local.env
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 cd sdks/python && ruff check . && ruff format --check . && mypy && pytest -q
+sdks/php/scripts/check.sh              # php -l, Pint, PHPStan and PHPUnit, in Docker
 ```
 
 ## Conventions
